@@ -1,4 +1,4 @@
-
+import { useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { Layout } from "./components/Layout";
 import LoginForm from "./components/LoginForm";
 import Dashboard from "./pages/Dashboard";
@@ -21,9 +22,29 @@ const queryClient = new QueryClient();
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const isAuthenticated = api.isAuthenticated();
+  const [supaReady, setSupaReady] = useState(false);
+  const [supaLogged, setSupaLogged] = useState(false);
+  const mondeAuthenticated = api.isAuthenticated();
+
+  useEffect(() => {
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSupaLogged(!!session);
+      setSupaReady(true);
+    };
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, session) => {
+      setSupaLogged(!!session);
+    });
+    init();
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const isAuthenticated = mondeAuthenticated || supaLogged;
   console.log("ProtectedRoute check:", { isAuthenticated });
-  
+
+  if (!supaReady && !mondeAuthenticated) {
+    return <></>;
+  }
   if (!isAuthenticated) {
     console.log("User not authenticated, redirecting to login");
     return <Navigate to="/login" replace />;

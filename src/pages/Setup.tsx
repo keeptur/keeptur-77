@@ -27,7 +27,20 @@ export default function Setup() {
       if (error) throw error;
       toast({ title: "Administrador criado", description: `ID: ${data?.user_id || "ok"}` });
     } catch (err: any) {
-      toast({ title: "Erro ao criar admin", description: err.message, variant: "destructive" });
+      // Tentativa alternativa para capturar mensagem detalhada de erro
+      try {
+        const resp = await fetch("https://lquuoriatdcspbcvgsbg.supabase.co/functions/v1/bootstrap-admin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password, token }),
+        });
+        const body = await resp.json().catch(() => ({} as any));
+        const msg = body?.error || body?.message || err?.message || "Falha ao criar admin";
+        if (!resp.ok) throw new Error(msg);
+        toast({ title: "Administrador criado", description: `ID: ${body?.user_id || "ok"}` });
+      } catch (err2: any) {
+        toast({ title: "Erro ao criar admin", description: err2.message, variant: "destructive" });
+      }
     } finally {
       setLoading(false);
     }

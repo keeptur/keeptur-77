@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { Loader2, Shield } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 export default function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [credentials, setCredentials] = useState({
@@ -27,24 +28,31 @@ export default function LoginForm() {
     setLoading(true);
     setAuthErrorInfo(null);
     try {
+      // 1) Tenta autenticar na Monde
       await api.authenticate(credentials.login, credentials.password);
-      toast({
-        title: "Login realizado com sucesso!",
-        description: "Bem-vindo ao Keeptur"
-      });
+      toast({ title: "Login realizado com sucesso!", description: "Bem-vindo ao Keeptur" });
       navigate("/");
-    } catch (error) {
-      const err: any = error;
-      setAuthErrorInfo({
-        code: err?.code ?? err?.status,
-        requestId: err?.requestId ?? null,
-        message: err instanceof Error ? err.message : "Credenciais inválidas"
-      });
-      toast({
-        title: "Erro no login",
-        description: err instanceof Error ? err.message : "Credenciais inválidas",
-        variant: "destructive"
-      });
+      return;
+    } catch (mondeErr) {
+      // 2) Fallback: tenta autenticar no Supabase com o mesmo email/senha
+      try {
+        const { error: supaError } = await supabase.auth.signInWithPassword({
+          email: credentials.login,
+          password: credentials.password,
+        });
+        if (supaError) throw supaError;
+        toast({ title: "Login (Admin) realizado", description: "Sessão Supabase ativa" });
+        navigate("/");
+        return;
+      } catch (supaErr: any) {
+        const err: any = mondeErr as any;
+        setAuthErrorInfo({
+          code: err?.code ?? err?.status ?? supaErr?.status,
+          requestId: err?.requestId ?? null,
+          message: (err instanceof Error ? err.message : null) || (supaErr?.message ?? "Credenciais inválidas")
+        });
+        toast({ title: "Erro no login", description: (err instanceof Error ? err.message : null) || (supaErr?.message ?? "Credenciais inválidas"), variant: "destructive" });
+      }
     } finally {
       setLoading(false);
     }
