@@ -14,16 +14,248 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      access_logs: {
+        Row: {
+          created_at: string
+          id: string
+          ip: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ip?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ip?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      accounts: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          name: string | null
+          owner_user_id: string | null
+          seats_purchased: number
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          subscribed: boolean
+          subscription_tier: string | null
+          trial_end: string | null
+          trial_start: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string | null
+          owner_user_id?: string | null
+          seats_purchased?: number
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscribed?: boolean
+          subscription_tier?: string | null
+          trial_end?: string | null
+          trial_start?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string | null
+          owner_user_id?: string | null
+          seats_purchased?: number
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscribed?: boolean
+          subscription_tier?: string | null
+          trial_end?: string | null
+          trial_start?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      email_templates: {
+        Row: {
+          created_at: string
+          html: string
+          id: string
+          subject: string
+          type: Database["public"]["Enums"]["email_template_type"]
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          html: string
+          id?: string
+          subject: string
+          type: Database["public"]["Enums"]["email_template_type"]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          html?: string
+          id?: string
+          subject?: string
+          type?: Database["public"]["Enums"]["email_template_type"]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      settings: {
+        Row: {
+          created_at: string
+          currency: string
+          id: string
+          price_per_seat_cents: number
+          trial_days: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          id?: string
+          price_per_seat_cents?: number
+          trial_days?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          id?: string
+          price_per_seat_cents?: number
+          trial_days?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      smtp_settings: {
+        Row: {
+          created_at: string
+          from_email: string
+          host: string
+          id: string
+          port: number
+          secure: boolean
+          updated_at: string
+          updated_by: string | null
+          username: string | null
+        }
+        Insert: {
+          created_at?: string
+          from_email: string
+          host: string
+          id?: string
+          port?: number
+          secure?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          username?: string | null
+        }
+        Update: {
+          created_at?: string
+          from_email?: string
+          host?: string
+          id?: string
+          port?: number
+          secure?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          username?: string | null
+        }
+        Relationships: []
+      }
+      user_memberships: {
+        Row: {
+          account_id: string
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          status: Database["public"]["Enums"]["membership_status"]
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          status?: Database["public"]["Enums"]["membership_status"]
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          status?: Database["public"]["Enums"]["membership_status"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_memberships_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _user_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: boolean
+      }
+      is_account_member: {
+        Args: { _account_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator" | "user"
+      email_template_type: "welcome" | "trial_expired" | "payment_confirmed"
+      membership_status: "active" | "inactive"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +382,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator", "user"],
+      email_template_type: ["welcome", "trial_expired", "payment_confirmed"],
+      membership_status: ["active", "inactive"],
+    },
   },
 } as const
