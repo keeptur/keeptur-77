@@ -12,7 +12,8 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const fallbackUrl = "https://lquuoriatdcspbcvgsbg.supabase.co"; // project fallback URL
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || fallbackUrl;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const bootstrapToken = Deno.env.get("ADMIN_BOOTSTRAP_TOKEN") ?? "";
 
