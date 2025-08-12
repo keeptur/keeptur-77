@@ -7,6 +7,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useTasks } from "@/hooks/useTasks";
 import { isSameDay, parseISO } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
 
 export function MondeHeader() {
   const { state } = useSidebar();
@@ -52,6 +53,23 @@ export function MondeHeader() {
       }
     })();
     return () => { mounted = false; };
+  }, []);
+
+  // Check admin role (Supabase)
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const uid = session?.user?.id;
+        if (!uid) return;
+        const { data } = await supabase.from('user_roles').select('role').eq('user_id', uid);
+        const admin = (data || []).some(r => r.role === 'admin');
+        if (active) setIsAdmin(admin);
+      } catch {}
+    })();
+    return () => { active = false; };
   }, []);
 
   const initials = useMemo(() => {
@@ -151,17 +169,22 @@ export function MondeHeader() {
             </div>
           </Button>
           
-          {userDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-lg shadow-lg py-1 z-50">
-              <button onClick={() => navigate("/profile")} className="block w-full text-left px-4 py-2 text-sm text-muted-foreground hover:bg-muted">
-                Meu Perfil
-              </button>
-              <div className="border-t border-border my-1"></div>
-              <button onClick={handleLogout} className="block w-full text-left px-4 py-2 text-sm text-destructive hover:bg-muted">
-                Sair
-              </button>
-            </div>
-          )}
+            {userDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-lg shadow-lg py-1 z-50">
+                {isAdmin && (
+                  <button onClick={() => { navigate("/admin"); setUserDropdownOpen(false); }} className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted">
+                    Admin
+                  </button>
+                )}
+                <button onClick={() => navigate("/profile")} className="block w-full text-left px-4 py-2 text-sm text-muted-foreground hover:bg-muted">
+                  Meu Perfil
+                </button>
+                <div className="border-t border-border my-1"></div>
+                <button onClick={handleLogout} className="block w-full text-left px-4 py-2 text-sm text-destructive hover:bg-muted">
+                  Sair
+                </button>
+              </div>
+            )}
         </div>
       </div>
     </header>

@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { Loader2, Shield } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+
 export default function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [credentials, setCredentials] = useState({
@@ -17,12 +18,14 @@ export default function LoginForm() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [authErrorInfo, setAuthErrorInfo] = useState<{ code?: string | number; requestId?: string | null; message?: string } | null>(null);
+
   const supportMailto = (() => {
     const subject = encodeURIComponent("Ajuda no login - Keeptur");
     const details = authErrorInfo ? `Mensagem: ${authErrorInfo.message || ''}\nCódigo: ${authErrorInfo.code ?? ''}\nRequest-ID: ${authErrorInfo.requestId ?? ''}` : '';
     const body = encodeURIComponent(`Olá suporte,\n\nEstou com dificuldade para acessar o Keeptur.\n\n${details}\n\nLogin informado: ${credentials.login}\n\nObrigado.`);
     return `mailto:suporte@keeptur.com?subject=${subject}&body=${body}`;
   })();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -36,13 +39,21 @@ export default function LoginForm() {
     } catch (mondeErr) {
       // 2) Fallback: tenta autenticar no Supabase com o mesmo email/senha
       try {
-        const { error: supaError } = await supabase.auth.signInWithPassword({
+        const { data, error: supaError } = await supabase.auth.signInWithPassword({
           email: credentials.login,
           password: credentials.password,
         });
         if (supaError) throw supaError;
-        toast({ title: "Login (Admin) realizado", description: "Sessão Supabase ativa" });
-        navigate("/");
+        // Verifica papel e redireciona
+        const { data: sessionData } = await supabase.auth.getSession();
+        const uid = sessionData.session?.user?.id;
+        let isAdmin = false;
+        if (uid) {
+          const { data: roles } = await supabase.from('user_roles').select('role').eq('user_id', uid);
+          isAdmin = (roles || []).some(r => r.role === 'admin');
+        }
+        toast({ title: isAdmin ? 'Login (Admin) realizado' : 'Login realizado', description: 'Sessão Supabase ativa' });
+        navigate(isAdmin ? '/admin' : '/');
         return;
       } catch (supaErr: any) {
         const err: any = mondeErr as any;
@@ -83,7 +94,7 @@ export default function LoginForm() {
   return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background p-4">
       <div className="w-full max-w-md">
         {/* Logo/Brand */}
-<div className="mb-8 text-center relative h-12">
+        <div className="mb-8 text-center relative h-12">
           <img src="/lovable-uploads/f6f14c3e-3352-4ebc-b005-0df0af815c32.png" alt="Keeptur" className="h-12 mx-auto block dark:hidden" />
           <img src="/lovable-uploads/d37f41bb-b855-4d9b-a4bc-2df94828278a.png" alt="Keeptur" className="h-12 mx-auto hidden dark:block" />
         </div>
