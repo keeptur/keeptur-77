@@ -45,6 +45,7 @@ export type Database = {
           id: string
           name: string | null
           owner_user_id: string | null
+          plan_kit_id: string | null
           seats_purchased: number
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
@@ -60,6 +61,7 @@ export type Database = {
           id?: string
           name?: string | null
           owner_user_id?: string | null
+          plan_kit_id?: string | null
           seats_purchased?: number
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -75,6 +77,7 @@ export type Database = {
           id?: string
           name?: string | null
           owner_user_id?: string | null
+          plan_kit_id?: string | null
           seats_purchased?: number
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -84,7 +87,15 @@ export type Database = {
           trial_start?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "accounts_plan_kit_id_fkey"
+            columns: ["plan_kit_id"]
+            isOneToOne: false
+            referencedRelation: "plan_kits"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       email_templates: {
         Row: {
@@ -113,6 +124,69 @@ export type Database = {
           type?: Database["public"]["Enums"]["email_template_type"]
           updated_at?: string
           updated_by?: string | null
+        }
+        Relationships: []
+      }
+      plan_kits: {
+        Row: {
+          active: boolean
+          created_at: string
+          currency: string
+          id: string
+          name: string
+          price_cents: number
+          seats: number
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          currency?: string
+          id?: string
+          name: string
+          price_cents: number
+          seats: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          currency?: string
+          id?: string
+          name?: string
+          price_cents?: number
+          seats?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
         }
         Relationships: []
       }
