@@ -11,6 +11,8 @@ interface SettingsRow {
   trial_days: number;
   price_per_seat_cents: number;
   currency: string;
+  stripe_publishable_key?: string | null;
+  stripe_secret_key?: string | null;
 }
 
 export default function AdminPage() {
@@ -55,7 +57,12 @@ export default function AdminPage() {
     try {
       const { error } = await supabase
         .from("settings")
-        .update({ trial_days: settings.trial_days, price_per_seat_cents: settings.price_per_seat_cents })
+        .update({
+          trial_days: settings.trial_days,
+          price_per_seat_cents: settings.price_per_seat_cents,
+          stripe_publishable_key: settings.stripe_publishable_key ?? null,
+          stripe_secret_key: settings.stripe_secret_key ?? null,
+        })
         .eq("id", settings.id);
       if (error) throw error;
       toast({ title: "Configurações salvas" });
@@ -141,6 +148,24 @@ export default function AdminPage() {
             <div>
               <Label>Preço por usuário (centavos)</Label>
               <Input type="number" min={0} value={settings?.price_per_seat_cents ?? 3990} onChange={(e) => setSettings((s) => (s ? { ...s, price_per_seat_cents: parseInt(e.target.value || "0", 10) } : s))} />
+            </div>
+            <div>
+              <Label>Stripe Publishable Key</Label>
+              <Input
+                type="text"
+                placeholder="pk_live_... ou pk_test_..."
+                value={settings?.stripe_publishable_key ?? ""}
+                onChange={(e) => setSettings((s) => (s ? { ...s, stripe_publishable_key: e.target.value } : s))}
+              />
+            </div>
+            <div>
+              <Label>Stripe Secret Key</Label>
+              <Input
+                type="password"
+                placeholder="sk_live_... ou sk_test_..."
+                value={settings?.stripe_secret_key ?? ""}
+                onChange={(e) => setSettings((s) => (s ? { ...s, stripe_secret_key: e.target.value } : s))}
+              />
             </div>
             <div className="flex items-end">
               <Button onClick={saveSettings}>Salvar</Button>

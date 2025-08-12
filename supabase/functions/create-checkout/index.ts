@@ -14,12 +14,14 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-  const stripeSecret = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const fallbackStripeSecret = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
 
   try {
-    if (!stripeSecret) throw new Error("Missing STRIPE_SECRET_KEY");
+    if (!serviceKey && !fallbackStripeSecret) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY or STRIPE_SECRET_KEY");
 
     const supabase = createClient(supabaseUrl, anonKey, { auth: { persistSession: false } });
+    const supabaseService = createClient(supabaseUrl, serviceKey || anonKey, { auth: { persistSession: false } });
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No Authorization header provided");
@@ -31,6 +33,21 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User email not available");
 
     const { quantity = 1 } = (await req.json().catch(() => ({}))) as { quantity?: number };
+
+    // Load dynamic settings (price, currency, trial days, keys)
+    const { data: appSettings } = await supabaseService
+      .from("settings")
+      .select("price_per_seat_cents, currency, trial_days, stripe_secret_key")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    const stripeSecret = appSettings?.stripe_secret_key || fallbackStripeSecret;
+    if (!stripeSecret) throw new Error("Stripe secret key not configured");
+
+    const priceCents = Math.max(0, Number(appSettings?.price_per_seat_cents ?? 3990));
+    const currency = (appSettings?.currency || "BRL").toLowerCase();
+    const trialDays = Math.max(0, Number(appSettings?.trial_days ?? 7));
 
     const stripe = new Stripe(stripeSecret, { apiVersion: "2023-10-16" });
 
@@ -51,9 +68,9 @@ serve(async (req) => {
       line_items: [
         {
           price_data: {
-            currency: "brl",
+            currency,
             product_data: { name: "Keeptur Assinatura por usuário" },
-            unit_amount: 3990, // R$ 39,90
+            unit_amount: priceCents,
             recurring: { interval: "month" },
           },
           quantity: Math.max(1, Number(quantity || 1)),
@@ -63,7 +80,7 @@ serve(async (req) => {
       success_url: `${origin}/`,
       cancel_url: `${origin}/`,
       subscription_data: {
-        trial_period_days: 7,
+        trial_period_days: trialDays,
       },
     });
 

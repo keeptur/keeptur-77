@@ -15,11 +15,13 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    const stripeSecret = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const fallbackStripeSecret = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
 
-    if (!stripeSecret) throw new Error("Missing STRIPE_SECRET_KEY");
+    if (!serviceKey && !fallbackStripeSecret) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY or STRIPE_SECRET_KEY");
 
     const supabase = createClient(supabaseUrl, anonKey, { auth: { persistSession: false } });
+    const supabaseService = createClient(supabaseUrl, serviceKey || anonKey, { auth: { persistSession: false } });
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No Authorization header provided");
@@ -29,6 +31,17 @@ serve(async (req) => {
     if (userError) throw new Error(`Auth error: ${userError.message}`);
     const user = userData.user;
     if (!user?.email) throw new Error("User email not available");
+
+    const { data: appSettings } = await supabaseService
+      .from("settings")
+      .select("stripe_secret_key")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    const stripeSecret = appSettings?.stripe_secret_key || fallbackStripeSecret;
+
+    if (!stripeSecret) throw new Error("Missing STRIPE_SECRET_KEY");
 
     const stripe = new Stripe(stripeSecret, { apiVersion: "2023-10-16" });
 
