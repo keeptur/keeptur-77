@@ -122,6 +122,8 @@ export type Database = {
           currency: string
           id: string
           price_per_seat_cents: number
+          stripe_publishable_key: string | null
+          stripe_secret_key: string | null
           trial_days: number
           updated_at: string
         }
@@ -130,6 +132,8 @@ export type Database = {
           currency?: string
           id?: string
           price_per_seat_cents?: number
+          stripe_publishable_key?: string | null
+          stripe_secret_key?: string | null
           trial_days?: number
           updated_at?: string
         }
@@ -138,6 +142,8 @@ export type Database = {
           currency?: string
           id?: string
           price_per_seat_cents?: number
+          stripe_publishable_key?: string | null
+          stripe_secret_key?: string | null
           trial_days?: number
           updated_at?: string
         }
