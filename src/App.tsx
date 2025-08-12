@@ -16,7 +16,7 @@ import NotFound from "./pages/NotFound";
 import { TokenManagerInside } from "./components/TokenManagerInside";
 import AdminPage from "./pages/Admin";
 import { AdminRoute } from "./components/auth/AdminRoute";
-import Setup from "./pages/Setup";
+// Setup page removed
 
 const queryClient = new QueryClient();
 
@@ -94,8 +94,7 @@ const AppWrapper = () => {
                 } />
               </Route>
               
-              {/* Public setup route (one-time) */}
-              <Route path="/setup" element={<Setup />} />
+// Setup route removed
             </Routes>
           </BrowserRouter>
         </TooltipProvider>
