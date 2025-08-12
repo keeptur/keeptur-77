@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 const WELCOME_KEY = "keeptur:welcome-shown";
 const TRIAL_START_KEY = "keeptur:trial-start";
@@ -8,17 +9,40 @@ const DEFAULT_TRIAL_DAYS = 7; // fallback when settings are not available
 
 export function WelcomeTrialModal() {
   const [open, setOpen] = useState(false);
+  const [allowed, setAllowed] = useState(false);
 
   useEffect(() => {
+    // Não exibe no admin
+    if (window.location.pathname.startsWith('/admin')) {
+      setAllowed(false);
+      return;
+    }
+
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setAllowed(true);
+      } else {
+        const { data: roles } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id);
+        const isAdmin = (roles || []).some(r => r.role === 'admin');
+        setAllowed(!isAdmin);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!allowed) return;
     const alreadyShown = localStorage.getItem(WELCOME_KEY);
     if (!alreadyShown) {
-      // mark trial start if first time
       if (!localStorage.getItem(TRIAL_START_KEY)) {
         localStorage.setItem(TRIAL_START_KEY, new Date().toISOString());
       }
       setOpen(true);
     }
-  }, []);
+  }, [allowed]);
 
   const daysRemaining = useMemo(() => {
     const startIso = localStorage.getItem(TRIAL_START_KEY);
