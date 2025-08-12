@@ -57,14 +57,52 @@ serve(async (req) => {
     const { error: roleError } = await supabase.from("user_roles").upsert({ user_id: userId, role: "admin" }, { onConflict: "user_id,role" });
     if (roleError) throw roleError;
 
-    // Create/Upsert account row
-    await supabase.from("accounts").upsert({
-      email,
-      owner_user_id: userId,
-      subscribed: false,
-      seats_purchased: 1,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'email' });
+    // Create/attach account row without relying on unique constraints
+    const nowIso = new Date().toISOString();
+
+    // 1) Try by owner_user_id
+    const { data: byOwner, error: byOwnerErr } = await supabase
+      .from("accounts")
+      .select("id")
+      .eq("owner_user_id", userId)
+      .maybeSingle();
+
+    if (byOwnerErr) {
+      console.log("[bootstrap-admin] accounts byOwner error:", byOwnerErr.message);
+    }
+
+    if (byOwner?.id) {
+      const { error: updErr } = await supabase
+        .from("accounts")
+        .update({ email, subscribed: false, seats_purchased: 1, updated_at: nowIso })
+        .eq("id", byOwner.id);
+      if (updErr) throw updErr;
+    } else {
+      // 2) Try by email
+      const { data: byEmail, error: byEmailErr } = await supabase
+        .from("accounts")
+        .select("id")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (byEmailErr) {
+        console.log("[bootstrap-admin] accounts byEmail error:", byEmailErr.message);
+      }
+
+      if (byEmail?.id) {
+        const { error: updErr } = await supabase
+          .from("accounts")
+          .update({ owner_user_id: userId, subscribed: false, seats_purchased: 1, updated_at: nowIso })
+          .eq("id", byEmail.id);
+        if (updErr) throw updErr;
+      } else {
+        // 3) Insert new account
+        const { error: insErr } = await supabase
+          .from("accounts")
+          .insert({ email, owner_user_id: userId, subscribed: false, seats_purchased: 1 });
+        if (insErr) throw insErr;
+      }
+    }
 
     return new Response(JSON.stringify({ ok: true, user_id: userId }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -110,6 +110,10 @@ export default function LoginForm() {
                   Entre em contato com o suporte
                 </a>
               </p>
+              <p className="mt-2 text-center text-sm">
+                Primeiro acesso? {" "}
+                <a href="/setup" className="text-primary hover:underline">Configurar administrador</a>
+              </p>
             </div>
           </CardContent>
         </Card>
