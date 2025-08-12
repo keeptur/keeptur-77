@@ -24,10 +24,12 @@ export function useTokenManager() {
     }, 60000); // Verificar a cada minuto
 
     // Escutar evento de token expirado
-    const handleTokenExpired = () => {
+  const handleTokenExpired = () => {
+    // Só exibe o modal se estivermos autenticados no Monde API
+    if (api.isAuthenticated()) {
       setShowReloginModal(true);
-    };
-
+    }
+  };
     window.addEventListener('token-expired', handleTokenExpired);
 
     return () => {
