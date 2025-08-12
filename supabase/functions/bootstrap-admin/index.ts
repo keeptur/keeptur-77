@@ -26,18 +26,35 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 
-    // Create user via Admin API
+    // Create user via Admin API (idempotente)
+    let userId: string | undefined;
     const { data: created, error: createError } = await supabase.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
     });
-    if (createError) throw createError;
-    const userId = created.user?.id;
-    if (!userId) throw new Error("Falha ao obter ID do usuário criado");
+    if (createError) {
+      console.log("[bootstrap-admin] createUser error:", createError.message);
+      // Se já existir, tenta localizar pelo email
+      try {
+        const { data: usersPage, error: listErr } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+        if (listErr) throw listErr;
+        const found = usersPage.users.find((u: any) => u.email?.toLowerCase() === email.toLowerCase());
+        if (found) {
+          userId = found.id;
+        } else {
+          throw createError;
+        }
+      } catch (e) {
+        throw createError;
+      }
+    } else {
+      userId = created.user?.id;
+    }
+    if (!userId) throw new Error("Falha ao obter ID do usuário (criação/listagem)");
 
-    // Grant admin role
-    const { error: roleError } = await supabase.from("user_roles").insert({ user_id: userId, role: "admin" });
+    // Grant admin role (idempotente via unique constraint)
+    const { error: roleError } = await supabase.from("user_roles").upsert({ user_id: userId, role: "admin" }, { onConflict: "user_id,role" });
     if (roleError) throw roleError;
 
     // Create/Upsert account row
