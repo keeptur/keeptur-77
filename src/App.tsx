@@ -15,6 +15,7 @@ import NotFound from "./pages/NotFound";
 import { TokenManagerInside } from "./components/TokenManagerInside";
 import AdminPage from "./pages/Admin";
 import { AdminRoute } from "./components/auth/AdminRoute";
+import Setup from "./pages/Setup";
 
 const queryClient = new QueryClient();
 
@@ -72,8 +73,8 @@ const AppWrapper = () => {
                 } />
               </Route>
               
-              {/* Catch-all route */}
-              <Route path="*" element={<NotFound />} />
+              {/* Public setup route (one-time) */}
+              <Route path="/setup" element={<Setup />} />
             </Routes>
           </BrowserRouter>
         </TooltipProvider>
