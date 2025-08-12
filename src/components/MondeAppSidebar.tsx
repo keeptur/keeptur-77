@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
-import { LayoutDashboard, Users, FileText, Settings, LogOut, ChevronLeft, ChevronRight } from "lucide-react";
+import { LayoutDashboard, Users, FileText, Settings, LogOut, ChevronLeft, ChevronRight, CreditCard, Mail, Package } from "lucide-react";
 import { api } from "@/lib/api";
 const navigationItems = [{
   title: "Dashboard",
@@ -12,6 +12,16 @@ const navigationItems = [{
   url: "/people",
   icon: Users
 }];
+
+const adminNavigationItems = [
+  { title: "Dashboard", url: "/admin/dashboard", icon: LayoutDashboard },
+  { title: "Usuários", url: "/admin/users", icon: Users },
+  { title: "Planos", url: "/admin/plans", icon: Package },
+  { title: "Assinatura", url: "/admin/billing", icon: CreditCard },
+  { title: "Configurações", url: "/admin/settings", icon: Settings },
+  { title: "E-mails", url: "/admin/emails", icon: Mail },
+  { title: "Logs", url: "/admin/logs", icon: FileText },
+];
 export function MondeAppSidebar() {
   const {
     state
@@ -66,14 +76,16 @@ export function MondeAppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navigationItems.map(item => <SidebarMenuItem key={item.title}>
+              {(location.pathname.startsWith("/admin") ? adminNavigationItems : navigationItems).map(item => (
+                <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={location.pathname === item.url} tooltip={item.title} className={isCollapsed ? "justify-center px-2" : ""}>
                     <NavLink to={item.url} className={`flex items-center text-foreground hover:text-foreground ${isCollapsed ? 'justify-center' : 'space-x-3'}`}>
                       <item.icon className={`h-4 w-4 ${isCollapsed ? 'mx-auto' : ''}`} />
                       {!isCollapsed && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
-                </SidebarMenuItem>)}
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

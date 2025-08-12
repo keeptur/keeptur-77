@@ -16,6 +16,13 @@ import NotFound from "./pages/NotFound";
 import { TokenManagerInside } from "./components/TokenManagerInside";
 import AdminPage from "./pages/Admin";
 import { AdminRoute } from "./components/auth/AdminRoute";
+import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
+import AdminUsersPage from "./pages/admin/AdminUsersPage";
+import AdminPlansPage from "./pages/admin/AdminPlansPage";
+import AdminBillingPage from "./pages/admin/AdminBillingPage";
+import AdminSettingsPage from "./pages/admin/AdminSettingsPage";
+import AdminEmailsPage from "./pages/admin/AdminEmailsPage";
+import AdminLogsPage from "./pages/admin/AdminLogsPage";
 // Setup page removed
 
 const queryClient = new QueryClient();
@@ -87,9 +94,46 @@ const AppWrapper = () => {
                 <Route index element={<Dashboard />} />
                 <Route path="people" element={<PeoplePage />} />
                 <Route path="profile" element={<ProfilePage />} />
+                {/* Legacy single admin page (kept) */}
                 <Route path="admin" element={
                   <AdminRoute>
                     <AdminPage />
+                  </AdminRoute>
+                } />
+                {/* New admin pages */}
+                <Route path="admin/dashboard" element={
+                  <AdminRoute>
+                    <AdminDashboardPage />
+                  </AdminRoute>
+                } />
+                <Route path="admin/users" element={
+                  <AdminRoute>
+                    <AdminUsersPage />
+                  </AdminRoute>
+                } />
+                <Route path="admin/plans" element={
+                  <AdminRoute>
+                    <AdminPlansPage />
+                  </AdminRoute>
+                } />
+                <Route path="admin/billing" element={
+                  <AdminRoute>
+                    <AdminBillingPage />
+                  </AdminRoute>
+                } />
+                <Route path="admin/settings" element={
+                  <AdminRoute>
+                    <AdminSettingsPage />
+                  </AdminRoute>
+                } />
+                <Route path="admin/emails" element={
+                  <AdminRoute>
+                    <AdminEmailsPage />
+                  </AdminRoute>
+                } />
+                <Route path="admin/logs" element={
+                  <AdminRoute>
+                    <AdminLogsPage />
                   </AdminRoute>
                 } />
               </Route>
