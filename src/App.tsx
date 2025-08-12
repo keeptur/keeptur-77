@@ -13,6 +13,8 @@ import PeoplePage from "./pages/People";
 import ProfilePage from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import { TokenManagerInside } from "./components/TokenManagerInside";
+import AdminPage from "./pages/Admin";
+import { AdminRoute } from "./components/auth/AdminRoute";
 
 const queryClient = new QueryClient();
 
@@ -63,6 +65,11 @@ const AppWrapper = () => {
                 <Route index element={<Dashboard />} />
                 <Route path="people" element={<PeoplePage />} />
                 <Route path="profile" element={<ProfilePage />} />
+                <Route path="admin" element={
+                  <AdminRoute>
+                    <AdminPage />
+                  </AdminRoute>
+                } />
               </Route>
               
               {/* Catch-all route */}
