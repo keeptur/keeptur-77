@@ -24,7 +24,7 @@ import AdminBillingPage from "./pages/admin/AdminBillingPage";
 import AdminSettingsPage from "./pages/admin/AdminSettingsPage";
 import AdminEmailsPage from "./pages/admin/AdminEmailsPage";
 import AdminLogsPage from "./pages/admin/AdminLogsPage";
-// Setup page removed
+import { UserRoute } from "./components/auth/UserRoute";
 
 const queryClient = new QueryClient();
 
@@ -93,9 +93,21 @@ const AppWrapper = () => {
                   <Layout />
                 </ProtectedRoute>
               }>
-                <Route index element={<Dashboard />} />
-                <Route path="people" element={<PeoplePage />} />
-                <Route path="profile" element={<ProfilePage />} />
+                <Route index element={
+                  <UserRoute>
+                    <Dashboard />
+                  </UserRoute>
+                } />
+                <Route path="people" element={
+                  <UserRoute>
+                    <PeoplePage />
+                  </UserRoute>
+                } />
+                <Route path="profile" element={
+                  <UserRoute>
+                    <ProfilePage />
+                  </UserRoute>
+                } />
                 {/* Legacy single admin page (kept) */}
                 <Route path="admin" element={
                   <AdminRoute>
@@ -111,8 +123,6 @@ const AppWrapper = () => {
                 <Route path="admin/emails" element={<Navigate to="/admin?t=emails" replace />} />
                 <Route path="admin/logs" element={<Navigate to="/admin?t=logs" replace />} />
               </Route>
-              
-// Setup route removed
             </Routes>
           </BrowserRouter>
         </TooltipProvider>
