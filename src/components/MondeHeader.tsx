@@ -18,36 +18,70 @@ function TrialStatus() {
   useEffect(() => {
     let mounted = true;
     (async () => {
+      console.log("TrialStatus: Loading trial/subscription status");
+      
       const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        const { data } = await supabase
-          .from('subscribers')
-          .select('trial_end, subscribed, subscription_end')
-          .or(`user_id.eq.${user.id},email.eq.${user.email}`)
-          .order('updated_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+      if (!user?.email) {
+        console.log("TrialStatus: No user email found");
+        return;
+      }
+      
+      console.log("TrialStatus: User email:", user.email);
+      
+      // Buscar configurações dinâmicas
+      const { data: settings } = await supabase
+        .from('settings')
+        .select('trial_days')
+        .limit(1)
+        .maybeSingle();
+      
+      console.log("TrialStatus: Settings:", settings);
+      
+      const { data } = await supabase
+        .from('subscribers')
+        .select('trial_end, subscribed, subscription_end, trial_start')
+        .or(`user_id.eq.${user.id},email.eq.${user.email}`)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-        if (mounted && data) {
-          const isSubscribed = data.subscribed || (data.subscription_end && new Date(data.subscription_end) > new Date());
-          setSubscribed(isSubscribed);
-          
-          if (isSubscribed) {
-            // Mostrar quando termina a assinatura se estiver ativo
-            if (data.subscription_end) {
-              const now = Date.now();
-              const subEnd = new Date(data.subscription_end).getTime();
-              const daysLeft = Math.max(0, Math.ceil((subEnd - now) / (1000 * 60 * 60 * 24)));
-              setDaysRemaining(daysLeft);
-            }
-          } else if (data.trial_end) {
-            // Mostrar trial restante
+      console.log("TrialStatus: Subscriber data:", data);
+
+      if (mounted && data) {
+        const isSubscribed = data.subscribed || (data.subscription_end && new Date(data.subscription_end) > new Date());
+        setSubscribed(isSubscribed);
+        
+        console.log("TrialStatus: Is subscribed:", isSubscribed);
+        
+        if (isSubscribed) {
+          // Mostrar quando termina a assinatura se estiver ativo
+          if (data.subscription_end) {
             const now = Date.now();
-            const t = new Date(data.trial_end).getTime();
-            setDaysRemaining(Math.max(0, Math.ceil((t - now) / (1000 * 60 * 60 * 24))));
-          } else {
-            setDaysRemaining(null);
+            const subEnd = new Date(data.subscription_end).getTime();
+            const daysLeft = Math.max(0, Math.ceil((subEnd - now) / (1000 * 60 * 60 * 24)));
+            console.log("TrialStatus: Subscription days left:", daysLeft);
+            setDaysRemaining(daysLeft);
           }
+        } else if (data.trial_end) {
+          // Mostrar trial restante baseado em trial_end
+          const now = Date.now();
+          const t = new Date(data.trial_end).getTime();
+          const calculatedDays = Math.max(0, Math.ceil((t - now) / (1000 * 60 * 60 * 24)));
+          console.log("TrialStatus: Trial days calculated from trial_end:", calculatedDays);
+          setDaysRemaining(calculatedDays);
+        } else if (data.trial_start && settings?.trial_days) {
+          // Fallback: calcular baseado em trial_start + configuração dinâmica
+          const trialStart = new Date(data.trial_start);
+          const trialEnd = new Date(trialStart);
+          trialEnd.setDate(trialEnd.getDate() + settings.trial_days);
+          
+          const now = Date.now();
+          const calculatedDays = Math.max(0, Math.ceil((trialEnd.getTime() - now) / (1000 * 60 * 60 * 24)));
+          console.log("TrialStatus: Trial days calculated from start + config:", calculatedDays);
+          setDaysRemaining(calculatedDays);
+        } else {
+          console.log("TrialStatus: No trial data available");
+          setDaysRemaining(null);
         }
       }
     })();
@@ -98,47 +132,83 @@ export function MondeHeader() {
 
   // Função para recarregar dados do usuário
   const reloadUserData = async () => {
+    console.log("MondeHeader: Starting reloadUserData");
+    
     const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      // Verificar se é admin primeiro
-      const { data: roles } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id);
-      const userIsAdmin = roles?.some(r => r.role === 'admin') || false;
-      setIsAdmin(userIsAdmin);
-      setUserRole(userIsAdmin ? 'Admin' : 'Usuário');
+    if (!user) {
+      console.log("MondeHeader: No user found");
+      return;
+    }
+    
+    console.log("MondeHeader: User ID:", user.id);
+    console.log("MondeHeader: User email:", user.email);
 
-      // Primeiro, sempre tenta pegar o profile do Supabase
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name, email, avatar_url')
-        .eq('id', user.id)
-        .maybeSingle();
+    // Verificar se é admin primeiro
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id);
+    
+    console.log("MondeHeader: User roles:", roles);
+    
+    const userIsAdmin = roles?.some(r => r.role === 'admin') || false;
+    setIsAdmin(userIsAdmin);
+    setUserRole(userIsAdmin ? 'Admin' : 'Usuário');
+    
+    console.log("MondeHeader: User is admin:", userIsAdmin);
 
-      if (userIsAdmin) {
-        // Para admin, usar dados do Supabase
-        if (profile) {
-          setUserName(profile.full_name || profile.email || 'Usuário');
-          setAvatarUrl(profile.avatar_url || '');
-        }
-      } else {
-        // Para usuário não-admin, priorizar nome da API do Monde
-        try {
-          const currentUser = await api.getCurrentUser();
+    // Primeiro, sempre tenta pegar o profile do Supabase
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, email, avatar_url')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    console.log("MondeHeader: Supabase profile:", profile);
+
+    if (userIsAdmin) {
+      // Para admin, usar dados do Supabase
+      if (profile) {
+        const adminName = profile.full_name || profile.email || 'Usuário';
+        console.log("MondeHeader: Setting admin name:", adminName);
+        setUserName(adminName);
+        setAvatarUrl(profile.avatar_url || '');
+      }
+    } else {
+      // Para usuário não-admin, priorizar nome da API do Monde
+      try {
+        console.log("MondeHeader: Trying to get data from Monde API");
+        console.log("MondeHeader: API authenticated:", api.isAuthenticated());
+        
+        const currentUser = await api.getCurrentUser();
+        console.log("MondeHeader: getCurrentUser response:", currentUser);
+        
+        if (currentUser && currentUser.data && currentUser.data.attributes) {
           const attrs = currentUser.data.attributes;
           const mondeName = attrs.name || attrs.login;
+          console.log("MondeHeader: Monde name found:", mondeName);
           
           // Usar nome do Monde se existir, senão usar Supabase
-          setUserName(mondeName || profile?.full_name || profile?.email || user.email || 'Usuário');
+          const finalName = mondeName || profile?.full_name || profile?.email || user.email || 'Usuário';
+          console.log("MondeHeader: Setting final name:", finalName);
+          setUserName(finalName);
           setAvatarUrl(profile?.avatar_url || ''); // Avatar sempre do Supabase
-        } catch (error) {
-          console.log('Fallback to Supabase profile for non-admin user');
-          // Fallback para profile do Supabase se API do Monde falhar
-          if (profile) {
-            setUserName(profile.full_name || profile.email || 'Usuário');
-            setAvatarUrl(profile.avatar_url || '');
-          }
+        } else {
+          throw new Error("Invalid API response structure");
+        }
+      } catch (error) {
+        console.error("MondeHeader: Error getting data from Monde API:", error);
+        console.log("MondeHeader: Fallback to Supabase profile for non-admin user");
+        
+        // Fallback para profile do Supabase se API do Monde falhar
+        if (profile) {
+          const fallbackName = profile.full_name || profile.email || user.email || 'Usuário';
+          console.log("MondeHeader: Setting fallback name:", fallbackName);
+          setUserName(fallbackName);
+          setAvatarUrl(profile.avatar_url || '');
+        } else {
+          console.log("MondeHeader: No profile data available, using email");
+          setUserName(user.email || 'Usuário');
         }
       }
     }

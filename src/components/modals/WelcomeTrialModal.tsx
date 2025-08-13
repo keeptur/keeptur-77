@@ -83,18 +83,29 @@ export function WelcomeTrialModal() {
   }, [allowed]);
 
   const daysRemaining = useMemo(() => {
-    // Se temos dados reais do trial, usar esses
+    console.log("WelcomeTrialModal: Calculating daysRemaining");
+    console.log("WelcomeTrialModal: realTrialDays:", realTrialDays);
+    console.log("WelcomeTrialModal: configuredTrialDays:", configuredTrialDays);
+    
+    // Priorizar dados reais do Supabase quando disponíveis
     if (realTrialDays !== null) {
+      console.log("WelcomeTrialModal: Using realTrialDays:", realTrialDays);
       return realTrialDays;
     }
     
     // Fallback para cálculo local com dias configurados pelo admin
+    console.log("WelcomeTrialModal: Using configuredTrialDays for calculation");
     const startIso = localStorage.getItem(TRIAL_START_KEY);
     const start = startIso ? new Date(startIso) : new Date();
     const end = new Date(start);
     end.setDate(end.getDate() + configuredTrialDays);
     const diffMs = end.getTime() - Date.now();
     const days = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+    
+    console.log("WelcomeTrialModal: Calculated days:", days);
+    console.log("WelcomeTrialModal: Trial start:", start);
+    console.log("WelcomeTrialModal: Trial end:", end);
+    
     return days;
   }, [open, realTrialDays, configuredTrialDays]);
 
