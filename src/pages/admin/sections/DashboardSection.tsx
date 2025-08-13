@@ -58,20 +58,35 @@ export default function DashboardSection() {
       const { data: roles } = await supabase
         .from("user_roles")
         .select("user_id, role");
-      // Contas e status (mantém compatibilidade atual)
+      // Contas (mantém compatibilidade atual)
       const { data: accounts } = await supabase
         .from("accounts")
         .select("id, subscribed, trial_start, trial_end");
+      // Subscribers: usado para cálculo preciso de assinaturas ativas e trials
+      const { data: subscribers } = await supabase
+        .from('subscribers')
+        .select('id, subscribed, trial_start, trial_end, subscription_end');
       // Calcular KPI básicos
       const users = profiles?.length || 0;
-      const admins = (roles || []).filter((r) => r.role === "admin").length;
+      const admins = (roles || []).filter((r) => r.role === 'admin').length;
       const accs = accounts?.length || 0;
-      const activeSubs = (accounts || []).filter((a) => a.subscribed).length;
+      // Assinaturas ativas: usa a tabela subscribers quando disponível, considerando subscription_end > agora
+      const activeSubs = (subscribers || []).filter((s) => {
+        if (s.subscribed) return true;
+        // Caso subscription_end exista e esteja no futuro, considerar ativo
+        if ((s as any).subscription_end) {
+          const end = new Date((s as any).subscription_end as any);
+          return end > new Date();
+        }
+        return false;
+      }).length;
+      // Trials em andamento: usuário não assinado com trial_end futuro
       const now = new Date();
-      const inTrial = (accounts || []).filter((a) => {
-        if (!a.trial_start || !a.trial_end) return false;
-        const end = new Date(a.trial_end as any);
-        return end > now && !a.subscribed;
+      const inTrial = (subscribers || []).filter((s) => {
+        if (s.subscribed) return false;
+        if (!s.trial_end) return false;
+        const end = new Date(s.trial_end as any);
+        return end > now;
       }).length;
       setKpis({ users, admins, accounts: accs, activeSubs, inTrial });
       // Usuários mais recentes (5 últimos)
