@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { AdminRoute } from "@/components/auth/AdminRoute";
@@ -13,10 +14,26 @@ import LogsSection from "./admin/sections/LogsSection";
 
 export default function AdminPage() {
   const [tab, setTab] = useState("dashboard");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   useEffect(() => {
     document.title = "Admin | Keeptur";
   }, []);
+
+  // Sync tab from URL
+  useEffect(() => {
+    const t = searchParams.get("t");
+    if (t && t !== tab) setTab(t);
+  }, [searchParams]);
+
+  // Update URL when tab changes
+  useEffect(() => {
+    const current = searchParams.get("t");
+    if (tab !== (current || "")) {
+      setSearchParams({ t: tab });
+    }
+  }, [tab]);
 
   return (
     <AdminRoute>

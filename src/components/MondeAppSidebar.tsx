@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { LayoutDashboard, Users, FileText, Settings, LogOut, ChevronLeft, ChevronRight, CreditCard, Mail, Package } from "lucide-react";
 import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 const navigationItems = [{
   title: "Dashboard",
   url: "/",
@@ -14,24 +15,64 @@ const navigationItems = [{
 }];
 
 const adminNavigationItems = [
-  { title: "Dashboard", url: "/admin/dashboard", icon: LayoutDashboard },
-  { title: "Usuários", url: "/admin/users", icon: Users },
-  { title: "Planos", url: "/admin/plans", icon: Package },
-  { title: "Assinatura", url: "/admin/billing", icon: CreditCard },
-  { title: "Configurações", url: "/admin/settings", icon: Settings },
-  { title: "E-mails", url: "/admin/emails", icon: Mail },
-  { title: "Logs", url: "/admin/logs", icon: FileText },
+  { title: "Dashboard", url: "/admin?t=dashboard", icon: LayoutDashboard },
+  { title: "Usuários", url: "/admin?t=users", icon: Users },
+  { title: "Planos", url: "/admin?t=plans", icon: Package },
+  { title: "Assinatura", url: "/admin?t=billing", icon: CreditCard },
+  { title: "Configurações", url: "/admin?t=settings", icon: Settings },
+  { title: "E-mails", url: "/admin?t=emails", icon: Mail },
+  { title: "Logs", url: "/admin?t=logs", icon: FileText },
 ];
 export function MondeAppSidebar() {
-  const {
-    state
-  } = useSidebar();
+  const { state } = useSidebar();
   const location = useLocation();
   const navigate = useNavigate();
   const isCollapsed = state === "collapsed";
+
+  const [trialDays, setTrialDays] = useState<number | null>(null);
+  const [loadingTrial, setLoadingTrial] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      setLoadingTrial(true);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { setTrialDays(null); return; }
+
+        const { data } = await supabase
+          .from('subscribers')
+          .select('trial_end, subscription_end, subscribed')
+          .or(`user_id.eq.${user.id},email.eq.${user.email}`)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (mounted && data?.trial_end && !data?.subscribed) {
+          const now = Date.now();
+          const t = new Date(data.trial_end).getTime();
+          const days = Math.ceil((t - now) / (1000*60*60*24));
+          setTrialDays(days);
+        } else if (mounted) {
+          setTrialDays(null);
+        }
+      } finally {
+        mounted && setLoadingTrial(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [location.pathname]);
+
   const handleLogout = () => {
     api.logout();
     navigate("/login");
+  };
+
+  const handleSubscribe = async () => {
+    const { data, error } = await supabase.functions.invoke('create-checkout', { body: { quantity: 1 } });
+    if (!error && (data as any)?.url) {
+      window.location.href = (data as any).url as string;
+    }
   };
   return <Sidebar collapsible="icon" className="border-r border-border bg-background" style={{
     width: isCollapsed ? '64px' : '280px'

@@ -14,6 +14,7 @@ import PeoplePage from "./pages/People";
 import ProfilePage from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import { TokenManagerInside } from "./components/TokenManagerInside";
+import { SubscriberSync } from "./components/SubscriberSync";
 import AdminPage from "./pages/Admin";
 import { AdminRoute } from "./components/auth/AdminRoute";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
@@ -77,6 +78,7 @@ const AppWrapper = () => {
           <Sonner />
           <BrowserRouter>
             <TokenManagerInside />
+            <SubscriberSync />
             <Routes>
               {/* Public routes */}
               <Route path="/login" element={
@@ -100,42 +102,14 @@ const AppWrapper = () => {
                     <AdminPage />
                   </AdminRoute>
                 } />
-                {/* New admin pages */}
-                <Route path="admin/dashboard" element={
-                  <AdminRoute>
-                    <AdminDashboardPage />
-                  </AdminRoute>
-                } />
-                <Route path="admin/users" element={
-                  <AdminRoute>
-                    <AdminUsersPage />
-                  </AdminRoute>
-                } />
-                <Route path="admin/plans" element={
-                  <AdminRoute>
-                    <AdminPlansPage />
-                  </AdminRoute>
-                } />
-                <Route path="admin/billing" element={
-                  <AdminRoute>
-                    <AdminBillingPage />
-                  </AdminRoute>
-                } />
-                <Route path="admin/settings" element={
-                  <AdminRoute>
-                    <AdminSettingsPage />
-                  </AdminRoute>
-                } />
-                <Route path="admin/emails" element={
-                  <AdminRoute>
-                    <AdminEmailsPage />
-                  </AdminRoute>
-                } />
-                <Route path="admin/logs" element={
-                  <AdminRoute>
-                    <AdminLogsPage />
-                  </AdminRoute>
-                } />
+                {/* Redirect legacy admin subroutes to unified /admin */}
+                <Route path="admin/dashboard" element={<Navigate to="/admin?t=dashboard" replace />} />
+                <Route path="admin/users" element={<Navigate to="/admin?t=users" replace />} />
+                <Route path="admin/plans" element={<Navigate to="/admin?t=plans" replace />} />
+                <Route path="admin/billing" element={<Navigate to="/admin?t=billing" replace />} />
+                <Route path="admin/settings" element={<Navigate to="/admin?t=settings" replace />} />
+                <Route path="admin/emails" element={<Navigate to="/admin?t=emails" replace />} />
+                <Route path="admin/logs" element={<Navigate to="/admin?t=logs" replace />} />
               </Route>
               
 // Setup route removed
