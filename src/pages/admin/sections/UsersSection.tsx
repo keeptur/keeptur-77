@@ -119,6 +119,10 @@ export default function UsersSection() {
   }, []);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'trial' | 'inactive'>('all');
   const [planFilter, setPlanFilter] = useState<'all' | 'basic' | 'pro' | 'enterprise'>('all');
+  
+  // Definir isAdmin primeiro
+  const isAdmin = (id: string) => roles.some(r => r.user_id === id && r.role === "admin");
+  
   const getStatus = (u: CombinedUser): 'active' | 'trial' | 'inactive' => {
     const uid = u.id || u.user_id || '';
     if (uid && isAdmin(uid)) return 'active'; // Super admin sempre ativo/vitalício
@@ -135,6 +139,7 @@ export default function UsersSection() {
     
     return 'inactive';
   };
+  
   const combinedUsers = useMemo<CombinedUser[]>(() => {
     const byEmail = new Map<string, CombinedUser>();
     (subscribers || []).forEach(su => {
@@ -162,6 +167,7 @@ export default function UsersSection() {
     });
     return Array.from(byEmail.values());
   }, [profiles, subscribers]);
+  
   const filtered = useMemo(() => {
     let list = combinedUsers;
     if (q) {
@@ -176,7 +182,6 @@ export default function UsersSection() {
     }
     return list;
   }, [q, combinedUsers, statusFilter, planFilter]);
-  const isAdmin = (id: string) => roles.some(r => r.user_id === id && r.role === "admin");
   const promote = async (userId: string) => {
     const {
       error
