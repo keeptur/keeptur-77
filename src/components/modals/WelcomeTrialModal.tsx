@@ -79,20 +79,25 @@ export function WelcomeTrialModal() {
       .maybeSingle();
     if (subscriber && !subscriber.subscribed) {
       const nowMs = Date.now();
-      // Se há data de término do trial, priorize-a
+      let daysFromEnd: number | null = null;
+      let daysFromStart: number | null = null;
+      // Calcular com base na data de término do trial se existir
       if (subscriber.trial_end) {
         const endMs = new Date(subscriber.trial_end as any).getTime();
-        const days = Math.max(0, Math.ceil((endMs - nowMs) / (1000 * 60 * 60 * 24)));
-        setRealTrialDays(days);
-        return;
+        daysFromEnd = Math.max(0, Math.ceil((endMs - nowMs) / (1000 * 60 * 60 * 24)));
       }
-      // Caso contrário, se houver trial_start, usa configuração dinâmica
+      // Calcular com base no início + configuração dinâmica
       if (subscriber.trial_start) {
         const startDate = new Date(subscriber.trial_start as any);
         const end = new Date(startDate);
         end.setDate(end.getDate() + cfgDays);
-        const days = Math.max(0, Math.ceil((end.getTime() - nowMs) / (1000 * 60 * 60 * 24)));
-        setRealTrialDays(days);
+        daysFromStart = Math.max(0, Math.ceil((end.getTime() - nowMs) / (1000 * 60 * 60 * 24)));
+      }
+      // Se ambas as métricas forem válidas, usar a maior (engloba dias adicionais)
+      // ou a que estiver disponível.
+      const possibleDays = [daysFromEnd, daysFromStart].filter((n) => n != null) as number[];
+      if (possibleDays.length > 0) {
+        setRealTrialDays(Math.max(...possibleDays));
         return;
       }
     }
