@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Trash2 } from "lucide-react";
 
 interface ProfileRow {
   id: string;
@@ -206,6 +207,60 @@ export default function UsersSection() {
     } else {
       setRoles((prev) => prev.filter((r) => !(r.user_id === userId && r.role === 'admin')));
       toast({ title: 'Admin removido' });
+    }
+  };
+
+  const deleteUser = async (user: CombinedUser) => {
+    if (!confirm(`Tem certeza que deseja deletar permanentemente o usuário ${user.email}? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+
+    try {
+      // Remover do subscribers
+      if (user.subscriber) {
+        const { error: subscriberError } = await supabase
+          .from('subscribers')
+          .delete()
+          .eq('id', user.subscriber.id);
+        if (subscriberError) throw subscriberError;
+      }
+
+      // Remover do user_roles se existir
+      if (user.id) {
+        const { error: rolesError } = await supabase
+          .from('user_roles')
+          .delete()
+          .eq('user_id', user.id);
+        if (rolesError) throw rolesError;
+      }
+
+      // Remover do profiles se existir
+      if (user.id) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .delete()
+          .eq('id', user.id);
+        if (profileError) throw profileError;
+      }
+
+      // Remover do auth.users via admin API se existir
+      if (user.id) {
+        const { error: authError } = await supabase.auth.admin.deleteUser(user.id);
+        if (authError) throw authError;
+      }
+
+      toast({ 
+        title: 'Usuário deletado', 
+        description: 'Usuário removido completamente do sistema. Se fizer login novamente, terá uma nova conta trial.' 
+      });
+      
+      await reload();
+    } catch (e: any) {
+      toast({ 
+        title: 'Erro ao deletar usuário', 
+        description: e.message || String(e), 
+        variant: 'destructive' 
+      });
     }
   };
 
@@ -461,23 +516,32 @@ export default function UsersSection() {
                         </div>
                       </td>
                       <td className="py-3 px-2">
-                        <div className="flex gap-1">
-                          <Button onClick={() => addDaysTo(u, 'subscription_end', 365)} variant="outline" size="sm" className="text-xs px-2 py-1 h-auto">
-                            Ativar
-                          </Button>
-                          {/* Mostrar botão Admin apenas se tiver id (usuário do Supabase) e ainda não for admin */}
-                          {u.id && !isAdmin(u.id) && (
-                            <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => promote(u.id!)}>
-                              Admin
-                            </Button>
-                          )}
-                          {/* Mostrar botão Remover apenas se usuário for admin */}
-                          {u.id && isAdmin(u.id) && (
-                            <Button size="sm" variant="destructive" className="h-6 px-2 text-xs" onClick={() => demote(u.id!)}>
-                              Remover
-                            </Button>
-                          )}
-                        </div>
+                         <div className="flex gap-1">
+                           <Button onClick={() => addDaysTo(u, 'subscription_end', 365)} variant="outline" size="sm" className="text-xs px-2 py-1 h-auto">
+                             Ativar
+                           </Button>
+                           {/* Mostrar botão Admin apenas se tiver id (usuário do Supabase) e ainda não for admin */}
+                           {u.id && !isAdmin(u.id) && (
+                             <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => promote(u.id!)}>
+                               Admin
+                             </Button>
+                           )}
+                           {/* Mostrar botão Remover apenas se usuário for admin */}
+                           {u.id && isAdmin(u.id) && (
+                             <Button size="sm" variant="destructive" className="h-6 px-2 text-xs" onClick={() => demote(u.id!)}>
+                               Remover
+                             </Button>
+                           )}
+                           {/* Botão de deletar usuário */}
+                           <Button 
+                             size="sm" 
+                             variant="destructive" 
+                             className="h-6 px-2 text-xs" 
+                             onClick={() => deleteUser(u)}
+                           >
+                             <Trash2 className="h-3 w-3" />
+                           </Button>
+                         </div>
                       </td>
                       <td className="py-3 px-2 text-xs text-muted-foreground">{dateStr}</td>
                     </tr>
