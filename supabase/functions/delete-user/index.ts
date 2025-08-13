@@ -34,11 +34,15 @@ Deno.serve(async (req) => {
 
     console.log(`Deletando usuário: ${userId}`)
 
-    // 1. Deletar do subscribers se existir (usando user_id)
+    // Primeiro buscar o email do usuário
+    const { data: userAuth } = await supabaseClient.auth.admin.getUserById(userId);
+    const userEmail = userAuth?.user?.email;
+
+    // 1. Deletar do subscribers se existir (usando user_id E email)
     const { error: subscriberError } = await supabaseClient
       .from('subscribers')
       .delete()
-      .eq('user_id', userId);
+      .or(`user_id.eq.${userId}${userEmail ? `,email.eq.${userEmail}` : ''}`);
     
     if (subscriberError) {
       console.log('Erro ao deletar subscriber:', subscriberError)

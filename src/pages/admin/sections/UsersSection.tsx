@@ -240,7 +240,7 @@ export default function UsersSection() {
       
       // Atualizar a lista removendo o usuário deletado
       setProfiles(prev => prev.filter(p => p.id !== userId));
-      setSubscribers(prev => prev.filter(s => s.user_id !== userId));
+      setSubscribers(prev => prev.filter(s => s.user_id !== userId && s.email !== user.email));
       setRoles(prev => prev.filter(r => r.user_id !== userId));
       
     } catch (e: any) {
@@ -451,63 +451,77 @@ export default function UsersSection() {
                           {status === 'active' ? 'Ativo' : status === 'trial' ? 'Trial' : 'Inativo'}
                         </span>
                       </td>
-                      <td className="py-3 px-2">
-                        <input
-                          type="number"
-                          placeholder="+"
-                          className="w-16 px-2 py-1 text-xs border rounded text-center"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              const days = parseInt((e.currentTarget as HTMLInputElement).value);
-                              if (days > 0) {
-                                addDaysTo(u, 'trial_end', days);
-                                (e.currentTarget as HTMLInputElement).value = '';
-                              }
-                            }
-                          }}
-                          onBlur={(e) => {
-                            const days = parseInt((e.currentTarget as HTMLInputElement).value);
-                            if (days > 0) {
-                              addDaysTo(u, 'trial_end', days);
-                              (e.currentTarget as HTMLInputElement).value = '';
-                            }
-                          }}
-                        />
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {u.subscriber?.trial_end ? `${getDaysRemaining(u.subscriber.trial_end) || 0}d` : '-'}
-                        </div>
-                      </td>
-                      <td className="py-3 px-2">
-                        <input
-                          type="number"
-                          placeholder="+"
-                          className="w-16 px-2 py-1 text-xs border rounded text-center"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              const days = parseInt((e.currentTarget as HTMLInputElement).value);
-                              if (days > 0) {
-                                addDaysTo(u, 'subscription_end', days);
-                                (e.currentTarget as HTMLInputElement).value = '';
-                              }
-                            }
-                          }}
-                          onBlur={(e) => {
-                            const days = parseInt((e.currentTarget as HTMLInputElement).value);
-                            if (days > 0) {
-                              addDaysTo(u, 'subscription_end', days);
-                              (e.currentTarget as HTMLInputElement).value = '';
-                            }
-                          }}
-                        />
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {u.subscriber?.subscription_end ? `${getDaysRemaining(u.subscriber.subscription_end) || 0}d` : '-'}
-                        </div>
-                      </td>
-                      <td className="py-3 px-2">
-                         <div className="flex gap-1">
-                           <Button onClick={() => addDaysTo(u, 'subscription_end', 365)} variant="outline" size="sm" className="text-xs px-2 py-1 h-auto">
-                             Ativar
-                           </Button>
+                       <td className="py-3 px-2">
+                         <input
+                           type="number"
+                           placeholder="+"
+                           className="w-16 px-2 py-1 text-xs border rounded text-center"
+                           disabled={status === 'active'}
+                           onKeyDown={(e) => {
+                             if (e.key === 'Enter') {
+                               const days = parseInt((e.currentTarget as HTMLInputElement).value);
+                               if (days > 0) {
+                                 addDaysTo(u, 'trial_end', days);
+                                 (e.currentTarget as HTMLInputElement).value = '';
+                               }
+                             }
+                           }}
+                           onBlur={(e) => {
+                             const days = parseInt((e.currentTarget as HTMLInputElement).value);
+                             if (days > 0) {
+                               addDaysTo(u, 'trial_end', days);
+                               (e.currentTarget as HTMLInputElement).value = '';
+                             }
+                           }}
+                         />
+                         <div className="text-xs text-muted-foreground mt-1">
+                           {u.subscriber?.trial_end ? `${getDaysRemaining(u.subscriber.trial_end) || 0}d` : '-'}
+                         </div>
+                       </td>
+                       <td className="py-3 px-2">
+                         <input
+                           type="number"
+                           placeholder="+"
+                           className="w-16 px-2 py-1 text-xs border rounded text-center"
+                           disabled={status === 'trial'}
+                           onKeyDown={(e) => {
+                             if (e.key === 'Enter') {
+                               const days = parseInt((e.currentTarget as HTMLInputElement).value);
+                               if (days > 0) {
+                                 addDaysTo(u, 'subscription_end', days);
+                                 (e.currentTarget as HTMLInputElement).value = '';
+                               }
+                             }
+                           }}
+                           onBlur={(e) => {
+                             const days = parseInt((e.currentTarget as HTMLInputElement).value);
+                             if (days > 0) {
+                               addDaysTo(u, 'subscription_end', days);
+                               (e.currentTarget as HTMLInputElement).value = '';
+                             }
+                           }}
+                         />
+                         <div className="text-xs text-muted-foreground mt-1">
+                           {u.subscriber?.subscription_end ? `${getDaysRemaining(u.subscriber.subscription_end) || 0}d` : '-'}
+                         </div>
+                       </td>
+                       <td className="py-3 px-2">
+                          <div className="flex gap-1">
+                            <Button 
+                              onClick={() => {
+                                addDaysTo(u, 'subscription_end', 30);
+                                // Zerar trial quando ativar assinatura
+                                if (u.subscriber?.trial_end) {
+                                  addDaysTo(u, 'trial_end', -365);
+                                }
+                              }} 
+                              variant="outline" 
+                              size="sm" 
+                              className="text-xs px-2 py-1 h-auto"
+                              disabled={status === 'active'}
+                            >
+                              Ativar
+                            </Button>
                            {/* Mostrar botão Admin apenas se tiver id (usuário do Supabase) e ainda não for admin */}
                            {u.id && !isAdmin(u.id) && (
                              <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => promote(u.id!)}>
