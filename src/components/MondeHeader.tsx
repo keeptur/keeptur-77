@@ -242,9 +242,9 @@ export function MondeHeader() {
             </div>
           )}
         </div>
-        {/* Trial status no topo: exibe sempre que houver dias restantes (trial ou assinatura) */}
+        {/* Trial status no topo: exibido apenas para usuários não‑admin */}
         <div className="hidden md:block">
-          <TrialStatus />
+          {!isAdmin && <TrialStatus />}
         </div>
         {/* User Menu */}
         <div className="relative">
