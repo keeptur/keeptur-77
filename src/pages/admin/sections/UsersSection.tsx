@@ -133,9 +133,8 @@ export default function UsersSection() {
   // Determina se um usuário é o super admin (o primeiro admin criado).
   const isSuperAdmin = (id: string): boolean => {
     if (!id || !roles.length) return false;
-    const adminRoles = roles
-      .filter((r) => r.role === 'admin')
-      .sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+    // Como `RoleRow` não possui `created_at`, considera-se o primeiro admin encontrado como super admin.
+    const adminRoles = roles.filter((r) => r.role === 'admin');
     return adminRoles.length > 0 && adminRoles[0].user_id === id;
   };
 
