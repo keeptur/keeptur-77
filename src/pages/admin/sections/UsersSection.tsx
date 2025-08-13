@@ -204,7 +204,7 @@ return (
                 return (
                   <TableRow key={u.email}>
                     <TableCell>{u.full_name || "-"}</TableCell>
-                    <TableCell>{u.email}</TableCell>
+                    <TableCell className="whitespace-normal break-words max-w-[260px] text-sm">{u.email}</TableCell>
                     <TableCell>
                       {u.subscriber?.trial_end ? (
                         <div className="flex items-center gap-2">
@@ -228,14 +228,16 @@ return (
                     <TableCell>
                       {isAdmin(uid) ? <Badge variant="default">admin</Badge> : <Badge variant="secondary">user</Badge>}
                     </TableCell>
-                    <TableCell className="space-x-2">
-                      {isAdmin(uid) ? (
-                        <Button variant="outline" size="sm" onClick={() => demote(uid)}>Remover admin</Button>
-                      ) : (
-                        <Button size="sm" onClick={() => promote(uid)}>Promover a admin</Button>
-                      )}
-                      <Button variant="outline" size="sm" onClick={() => addDaysTo(u, 'trial_end', 30)}>Trial +30d</Button>
-                      <Button variant="outline" size="sm" onClick={() => addDaysTo(u, 'subscription_end', 30)}>Assin. +30d</Button>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-2">
+                        {isAdmin(uid) ? (
+                          <Button variant="outline" size="sm" onClick={() => demote(uid)}>Remover admin</Button>
+                        ) : (
+                          <Button size="sm" onClick={() => promote(uid)}>Promover a admin</Button>
+                        )}
+                        <Button variant="outline" size="sm" onClick={() => addDaysTo(u, 'trial_end', 30)}>Trial +30d</Button>
+                        <Button variant="outline" size="sm" onClick={() => addDaysTo(u, 'subscription_end', 30)}>Assin. +30d</Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );

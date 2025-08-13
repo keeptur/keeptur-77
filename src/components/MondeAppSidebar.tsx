@@ -132,8 +132,29 @@ export function MondeAppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      {/* Footer with logout */}
+      {/* Footer with trial banner and logout */}
       <div className="mt-auto p-3 border-t border-border">
+        {trialDays !== null && trialDays > 0 && (
+          <div className={isCollapsed ? "px-1 mb-2" : "mb-3"}>
+            <div className="rounded-lg border border-primary/30 bg-primary/10 p-2">
+              <div className={isCollapsed ? "flex justify-center" : "flex items-center justify-between gap-2"}>
+                {!isCollapsed && (
+                  <div>
+                    <div className="text-sm font-medium">Período de Trial</div>
+                    <div className="text-xs text-muted-foreground">{trialDays} dias restantes</div>
+                  </div>
+                )}
+                <button
+                  onClick={handleSubscribe}
+                  className="px-2 py-1 text-xs rounded-button bg-primary text-primary-foreground hover:opacity-90"
+                >
+                  Assinar agora
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Sair" className={`text-destructive hover:text-destructive hover:bg-destructive/10 ${isCollapsed ? "justify-center px-2" : ""}`}>
@@ -144,12 +165,13 @@ export function MondeAppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        
-        {isCollapsed && <div className="flex justify-center mt-2">
+        {isCollapsed && (
+          <div className="flex justify-center mt-2">
             <SidebarTrigger className="h-6 w-6">
               <ChevronRight className="h-4 w-4" />
             </SidebarTrigger>
-          </div>}
+          </div>
+        )}
       </div>
     </Sidebar>;
 }
