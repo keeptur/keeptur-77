@@ -188,6 +188,8 @@ export default function UsersSection() {
         await supabase.from('subscribers').delete().or(`user_id.eq.${userId},email.eq.${user.email}`);
         // Remove perfil
         await supabase.from('profiles').delete().or(`id.eq.${userId},email.eq.${user.email}`);
+        // Remove contas (utilizadas para métricas de assinatura/trial)
+        await supabase.from('accounts').delete().or(`user_id.eq.${userId},email.eq.${user.email}`);
         // Atualiza listas locais
         setProfiles((prev) => prev.filter((p) => p.id !== userId && p.email !== user.email));
         setSubscribers((prev) => prev.filter((s) => s.user_id !== userId && s.email !== user.email));
@@ -196,6 +198,7 @@ export default function UsersSection() {
         // Usuário sem ID Supabase (apenas Monde). Remover registros baseados no email.
         await supabase.from('subscribers').delete().eq('email', user.email);
         await supabase.from('profiles').delete().eq('email', user.email);
+        await supabase.from('accounts').delete().eq('email', user.email);
         // Atualiza estados locais
         setProfiles((prev) => prev.filter((p) => p.email !== user.email));
         setSubscribers((prev) => prev.filter((s) => s.email !== user.email));
