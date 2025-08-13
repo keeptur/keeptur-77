@@ -72,17 +72,23 @@ export default function DashboardSection() {
       const admins = (roles || []).filter((r) => r.role === 'admin').length;
       const accs = accounts?.length || 0;
 
-      // Para assinaturas ativas e trials, use a tabela `accounts`. Cada conta corresponde
-      // a um usuário único, evitando que múltiplos registros em `subscribers` inflem
-      // as contagens. Uma assinatura está ativa quando `subscribed` é true. Um trial
-      // está em andamento quando `subscribed` é false e `trial_end` é futura.
+      // Para assinaturas ativas e trials, priorize a tabela `subscribers`. Cada linha
+      // em `subscribers` representa um e‑mail/usuário único, então calculamos as
+      // contagens de forma mais fidedigna. Consideramos assinatura ativa quando
+      // `subscribed` está true ou quando existe `subscription_end` futura. Consideramos
+      // em trial quando não há assinatura ativa e `trial_end` é futura.
       const now = new Date();
-      const activeSubs = (accounts || []).filter((a: any) => (a as any).subscribed).length;
-      const inTrial = (accounts || []).filter((a: any) => {
-        if ((a as any).subscribed) return false;
-        if (!(a as any).trial_end) return false;
-        const end = new Date((a as any).trial_end as any);
-        return end > now;
+      const activeSubs = (subscribers || []).filter((s: any) => {
+        const subscribed = !!s.subscribed;
+        const subEnd = s.subscription_end ? new Date(s.subscription_end as any) : null;
+        return subscribed || (subEnd && subEnd > now);
+      }).length;
+      const inTrial = (subscribers || []).filter((s: any) => {
+        const subscribed = !!s.subscribed;
+        const subEnd = s.subscription_end ? new Date(s.subscription_end as any) : null;
+        const trialEnd = s.trial_end ? new Date(s.trial_end as any) : null;
+        // Trial se não está ativo e trial_end existe no futuro
+        return !subscribed && (!subEnd || subEnd <= now) && trialEnd && trialEnd > now;
       }).length;
       setKpis({ users, admins, accounts: accs, activeSubs, inTrial });
       // Usuários mais recentes (5 últimos)
