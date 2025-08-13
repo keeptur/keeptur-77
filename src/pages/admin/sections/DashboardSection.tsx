@@ -62,7 +62,8 @@ export default function DashboardSection() {
       const { data: accounts } = await supabase
         .from("accounts")
         .select("id, subscribed, trial_start, trial_end");
-      // Subscribers: usado para cálculo preciso de assinaturas ativas e trials
+      // Subscribers: ainda é carregado abaixo, mas as métricas de assinatura e trial
+      // serão calculadas a partir da tabela `accounts` para evitar duplicidades de registros
       const { data: subscribers } = await supabase
         .from('subscribers')
         .select('id, subscribed, trial_start, trial_end, subscription_end');
@@ -70,31 +71,18 @@ export default function DashboardSection() {
       const users = profiles?.length || 0;
       const admins = (roles || []).filter((r) => r.role === 'admin').length;
       const accs = accounts?.length || 0;
-      // Assinaturas ativas: Prioridade para subscription_end > agora
+
+      // Para assinaturas ativas e trials, use a tabela `accounts`. Cada conta corresponde
+      // a um usuário único, evitando que múltiplos registros em `subscribers` inflem
+      // as contagens. Uma assinatura está ativa quando `subscribed` é true. Um trial
+      // está em andamento quando `subscribed` é false e `trial_end` é futura.
       const now = new Date();
-      const activeSubs = (subscribers || []).filter((s) => {
-        // Primeiro verifica se tem subscription ativa
-        if ((s as any).subscription_end) {
-          const end = new Date((s as any).subscription_end as any);
-          return end > now;
-        }
-        // Se não tem subscription_end, verifica subscribed flag (fallback)
-        return s.subscribed;
-      }).length;
-      
-      // Trials em andamento: trial_end futuro E não tem subscription ativa
-      const inTrial = (subscribers || []).filter((s) => {
-        // Não pode estar em trial se tem subscription ativa
-        if ((s as any).subscription_end) {
-          const end = new Date((s as any).subscription_end as any);
-          if (end > now) return false; // Tem subscription ativa
-        }
-        if (s.subscribed) return false; // Marcado como assinado
-        
-        // Só considera trial se trial_end for futuro
-        if (!s.trial_end) return false;
-        const trialEnd = new Date(s.trial_end as any);
-        return trialEnd > now;
+      const activeSubs = (accounts || []).filter((a: any) => (a as any).subscribed).length;
+      const inTrial = (accounts || []).filter((a: any) => {
+        if ((a as any).subscribed) return false;
+        if (!(a as any).trial_end) return false;
+        const end = new Date((a as any).trial_end as any);
+        return end > now;
       }).length;
       setKpis({ users, admins, accounts: accs, activeSubs, inTrial });
       // Usuários mais recentes (5 últimos)
