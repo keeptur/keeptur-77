@@ -70,23 +70,31 @@ export default function DashboardSection() {
       const users = profiles?.length || 0;
       const admins = (roles || []).filter((r) => r.role === 'admin').length;
       const accs = accounts?.length || 0;
-      // Assinaturas ativas: usa a tabela subscribers quando disponível, considerando subscription_end > agora
+      // Assinaturas ativas: Prioridade para subscription_end > agora
+      const now = new Date();
       const activeSubs = (subscribers || []).filter((s) => {
-        if (s.subscribed) return true;
-        // Caso subscription_end exista e esteja no futuro, considerar ativo
+        // Primeiro verifica se tem subscription ativa
         if ((s as any).subscription_end) {
           const end = new Date((s as any).subscription_end as any);
-          return end > new Date();
+          return end > now;
         }
-        return false;
+        // Se não tem subscription_end, verifica subscribed flag (fallback)
+        return s.subscribed;
       }).length;
-      // Trials em andamento: usuário não assinado com trial_end futuro
-      const now = new Date();
+      
+      // Trials em andamento: trial_end futuro E não tem subscription ativa
       const inTrial = (subscribers || []).filter((s) => {
-        if (s.subscribed) return false;
+        // Não pode estar em trial se tem subscription ativa
+        if ((s as any).subscription_end) {
+          const end = new Date((s as any).subscription_end as any);
+          if (end > now) return false; // Tem subscription ativa
+        }
+        if (s.subscribed) return false; // Marcado como assinado
+        
+        // Só considera trial se trial_end for futuro
         if (!s.trial_end) return false;
-        const end = new Date(s.trial_end as any);
-        return end > now;
+        const trialEnd = new Date(s.trial_end as any);
+        return trialEnd > now;
       }).length;
       setKpis({ users, admins, accounts: accs, activeSubs, inTrial });
       // Usuários mais recentes (5 últimos)

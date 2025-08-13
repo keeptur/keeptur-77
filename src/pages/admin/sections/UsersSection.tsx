@@ -18,6 +18,7 @@ interface ProfileRow {
 interface RoleRow {
   user_id: string;
   role: string;
+  created_at?: string;
 }
 interface SubscriberRow {
   id: string;
@@ -72,59 +73,17 @@ export default function UsersSection() {
       data: r
     }, {
       data: s
-    }] = await Promise.all([supabase.from("profiles").select("id, email, full_name, created_at"), supabase.from("user_roles").select("user_id, role"), supabase.from("subscribers").select("id, user_id, email, display_name, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at, updated_at")]);
+    }] = await Promise.all([supabase.from("profiles").select("id, email, full_name, created_at"), supabase.from("user_roles").select("user_id, role, created_at"), supabase.from("subscribers").select("id, user_id, email, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at, updated_at")]);
     setProfiles((p || []) as any);
     setRoles((r || []) as any);
     setSubscribers((s || []) as any);
   };
-  const handleCreateUser = async () => {
-    if (!newEmail) return;
-    setCreating(true);
-    try {
-      const {
-        error
-      } = await supabase.functions.invoke('create-admin-user', {
-        body: {
-          email: newEmail,
-          name: newName,
-          // Utiliza o estado newIsAdmin diretamente (padrão false)
-          makeAdmin: newIsAdmin
-        }
-      });
-      if (error) throw error;
-      toast({
-        title: "Usuário criado",
-        description: "Convite enviado por e-mail."
-      });
-      setOpen(false);
-      setNewEmail("");
-      setNewName("");
-      // Após criar um usuário, volte o checkbox de admin para false
-      setNewIsAdmin(false);
-      await reload();
-    } catch (e: any) {
-      toast({
-        title: "Erro ao criar usuário",
-        description: e.message || String(e),
-        variant: "destructive"
-      });
-    } finally {
-      setCreating(false);
-    }
-  };
+
   useEffect(() => {
     const load = async () => {
       try {
-        const [{
-          data: p
-        }, {
-          data: r
-        }, {
-          data: s
-        }] = await Promise.all([supabase.from("profiles").select("id, email, full_name, created_at"), supabase.from("user_roles").select("user_id, role"), supabase.from("subscribers").select("id, user_id, email, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at, updated_at")]);
-        setProfiles((p || []) as any);
-        setRoles((r || []) as any);
-        setSubscribers((s || []) as any);
+        setLoading(true);
+        await reload();
       } finally {
         setLoading(false);
       }
@@ -136,17 +95,31 @@ export default function UsersSection() {
 
   // Definir isAdmin primeiro
   const isAdmin = (id: string) => roles.some(r => r.user_id === id && r.role === 'admin');
+  
+  // Função para verificar se é o super admin (primeiro admin criado)
+  const isSuperAdmin = (id: string) => {
+    if (!id || !roles.length) return false;
+    const adminRoles = roles.filter(r => r.role === 'admin').sort((a, b) => 
+      new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+    );
+    return adminRoles.length > 0 && adminRoles[0].user_id === id;
+  };
+  
   const getStatus = (u: CombinedUser): 'active' | 'trial' | 'inactive' => {
     const uid = u.id || u.user_id || '';
-    if (uid && isAdmin(uid)) return 'active'; // Super admin sempre ativo/vitalício
+    if (uid && isAdmin(uid)) return 'active'; // Admin sempre ativo
     const now = new Date();
     const sub = u.subscriber;
-    // Verificar se tem assinatura ativa
+    
+    // REGRA: Não pode estar em trial E ativo ao mesmo tempo
+    // Prioridade: subscription_end > trial_end
     const hasActiveSubscription = !!(sub?.subscribed && sub?.subscription_end && new Date(sub.subscription_end) > now);
     if (hasActiveSubscription) return 'active';
-    // Verificar se está em trial válido
-    const inValidTrial = !!(sub?.trial_end && new Date(sub.trial_end) > now);
+    
+    // Só considera trial se não tem subscription ativa
+    const inValidTrial = !!(sub?.trial_end && new Date(sub.trial_end) > now && !hasActiveSubscription);
     if (inValidTrial) return 'trial';
+    
     return 'inactive';
   };
   const combinedUsers = useMemo<CombinedUser[]>(() => {
@@ -496,16 +469,45 @@ export default function UsersSection() {
                     }} variant="outline" size="sm" className="text-xs px-2 py-1 h-auto" disabled={status === 'active'}>
                               Ativar
                             </Button>
-                           {/* Mostrar botão Admin apenas se tiver id (usuário do Supabase) e ainda não for admin */}
-                           {u.id && !isAdmin(u.id) && <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => promote(u.id!)}>
-                               Admin
-                             </Button>}
-                           {/* Mostrar botão Remover apenas se usuário for admin */}
-                           {u.id && isAdmin(u.id)}
-                           {/* Botão de deletar usuário */}
-                           <Button size="sm" variant="destructive" className="h-6 px-2 text-xs" onClick={() => deleteUser(u)}>
-                             <Trash2 className="h-3 w-3" />
-                           </Button>
+                            {/* Botão Ativar/Desativar para admins */}
+                            {u.id && isAdmin(u.id) && status === 'active' && !isSuperAdmin(u.id) && (
+                              <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={async () => {
+                                // Desativar admin: voltar para trial se ainda tem dias restantes
+                                await demote(u.id!);
+                                // Calcular dias restantes de trial baseado na configuração
+                                const trialDays = 2; // pegar do settings
+                                const now = new Date();
+                                const trialEnd = addDays(now, trialDays).toISOString();
+                                const payload: any = {
+                                  trial_end: trialEnd,
+                                  subscribed: false,
+                                  subscription_end: null
+                                };
+                                await supabase.from('subscribers').upsert({
+                                  email: u.email,
+                                  user_id: u.id,
+                                  ...payload
+                                });
+                                // Reload data to reflect changes
+                                await reload();
+                              }}>
+                                Desativar
+                              </Button>
+                            )}
+                            
+                            {/* Mostrar botão Admin apenas se tiver id (usuário do Supabase) e ainda não for admin */}
+                            {u.id && !isAdmin(u.id) && (
+                              <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => promote(u.id!)}>
+                                Admin
+                              </Button>
+                            )}
+                            
+                            {/* Botão de deletar usuário - ocultar para super admin */}
+                            {(!u.id || !isSuperAdmin(u.id)) && (
+                              <Button size="sm" variant="destructive" className="h-6 px-2 text-xs" onClick={() => deleteUser(u)}>
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
                          </div>
                       </td>
                       <td className="py-3 px-2 text-xs text-muted-foreground">{dateStr}</td>
@@ -539,7 +541,37 @@ export default function UsersSection() {
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleCreateUser} disabled={creating || !newEmail}>
+            <Button onClick={async () => {
+              if (!newEmail) return;
+              setCreating(true);
+              try {
+                const { error } = await supabase.functions.invoke('create-admin-user', {
+                  body: {
+                    email: newEmail,
+                    name: newName || null,
+                    makeAdmin: newIsAdmin
+                  }
+                });
+                if (error) throw error;
+                toast({
+                  title: 'Usuário criado',
+                  description: `Usuário ${newEmail} criado com sucesso.`
+                });
+                await reload();
+                setOpen(false);
+                setNewEmail('');
+                setNewName('');
+                setNewIsAdmin(false);
+              } catch (e: any) {
+                toast({
+                  title: 'Erro ao criar usuário',
+                  description: e.message || String(e),
+                  variant: 'destructive'
+                });
+              } finally {
+                setCreating(false);
+              }
+            }} disabled={creating || !newEmail}>
               {creating ? 'Criando...' : 'Criar Usuário'}
             </Button>
           </DialogFooter>
