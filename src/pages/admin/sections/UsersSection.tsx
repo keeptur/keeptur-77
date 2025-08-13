@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Trash2 } from "lucide-react";
-
 interface ProfileRow {
   id: string;
   email: string;
@@ -51,7 +50,9 @@ type CombinedUser = {
  * sejam promovidos erroneamente.
  */
 export default function UsersSection() {
-  const { toast } = useToast();
+  const {
+    toast
+  } = useToast();
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [roles, setRoles] = useState<RoleRow[]>([]);
   const [subscribers, setSubscribers] = useState<SubscriberRow[]>([]);
@@ -64,34 +65,37 @@ export default function UsersSection() {
   // Altere o padrão de true para false para evitar criação acidental de admins
   const [newIsAdmin, setNewIsAdmin] = useState(false);
   const [creating, setCreating] = useState(false);
-
   const reload = async () => {
-    const [ { data: p }, { data: r }, { data: s } ] = await Promise.all([
-      supabase.from("profiles").select("id, email, full_name, created_at"),
-      supabase.from("user_roles").select("user_id, role"),
-      supabase
-        .from("subscribers")
-        .select("id, user_id, email, display_name, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at, updated_at"),
-    ]);
+    const [{
+      data: p
+    }, {
+      data: r
+    }, {
+      data: s
+    }] = await Promise.all([supabase.from("profiles").select("id, email, full_name, created_at"), supabase.from("user_roles").select("user_id, role"), supabase.from("subscribers").select("id, user_id, email, display_name, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at, updated_at")]);
     setProfiles((p || []) as any);
     setRoles((r || []) as any);
     setSubscribers((s || []) as any);
   };
-
   const handleCreateUser = async () => {
     if (!newEmail) return;
     setCreating(true);
     try {
-      const { error } = await supabase.functions.invoke('create-admin-user', {
+      const {
+        error
+      } = await supabase.functions.invoke('create-admin-user', {
         body: {
           email: newEmail,
           name: newName,
           // Utiliza o estado newIsAdmin diretamente (padrão false)
-          makeAdmin: newIsAdmin,
-        },
+          makeAdmin: newIsAdmin
+        }
       });
       if (error) throw error;
-      toast({ title: "Usuário criado", description: "Convite enviado por e-mail." });
+      toast({
+        title: "Usuário criado",
+        description: "Convite enviado por e-mail."
+      });
       setOpen(false);
       setNewEmail("");
       setNewName("");
@@ -99,22 +103,25 @@ export default function UsersSection() {
       setNewIsAdmin(false);
       await reload();
     } catch (e: any) {
-      toast({ title: "Erro ao criar usuário", description: e.message || String(e), variant: "destructive" });
+      toast({
+        title: "Erro ao criar usuário",
+        description: e.message || String(e),
+        variant: "destructive"
+      });
     } finally {
       setCreating(false);
     }
   };
-
   useEffect(() => {
     const load = async () => {
       try {
-        const [ { data: p }, { data: r }, { data: s } ] = await Promise.all([
-          supabase.from("profiles").select("id, email, full_name, created_at"),
-          supabase.from("user_roles").select("user_id, role"),
-          supabase
-            .from("subscribers")
-            .select("id, user_id, email, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at, updated_at"),
-        ]);
+        const [{
+          data: p
+        }, {
+          data: r
+        }, {
+          data: s
+        }] = await Promise.all([supabase.from("profiles").select("id, email, full_name, created_at"), supabase.from("user_roles").select("user_id, role"), supabase.from("subscribers").select("id, user_id, email, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at, updated_at")]);
         setProfiles((p || []) as any);
         setRoles((r || []) as any);
         setSubscribers((s || []) as any);
@@ -124,13 +131,11 @@ export default function UsersSection() {
     };
     load().catch(() => setLoading(false));
   }, []);
-
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'trial' | 'inactive'>('all');
   const [planFilter, setPlanFilter] = useState<'all' | 'basic' | 'pro' | 'enterprise'>('all');
 
   // Definir isAdmin primeiro
-  const isAdmin = (id: string) => roles.some((r) => r.user_id === id && r.role === 'admin');
-
+  const isAdmin = (id: string) => roles.some(r => r.user_id === id && r.role === 'admin');
   const getStatus = (u: CombinedUser): 'active' | 'trial' | 'inactive' => {
     const uid = u.id || u.user_id || '';
     if (uid && isAdmin(uid)) return 'active'; // Super admin sempre ativo/vitalício
@@ -144,19 +149,18 @@ export default function UsersSection() {
     if (inValidTrial) return 'trial';
     return 'inactive';
   };
-
   const combinedUsers = useMemo<CombinedUser[]>(() => {
     const byEmail = new Map<string, CombinedUser>();
-    (subscribers || []).forEach((su) => {
+    (subscribers || []).forEach(su => {
       byEmail.set(su.email, {
         id: su.user_id || null,
         user_id: su.user_id,
         email: su.email,
         full_name: null,
-        subscriber: su,
+        subscriber: su
       });
     });
-    (profiles || []).forEach((pr) => {
+    (profiles || []).forEach(pr => {
       const existing = byEmail.get(pr.email);
       if (existing) {
         existing.id = pr.id;
@@ -166,92 +170,108 @@ export default function UsersSection() {
           id: pr.id,
           user_id: pr.id,
           email: pr.email,
-          full_name: pr.full_name,
+          full_name: pr.full_name
         });
       }
     });
     return Array.from(byEmail.values());
   }, [profiles, subscribers]);
-
   const filtered = useMemo(() => {
     let list = combinedUsers;
     if (q) {
       const s = q.toLowerCase();
-      list = list.filter((u) => u.email?.toLowerCase().includes(s) || (u.full_name || '').toLowerCase().includes(s));
+      list = list.filter(u => u.email?.toLowerCase().includes(s) || (u.full_name || '').toLowerCase().includes(s));
     }
     if (statusFilter !== 'all') {
-      list = list.filter((u) => getStatus(u) === statusFilter);
+      list = list.filter(u => getStatus(u) === statusFilter);
     }
     if (planFilter !== 'all') {
-      list = list.filter((u) => (u.subscriber?.subscription_tier || '').toLowerCase() === planFilter);
+      list = list.filter(u => (u.subscriber?.subscription_tier || '').toLowerCase() === planFilter);
     }
     return list;
   }, [q, combinedUsers, statusFilter, planFilter]);
-
   const promote = async (userId: string) => {
     // Só permitir promover se este usuário possuir id (ou seja, autenticação do Supabase)
     if (!userId) return;
-    const { error } = await supabase.from("user_roles").insert({ user_id: userId, role: 'admin' as any });
+    const {
+      error
+    } = await supabase.from("user_roles").insert({
+      user_id: userId,
+      role: 'admin' as any
+    });
     if (error) {
-      toast({ title: 'Erro ao promover', description: error.message, variant: 'destructive' });
+      toast({
+        title: 'Erro ao promover',
+        description: error.message,
+        variant: 'destructive'
+      });
     } else {
-      setRoles((prev) => [...prev, { user_id: userId, role: 'admin' }]);
-      toast({ title: 'Usuário promovido a admin' });
+      setRoles(prev => [...prev, {
+        user_id: userId,
+        role: 'admin'
+      }]);
+      toast({
+        title: 'Usuário promovido a admin'
+      });
     }
   };
-
   const demote = async (userId: string) => {
-    const { error } = await supabase.from("user_roles").delete().eq("user_id", userId).eq("role", 'admin');
+    const {
+      error
+    } = await supabase.from("user_roles").delete().eq("user_id", userId).eq("role", 'admin');
     if (error) {
-      toast({ title: 'Erro ao remover admin', description: error.message, variant: 'destructive' });
+      toast({
+        title: 'Erro ao remover admin',
+        description: error.message,
+        variant: 'destructive'
+      });
     } else {
-      setRoles((prev) => prev.filter((r) => !(r.user_id === userId && r.role === 'admin')));
-      toast({ title: 'Admin removido' });
+      setRoles(prev => prev.filter(r => !(r.user_id === userId && r.role === 'admin')));
+      toast({
+        title: 'Admin removido'
+      });
     }
   };
-
   const deleteUser = async (user: CombinedUser) => {
     if (!confirm(`Tem certeza que deseja deletar permanentemente o usuário ${user.email}? Esta ação não pode ser desfeita.`)) {
       return;
     }
-
     try {
       // Usar edge function para deletar com permissões adequadas
       const userId = user.id || user.user_id;
       if (!userId) {
-        toast({ 
-          title: 'Erro ao deletar usuário', 
-          description: 'ID do usuário não encontrado', 
-          variant: 'destructive' 
+        toast({
+          title: 'Erro ao deletar usuário',
+          description: 'ID do usuário não encontrado',
+          variant: 'destructive'
         });
         return;
       }
-
-      const { error } = await supabase.functions.invoke('delete-user', {
-        body: { userId }
+      const {
+        error
+      } = await supabase.functions.invoke('delete-user', {
+        body: {
+          userId
+        }
       });
-
       if (error) throw error;
-
-      toast({ 
-        title: 'Usuário deletado', 
-        description: 'Usuário removido completamente do sistema. Se fizer login novamente, terá uma nova conta trial.' 
+      toast({
+        title: 'Usuário deletado',
+        description: 'Usuário removido completamente do sistema. Se fizer login novamente, terá uma nova conta trial.'
       });
-      
+
       // Atualizar a lista removendo o usuário deletado
       setProfiles(prev => prev.filter(p => p.id !== userId));
       setSubscribers(prev => prev.filter(s => s.user_id !== userId && s.email !== user.email));
       setRoles(prev => prev.filter(r => r.user_id !== userId));
-      
     } catch (e: any) {
-      toast({ 
-        title: 'Erro ao deletar usuário', 
-        description: e.message || String(e), 
-        variant: 'destructive' 
+      toast({
+        title: 'Erro ao deletar usuário',
+        description: e.message || String(e),
+        variant: 'destructive'
       });
     }
   };
-
   const getDaysRemaining = (dateStr: string | null | undefined) => {
     if (!dateStr) return null;
     const now = new Date().getTime();
@@ -265,51 +285,51 @@ export default function UsersSection() {
   };
   async function addDaysTo(user: CombinedUser, field: 'trial_end' | 'subscription_end', days: number) {
     try {
-      const sub = subscribers.find((s) => s.email === user.email) || null;
+      const sub = subscribers.find(s => s.email === user.email) || null;
       const baseDateStr = sub?.[field] || null;
       const base = baseDateStr ? new Date(baseDateStr) : new Date();
       const newDate = addDays(base, days).toISOString();
       if (sub) {
-        const { error } = await supabase
-          .from('subscribers')
-          .update({ [field]: newDate, subscribed: field === 'subscription_end' ? true : sub.subscribed })
-          .eq('id', sub.id);
+        const {
+          error
+        } = await supabase.from('subscribers').update({
+          [field]: newDate,
+          subscribed: field === 'subscription_end' ? true : sub.subscribed
+        }).eq('id', sub.id);
         if (error) throw error;
-        setSubscribers((prev) =>
-          prev.map((x) =>
-            x.id === sub.id
-              ? ({
-                  ...x,
-                  [field]: newDate,
-                  subscribed: field === 'subscription_end' ? true : x.subscribed,
-                  updated_at: new Date().toISOString(),
-                } as SubscriberRow)
-              : x,
-          ),
-        );
+        setSubscribers(prev => prev.map(x => x.id === sub.id ? {
+          ...x,
+          [field]: newDate,
+          subscribed: field === 'subscription_end' ? true : x.subscribed,
+          updated_at: new Date().toISOString()
+        } as SubscriberRow : x));
       } else {
         const payload: any = {
           email: user.email,
           user_id: user.id || user.user_id || null,
           subscribed: field === 'subscription_end',
-          [field]: newDate,
+          [field]: newDate
         };
-        const { data, error } = await supabase
-          .from('subscribers')
-          .insert(payload)
-          .select()
-          .single();
+        const {
+          data,
+          error
+        } = await supabase.from('subscribers').insert(payload).select().single();
         if (error) throw error;
-        if (data) setSubscribers((prev) => [...prev, data as SubscriberRow]);
+        if (data) setSubscribers(prev => [...prev, data as SubscriberRow]);
       }
-      toast({ title: 'Prazo atualizado', description: `+${days} dias em ${field === 'trial_end' ? 'trial' : 'assinatura'}.` });
+      toast({
+        title: 'Prazo atualizado',
+        description: `+${days} dias em ${field === 'trial_end' ? 'trial' : 'assinatura'}.`
+      });
     } catch (e: any) {
-      toast({ title: 'Erro ao atualizar prazos', description: e.message, variant: 'destructive' });
+      toast({
+        title: 'Erro ao atualizar prazos',
+        description: e.message,
+        variant: 'destructive'
+      });
     }
   }
-
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Últimos Usuários Cadastrados</h3>
         <Button onClick={() => setOpen(true)}>Criar Usuário</Button>
@@ -317,24 +337,16 @@ export default function UsersSection() {
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex-1">
-          <Input placeholder="Buscar por nome ou email..." value={q} onChange={(e) => setQ(e.target.value)} className="w-full" />
+          <Input placeholder="Buscar por nome ou email..." value={q} onChange={e => setQ(e.target.value)} className="w-full" />
         </div>
         <div className="flex gap-2">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="px-3 py-1 text-xs rounded-button bg-card border text-muted-foreground"
-          >
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="px-3 py-1 text-xs rounded-button bg-card border text-muted-foreground">
             <option value="all">Todos</option>
             <option value="active">Ativo</option>
             <option value="trial">Trial</option>
             <option value="inactive">Inativo</option>
           </select>
-          <select
-            value={planFilter}
-            onChange={(e) => setPlanFilter(e.target.value as any)}
-            className="px-3 py-1 text-xs rounded-button bg-card border text-muted-foreground"
-          >
+          <select value={planFilter} onChange={e => setPlanFilter(e.target.value as any)} className="px-3 py-1 text-xs rounded-button bg-card border text-muted-foreground">
             <option value="all">Planos</option>
             <option value="basic">Básico</option>
             <option value="pro">Pro</option>
@@ -358,72 +370,60 @@ export default function UsersSection() {
               </tr>
             </thead>
             <tbody>
-              {loading && (
-                <tr>
+              {loading && <tr>
                   <td className="py-6 px-2 text-sm text-muted-foreground" colSpan={8}>
                     Carregando...
                   </td>
-                </tr>
-              )}
-              {!loading && filtered.length === 0 && (
-                <tr>
+                </tr>}
+              {!loading && filtered.length === 0 && <tr>
                   <td className="py-6 px-2 text-sm text-muted-foreground" colSpan={8}>
                     Nenhum usuário encontrado.
                   </td>
-                </tr>
-              )}
-              {!loading &&
-                filtered.map((u) => {
-                  const initials = (u.full_name || u.email)
-                    .split(/\s|@/)
-                    .filter(Boolean)
-                    .slice(0, 2)
-                    .map((s) => s[0])
-                    .join('')
-                    .toUpperCase();
-                  const idShort = (u.id || u.user_id || '').slice(0, 8) || '—';
-                  const status = getStatus(u);
-                  const planRaw = (u.subscriber?.subscription_tier || '').toLowerCase();
-                  const plan = planRaw ? (planRaw === 'pro' ? 'Pro' : planRaw === 'enterprise' ? 'Enterprise' : 'Básico') : '—';
-                  const subCreated = u.subscriber?.created_at || undefined;
-                  const profileCreated = profiles.find((p) => p.email === u.email)?.created_at as string | undefined;
-                  const dateStr = subCreated || profileCreated ? new Date(subCreated || (profileCreated as string)).toLocaleDateString() : '—';
-                  const badgeStyle = (kind: 'plan-pro' | 'plan-enterprise' | 'plan-basic' | 'status-active' | 'status-trial' | 'status-inactive') => {
-                    switch (kind) {
-                      case 'plan-pro':
-                        return {
-                          backgroundColor: 'hsl(var(--warning) / 0.15)',
-                          color: 'hsl(var(--warning))',
-                        } as React.CSSProperties;
-                      case 'plan-enterprise':
-                        return {
-                          backgroundColor: 'hsl(var(--primary) / 0.15)',
-                          color: 'hsl(var(--primary))',
-                        } as React.CSSProperties;
-                      case 'plan-basic':
-                        return {
-                          backgroundColor: 'hsl(var(--muted))',
-                          color: 'hsl(var(--foreground))',
-                        } as React.CSSProperties;
-                      case 'status-active':
-                        return {
-                          backgroundColor: 'hsl(var(--success) / 0.15)',
-                          color: 'hsl(var(--success))',
-                        } as React.CSSProperties;
-                      case 'status-trial':
-                        return {
-                          backgroundColor: 'hsl(var(--primary) / 0.15)',
-                          color: 'hsl(var(--primary))',
-                        } as React.CSSProperties;
-                      default:
-                        return {
-                          backgroundColor: 'hsl(var(--muted))',
-                          color: 'hsl(var(--muted-foreground))',
-                        } as React.CSSProperties;
-                    }
-                  };
-                  return (
-                    <tr key={u.email} className="border-b last:border-b-0">
+                </tr>}
+              {!loading && filtered.map(u => {
+              const initials = (u.full_name || u.email).split(/\s|@/).filter(Boolean).slice(0, 2).map(s => s[0]).join('').toUpperCase();
+              const idShort = (u.id || u.user_id || '').slice(0, 8) || '—';
+              const status = getStatus(u);
+              const planRaw = (u.subscriber?.subscription_tier || '').toLowerCase();
+              const plan = planRaw ? planRaw === 'pro' ? 'Pro' : planRaw === 'enterprise' ? 'Enterprise' : 'Básico' : '—';
+              const subCreated = u.subscriber?.created_at || undefined;
+              const profileCreated = profiles.find(p => p.email === u.email)?.created_at as string | undefined;
+              const dateStr = subCreated || profileCreated ? new Date(subCreated || profileCreated as string).toLocaleDateString() : '—';
+              const badgeStyle = (kind: 'plan-pro' | 'plan-enterprise' | 'plan-basic' | 'status-active' | 'status-trial' | 'status-inactive') => {
+                switch (kind) {
+                  case 'plan-pro':
+                    return {
+                      backgroundColor: 'hsl(var(--warning) / 0.15)',
+                      color: 'hsl(var(--warning))'
+                    } as React.CSSProperties;
+                  case 'plan-enterprise':
+                    return {
+                      backgroundColor: 'hsl(var(--primary) / 0.15)',
+                      color: 'hsl(var(--primary))'
+                    } as React.CSSProperties;
+                  case 'plan-basic':
+                    return {
+                      backgroundColor: 'hsl(var(--muted))',
+                      color: 'hsl(var(--foreground))'
+                    } as React.CSSProperties;
+                  case 'status-active':
+                    return {
+                      backgroundColor: 'hsl(var(--success) / 0.15)',
+                      color: 'hsl(var(--success))'
+                    } as React.CSSProperties;
+                  case 'status-trial':
+                    return {
+                      backgroundColor: 'hsl(var(--primary) / 0.15)',
+                      color: 'hsl(var(--primary))'
+                    } as React.CSSProperties;
+                  default:
+                    return {
+                      backgroundColor: 'hsl(var(--muted))',
+                      color: 'hsl(var(--muted-foreground))'
+                    } as React.CSSProperties;
+                }
+              };
+              return <tr key={u.email} className="border-b last:border-b-0">
                       <td className="py-3 px-2">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground text-xs font-medium grid place-items-center">
@@ -436,119 +436,81 @@ export default function UsersSection() {
                       </td>
                       <td className="py-3 px-2 text-sm break-words whitespace-normal max-w-[260px]">{u.email}</td>
                       <td className="py-3 px-2">
-                        <span
-                          className="px-2 py-1 rounded-full text-xs font-medium"
-                          style={plan === 'Pro' ? badgeStyle('plan-pro') : plan === 'Enterprise' ? badgeStyle('plan-enterprise') : badgeStyle('plan-basic')}
-                        >
+                        <span className="px-2 py-1 rounded-full text-xs font-medium" style={plan === 'Pro' ? badgeStyle('plan-pro') : plan === 'Enterprise' ? badgeStyle('plan-enterprise') : badgeStyle('plan-basic')}>
                           {plan}
                         </span>
                       </td>
                       <td className="py-3 px-2">
-                        <span
-                          className="px-2 py-1 rounded-full text-xs font-medium"
-                          style={status === 'active' ? badgeStyle('status-active') : status === 'trial' ? badgeStyle('status-trial') : badgeStyle('status-inactive')}
-                        >
+                        <span className="px-2 py-1 rounded-full text-xs font-medium" style={status === 'active' ? badgeStyle('status-active') : status === 'trial' ? badgeStyle('status-trial') : badgeStyle('status-inactive')}>
                           {status === 'active' ? 'Ativo' : status === 'trial' ? 'Trial' : 'Inativo'}
                         </span>
                       </td>
                        <td className="py-3 px-2">
-                         <input
-                           type="number"
-                           placeholder="+"
-                           className="w-16 px-2 py-1 text-xs border rounded text-center"
-                           disabled={status === 'active'}
-                           onKeyDown={(e) => {
-                             if (e.key === 'Enter') {
-                               const days = parseInt((e.currentTarget as HTMLInputElement).value);
-                               if (days > 0) {
-                                 addDaysTo(u, 'trial_end', days);
-                                 (e.currentTarget as HTMLInputElement).value = '';
-                               }
-                             }
-                           }}
-                           onBlur={(e) => {
-                             const days = parseInt((e.currentTarget as HTMLInputElement).value);
-                             if (days > 0) {
-                               addDaysTo(u, 'trial_end', days);
-                               (e.currentTarget as HTMLInputElement).value = '';
-                             }
-                           }}
-                         />
+                         <input type="number" placeholder="+" className="w-16 px-2 py-1 text-xs border rounded text-center" disabled={status === 'active'} onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      const days = parseInt((e.currentTarget as HTMLInputElement).value);
+                      if (days > 0) {
+                        addDaysTo(u, 'trial_end', days);
+                        (e.currentTarget as HTMLInputElement).value = '';
+                      }
+                    }
+                  }} onBlur={e => {
+                    const days = parseInt((e.currentTarget as HTMLInputElement).value);
+                    if (days > 0) {
+                      addDaysTo(u, 'trial_end', days);
+                      (e.currentTarget as HTMLInputElement).value = '';
+                    }
+                  }} />
                          <div className="text-xs text-muted-foreground mt-1">
                            {u.subscriber?.trial_end ? `${getDaysRemaining(u.subscriber.trial_end) || 0}d` : '-'}
                          </div>
                        </td>
                        <td className="py-3 px-2">
-                         <input
-                           type="number"
-                           placeholder="+"
-                           className="w-16 px-2 py-1 text-xs border rounded text-center"
-                           disabled={status === 'trial'}
-                           onKeyDown={(e) => {
-                             if (e.key === 'Enter') {
-                               const days = parseInt((e.currentTarget as HTMLInputElement).value);
-                               if (days > 0) {
-                                 addDaysTo(u, 'subscription_end', days);
-                                 (e.currentTarget as HTMLInputElement).value = '';
-                               }
-                             }
-                           }}
-                           onBlur={(e) => {
-                             const days = parseInt((e.currentTarget as HTMLInputElement).value);
-                             if (days > 0) {
-                               addDaysTo(u, 'subscription_end', days);
-                               (e.currentTarget as HTMLInputElement).value = '';
-                             }
-                           }}
-                         />
+                         <input type="number" placeholder="+" className="w-16 px-2 py-1 text-xs border rounded text-center" disabled={status === 'trial'} onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      const days = parseInt((e.currentTarget as HTMLInputElement).value);
+                      if (days > 0) {
+                        addDaysTo(u, 'subscription_end', days);
+                        (e.currentTarget as HTMLInputElement).value = '';
+                      }
+                    }
+                  }} onBlur={e => {
+                    const days = parseInt((e.currentTarget as HTMLInputElement).value);
+                    if (days > 0) {
+                      addDaysTo(u, 'subscription_end', days);
+                      (e.currentTarget as HTMLInputElement).value = '';
+                    }
+                  }} />
                          <div className="text-xs text-muted-foreground mt-1">
                            {u.subscriber?.subscription_end ? `${getDaysRemaining(u.subscriber.subscription_end) || 0}d` : '-'}
                          </div>
                        </td>
                        <td className="py-3 px-2">
                           <div className="flex gap-1">
-                            <Button 
-                              onClick={() => {
-                                addDaysTo(u, 'subscription_end', 30);
-                                // Zerar trial quando ativar assinatura
-                                if (u.subscriber?.trial_end) {
-                                  addDaysTo(u, 'trial_end', -365);
-                                }
-                              }} 
-                              variant="outline" 
-                              size="sm" 
-                              className="text-xs px-2 py-1 h-auto"
-                              disabled={status === 'active'}
-                            >
+                            <Button onClick={() => {
+                      addDaysTo(u, 'subscription_end', 30);
+                      // Zerar trial quando ativar assinatura
+                      if (u.subscriber?.trial_end) {
+                        addDaysTo(u, 'trial_end', -365);
+                      }
+                    }} variant="outline" size="sm" className="text-xs px-2 py-1 h-auto" disabled={status === 'active'}>
                               Ativar
                             </Button>
                            {/* Mostrar botão Admin apenas se tiver id (usuário do Supabase) e ainda não for admin */}
-                           {u.id && !isAdmin(u.id) && (
-                             <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => promote(u.id!)}>
+                           {u.id && !isAdmin(u.id) && <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => promote(u.id!)}>
                                Admin
-                             </Button>
-                           )}
+                             </Button>}
                            {/* Mostrar botão Remover apenas se usuário for admin */}
-                           {u.id && isAdmin(u.id) && (
-                             <Button size="sm" variant="destructive" className="h-6 px-2 text-xs" onClick={() => demote(u.id!)}>
-                               Remover
-                             </Button>
-                           )}
+                           {u.id && isAdmin(u.id)}
                            {/* Botão de deletar usuário */}
-                           <Button 
-                             size="sm" 
-                             variant="destructive" 
-                             className="h-6 px-2 text-xs" 
-                             onClick={() => deleteUser(u)}
-                           >
+                           <Button size="sm" variant="destructive" className="h-6 px-2 text-xs" onClick={() => deleteUser(u)}>
                              <Trash2 className="h-3 w-3" />
                            </Button>
                          </div>
                       </td>
                       <td className="py-3 px-2 text-xs text-muted-foreground">{dateStr}</td>
-                    </tr>
-                  );
-                })}
+                    </tr>;
+            })}
             </tbody>
           </table>
         </div>
@@ -562,14 +524,14 @@ export default function UsersSection() {
           <div className="space-y-4">
             <div>
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="usuario@exemplo.com" />
+              <Input id="email" type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="usuario@exemplo.com" />
             </div>
             <div>
               <Label htmlFor="name">Nome (opcional)</Label>
-              <Input id="name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nome do usuário" />
+              <Input id="name" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nome do usuário" />
             </div>
             <div className="flex items-center space-x-2">
-              <input id="admin" type="checkbox" checked={newIsAdmin} onChange={(e) => setNewIsAdmin(e.target.checked)} />
+              <input id="admin" type="checkbox" checked={newIsAdmin} onChange={e => setNewIsAdmin(e.target.checked)} />
               <Label htmlFor="admin">Criar como administrador</Label>
             </div>
           </div>
@@ -583,6 +545,5 @@ export default function UsersSection() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  );
+    </div>;
 }
