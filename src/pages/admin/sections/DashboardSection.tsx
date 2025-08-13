@@ -1,16 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-} from "recharts";
-
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 interface KPIs {
   users: number;
   admins: number;
@@ -18,81 +9,107 @@ interface KPIs {
   activeSubs: number;
   inTrial: number;
 }
-
 interface ProfileLite {
   id: string;
   email: string;
   full_name?: string | null;
   created_at?: string | null;
 }
-
 export default function DashboardSection() {
-  const [kpis, setKpis] = useState<KPIs>({ users: 0, admins: 0, accounts: 0, activeSubs: 0, inTrial: 0 });
+  const [kpis, setKpis] = useState<KPIs>({
+    users: 0,
+    admins: 0,
+    accounts: 0,
+    activeSubs: 0,
+    inTrial: 0
+  });
   const [recent, setRecent] = useState<ProfileLite[]>([]);
-
   useEffect(() => {
     const load = async () => {
       // Perfis (para métricas e lista recente)
-      const { data: profiles } = await supabase.from("profiles").select("id, email, full_name, created_at");
+      const {
+        data: profiles
+      } = await supabase.from("profiles").select("id, email, full_name, created_at");
       // Admins
-      const { data: roles } = await supabase.from("user_roles").select("user_id, role");
+      const {
+        data: roles
+      } = await supabase.from("user_roles").select("user_id, role");
       // Contas e status (mantém compatibilidade atual)
-      const { data: accounts } = await supabase.from("accounts").select("id, subscribed, trial_start, trial_end");
-
+      const {
+        data: accounts
+      } = await supabase.from("accounts").select("id, subscribed, trial_start, trial_end");
       const users = profiles?.length || 0;
-      const admins = (roles || []).filter((r) => r.role === "admin").length;
+      const admins = (roles || []).filter(r => r.role === "admin").length;
       const accs = accounts?.length || 0;
-      const activeSubs = (accounts || []).filter((a) => a.subscribed).length;
-
+      const activeSubs = (accounts || []).filter(a => a.subscribed).length;
       const now = new Date();
-      const inTrial = (accounts || []).filter((a) => {
+      const inTrial = (accounts || []).filter(a => {
         if (!a.trial_start || !a.trial_end) return false;
         const end = new Date(a.trial_end as any);
         return end > now && !a.subscribed;
       }).length;
-
-      setKpis({ users, admins, accounts: accs, activeSubs, inTrial });
-
-      const rec = (profiles || [])
-        .slice()
-        .sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
-        .slice(0, 5) as ProfileLite[];
+      setKpis({
+        users,
+        admins,
+        accounts: accs,
+        activeSubs,
+        inTrial
+      });
+      const rec = (profiles || []).slice().sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()).slice(0, 5) as ProfileLite[];
       setRecent(rec);
     };
     load().catch(() => {});
   }, []);
-
-  const revenueData = useMemo(
-    () => [
-      { d: "01/08", v: 85000 },
-      { d: "03/08", v: 92000 },
-      { d: "05/08", v: 88000 },
-      { d: "07/08", v: 105000 },
-      { d: "09/08", v: 118000 },
-      { d: "11/08", v: 125000 },
-      { d: "13/08", v: 127450 },
-    ],
-    []
-  );
-
-  const usersData = useMemo(
-    () => [
-      { d: "01/08", v: 2450 },
-      { d: "03/08", v: 2520 },
-      { d: "05/08", v: 2680 },
-      { d: "07/08", v: 2750 },
-      { d: "09/08", v: 2780 },
-      { d: "11/08", v: 2820 },
-      { d: "13/08", v: 2847 },
-    ],
-    []
-  );
-
-  return (
-    <div className="space-y-6">
+  const revenueData = useMemo(() => [{
+    d: "01/08",
+    v: 85000
+  }, {
+    d: "03/08",
+    v: 92000
+  }, {
+    d: "05/08",
+    v: 88000
+  }, {
+    d: "07/08",
+    v: 105000
+  }, {
+    d: "09/08",
+    v: 118000
+  }, {
+    d: "11/08",
+    v: 125000
+  }, {
+    d: "13/08",
+    v: 127450
+  }], []);
+  const usersData = useMemo(() => [{
+    d: "01/08",
+    v: 2450
+  }, {
+    d: "03/08",
+    v: 2520
+  }, {
+    d: "05/08",
+    v: 2680
+  }, {
+    d: "07/08",
+    v: 2750
+  }, {
+    d: "09/08",
+    v: 2780
+  }, {
+    d: "11/08",
+    v: 2820
+  }, {
+    d: "13/08",
+    v: 2847
+  }], []);
+  return <div className="space-y-6">
       {/* Cards KPI com gradientes como no layout de referência */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="rounded-xl overflow-hidden" style={{ background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)" }}>
+        <Card className="rounded-xl overflow-hidden" style={{
+        background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)"
+      }}>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -109,7 +126,9 @@ export default function DashboardSection() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-xl overflow-hidden" style={{ background: "linear-gradient(135deg, #f59e0b 0%, #f97316 100%)" }}>
+        <Card className="rounded-xl overflow-hidden" style={{
+        background: "linear-gradient(135deg, #f59e0b 0%, #f97316 100%)"
+      }}>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -126,7 +145,9 @@ export default function DashboardSection() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-xl overflow-hidden" style={{ background: "linear-gradient(135deg, #10b981 0%, #059669 100%)" }}>
+        <Card className="rounded-xl overflow-hidden" style={{
+        background: "linear-gradient(135deg, #10b981 0%, #059669 100%)"
+      }}>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -143,7 +164,9 @@ export default function DashboardSection() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-xl overflow-hidden" style={{ background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)" }}>
+        <Card className="rounded-xl overflow-hidden" style={{
+        background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)"
+      }}>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -173,7 +196,9 @@ export default function DashboardSection() {
                   <CartesianGrid vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="d" tickLine={false} axisLine={false} stroke="#64748b" fontSize={12} />
                   <YAxis tickLine={false} axisLine={false} stroke="#64748b" fontSize={12} />
-                  <Tooltip cursor={{ stroke: "#e2e8f0" }} />
+                  <Tooltip cursor={{
+                  stroke: "#e2e8f0"
+                }} />
                   <Line type="monotone" dataKey="v" stroke="#57b5e7" strokeWidth={3} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
@@ -192,7 +217,9 @@ export default function DashboardSection() {
                   <CartesianGrid vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="d" tickLine={false} axisLine={false} stroke="#64748b" fontSize={12} />
                   <YAxis tickLine={false} axisLine={false} stroke="#64748b" fontSize={12} />
-                  <Tooltip cursor={{ stroke: "#e2e8f0" }} />
+                  <Tooltip cursor={{
+                  stroke: "#e2e8f0"
+                }} />
                   <Line type="monotone" dataKey="v" stroke="#8dd3c7" strokeWidth={3} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
@@ -217,8 +244,7 @@ export default function DashboardSection() {
                   </tr>
                 </thead>
                 <tbody>
-                  {recent.map((u) => (
-                    <tr key={u.id} className="border-b last:border-b-0">
+                  {recent.map(u => <tr key={u.id} className="border-b last:border-b-0">
                       <td className="py-3 px-2">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-indigo-500 text-white text-xs font-medium grid place-items-center">
@@ -232,13 +258,10 @@ export default function DashboardSection() {
                       </td>
                       <td className="py-3 px-2 text-sm break-words whitespace-normal max-w-[260px]">{u.email}</td>
                       <td className="py-3 px-2 text-xs text-muted-foreground">{u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}</td>
-                    </tr>
-                  ))}
-                  {recent.length === 0 && (
-                    <tr>
+                    </tr>)}
+                  {recent.length === 0 && <tr>
                       <td className="py-6 px-2 text-sm text-muted-foreground" colSpan={3}>Nenhum usuário recente.</td>
-                    </tr>
-                  )}
+                    </tr>}
                 </tbody>
               </table>
             </div>
@@ -260,7 +283,9 @@ export default function DashboardSection() {
                   <span className="text-sm font-semibold">68.5%</span>
                 </div>
                 <div className="w-full bg-muted rounded-full h-2">
-                  <div className="bg-green-500 h-2 rounded-full" style={{ width: "68.5%" }} />
+                  <div className="bg-green-500 h-2 rounded-full" style={{
+                  width: "68.5%"
+                }} />
                 </div>
               </div>
               <div>
@@ -272,7 +297,9 @@ export default function DashboardSection() {
                   <span className="text-sm font-semibold">84.2%</span>
                 </div>
                 <div className="w-full bg-muted rounded-full h-2">
-                  <div className="bg-blue-500 h-2 rounded-full" style={{ width: "84.2%" }} />
+                  <div className="bg-blue-500 h-2 rounded-full" style={{
+                  width: "84.2%"
+                }} />
                 </div>
               </div>
               <div>
@@ -284,7 +311,9 @@ export default function DashboardSection() {
                   <span className="text-sm font-semibold">4.8%</span>
                 </div>
                 <div className="w-full bg-muted rounded-full h-2">
-                  <div className="bg-red-500 h-2 rounded-full" style={{ width: "4.8%" }} />
+                  <div className="bg-red-500 h-2 rounded-full" style={{
+                  width: "4.8%"
+                }} />
                 </div>
               </div>
             </CardContent>
@@ -302,6 +331,5 @@ export default function DashboardSection() {
           </Card>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 }
