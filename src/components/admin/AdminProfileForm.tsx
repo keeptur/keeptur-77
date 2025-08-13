@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import AvatarUploader from "./AvatarUploader";
+import { formatPhoneBR } from "@/utils/phoneMask";
 
 const schema = z.object({
   full_name: z.string().min(2, "Informe seu nome completo").max(120),
@@ -181,7 +183,11 @@ export default function AdminProfileForm() {
                 <FormItem>
                   <FormLabel>Telefone</FormLabel>
                   <FormControl>
-                    <Input placeholder="(00) 0000-0000" {...field} />
+                    <Input
+                      placeholder="(00) 0000-0000"
+                      value={field.value || ""}
+                      onChange={(e) => field.onChange(formatPhoneBR(e.target.value))}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -195,7 +201,11 @@ export default function AdminProfileForm() {
                 <FormItem>
                   <FormLabel>Celular</FormLabel>
                   <FormControl>
-                    <Input placeholder="(00) 00000-0000" {...field} />
+                    <Input
+                      placeholder="(00) 00000-0000"
+                      value={field.value || ""}
+                      onChange={(e) => field.onChange(formatPhoneBR(e.target.value))}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -220,12 +230,20 @@ export default function AdminProfileForm() {
               control={form.control}
               name="avatar_url"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Avatar (URL)</FormLabel>
+                <FormItem className="md:col-span-2">
+                  <FormLabel>Avatar</FormLabel>
                   <FormControl>
-                    <Input placeholder="https://..." {...field} />
+                    <div className="space-y-2">
+                      <AvatarUploader
+                        value={field.value || ""}
+                        onChange={(url) => field.onChange(url)}
+                        triggerText="Enviar avatar"
+                      />
+                      {/* Mantemos um input escondido para o valor, garantindo bind com o form */}
+                      <input type="hidden" value={field.value || ""} onChange={() => {}} />
+                    </div>
                   </FormControl>
-                  <FormDescription>Informe a URL de uma imagem.</FormDescription>
+                  <FormDescription>Envie uma imagem; faremos o corte quadrado automaticamente.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
