@@ -169,37 +169,37 @@ export default function UsersSection() {
   };
 
   /**
-   * Deleta completamente um usuário. Se o usuário possuir ID Supabase, utiliza a
-   * edge function `delete-user` para remover todos os dados relacionados com
-   * permissões adequadas. Caso contrário, remove registros de assinante e
-   * perfil manualmente com base no email.
+   * Deleta completamente um usuário, removendo todos os seus registros no Supabase.
+   * Caso o usuário possua ID (foi autenticado via Supabase), serão removidos os
+   * registros de `user_roles`, `subscribers` e `profiles` usando esse ID ou o e‑mail.
+   * Se o usuário não tiver ID (foi criado apenas no Monde), a remoção será
+   * baseada somente no e‑mail. Após a exclusão, o estado local é atualizado.
    */
   const deleteUser = async (user: CombinedUser) => {
     if (!confirm(`Tem certeza que deseja deletar permanentemente o usuário ${user.email}? Esta ação não pode ser desfeita.`)) {
       return;
     }
     try {
-      const userId = user.id || user.user_id;
+      const userId = user.id || user.user_id || null;
       if (userId) {
-        // Invoca edge function para deletar usuário completo (profiles, subscribers, roles)
-        const { error } = await supabase.functions.invoke('delete-user', { body: { userId } });
-        if (error) throw error;
-        // Atualiza listas locais removendo o usuário
-        setProfiles((prev) => prev.filter((p) => p.id !== userId));
+        // Remove papéis do usuário
+        await supabase.from('user_roles').delete().eq('user_id', userId);
+        // Remove registros de assinante (pode haver duplicidades por id ou email)
+        await supabase.from('subscribers').delete().or(`user_id.eq.${userId},email.eq.${user.email}`);
+        // Remove perfil
+        await supabase.from('profiles').delete().or(`id.eq.${userId},email.eq.${user.email}`);
+        // Atualiza listas locais
+        setProfiles((prev) => prev.filter((p) => p.id !== userId && p.email !== user.email));
         setSubscribers((prev) => prev.filter((s) => s.user_id !== userId && s.email !== user.email));
         setRoles((prev) => prev.filter((r) => r.user_id !== userId));
       } else {
         // Usuário sem ID Supabase (apenas Monde). Remover registros baseados no email.
-        // Remove assinaturas
-        const { error: subErr } = await supabase.from('subscribers').delete().eq('email', user.email);
-        if (subErr) throw subErr;
-        // Remove perfil (caso exista)
-        const { error: profErr } = await supabase.from('profiles').delete().eq('email', user.email);
-        if (profErr) throw profErr;
+        await supabase.from('subscribers').delete().eq('email', user.email);
+        await supabase.from('profiles').delete().eq('email', user.email);
         // Atualiza estados locais
         setProfiles((prev) => prev.filter((p) => p.email !== user.email));
         setSubscribers((prev) => prev.filter((s) => s.email !== user.email));
-        setRoles((prev) => prev);
+        // roles permanecem inalterados
       }
       toast({ title: 'Usuário deletado', description: 'Usuário removido completamente do sistema.' });
     } catch (e: any) {
@@ -535,9 +535,17 @@ export default function UsersSection() {
                       </td>
                       <td className="py-3 px-2">
                         <div className="flex gap-1">
-                          <Button onClick={() => addDaysTo(u, 'subscription_end', 365)} variant="outline" size="sm" className="text-xs px-2 py-1 h-auto">
-                            Ativar
-                          </Button>
+                          {/* Mostrar botão de ativar assinatura apenas se o usuário não for admin */}
+                          {!(u.id && isAdmin(u.id)) && (
+                            <Button
+                              onClick={() => addDaysTo(u, 'subscription_end', 365)}
+                              variant="outline"
+                              size="sm"
+                              className="text-xs px-2 py-1 h-auto"
+                            >
+                              Ativar
+                            </Button>
+                          )}
                           {/* Mostrar botão Admin apenas se tiver id (usuário do Supabase) e ainda não for admin */}
                           {u.id && !isAdmin(u.id) && (
                             <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => promote(u.id!)}>
