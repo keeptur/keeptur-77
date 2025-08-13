@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -11,12 +10,10 @@ import SubscriptionSection from "./admin/sections/SubscriptionSection";
 import SettingsSection from "./admin/sections/SettingsSection";
 import EmailsSection from "./admin/sections/EmailsSection";
 import LogsSection from "./admin/sections/LogsSection";
-
 export default function AdminPage() {
   const [tab, setTab] = useState("dashboard");
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-
   useEffect(() => {
     document.title = "Admin | Keeptur";
   }, []);
@@ -31,33 +28,20 @@ export default function AdminPage() {
   useEffect(() => {
     const current = searchParams.get("t");
     if (tab !== (current || "")) {
-      setSearchParams({ t: tab });
+      setSearchParams({
+        t: tab
+      });
     }
   }, [tab]);
-
-  return (
-    <AdminRoute>
-      <div className="p-6 space-y-6">
-        <header className="space-y-1">
-          <h1 className="text-2xl font-bold">Super Admin</h1>
-          <p className="text-muted-foreground">Controle total do sistema, usuários, planos e integrações.</p>
-        </header>
+  return <AdminRoute>
+      <div className="p-2 space-y-3">
+        
 
         <Card className="overflow-hidden">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium">Administração</CardTitle>
-          </CardHeader>
+          
           <CardContent>
             <Tabs value={tab} onValueChange={setTab} className="w-full">
-              <TabsList className="flex flex-wrap gap-1">
-                <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-                <TabsTrigger value="users">Usuários</TabsTrigger>
-                <TabsTrigger value="plans">Planos</TabsTrigger>
-                <TabsTrigger value="billing">Assinatura</TabsTrigger>
-                <TabsTrigger value="settings">Configurações</TabsTrigger>
-                <TabsTrigger value="emails">E-mails</TabsTrigger>
-                <TabsTrigger value="logs">Logs</TabsTrigger>
-              </TabsList>
+              
 
               <TabsContent value="dashboard" className="mt-4">
                 <DashboardSection />
@@ -90,6 +74,5 @@ export default function AdminPage() {
           </CardContent>
         </Card>
       </div>
-    </AdminRoute>
-  );
+    </AdminRoute>;
 }
