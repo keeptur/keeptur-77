@@ -10,6 +10,55 @@ import { isSameDay, parseISO } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
+// Componente para mostrar status do trial no menu
+function TrialStatus() {
+  const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
+  const [subscribed, setSubscribed] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        const { data } = await supabase
+          .from('subscribers')
+          .select('trial_end, subscribed, subscription_end')
+          .or(`user_id.eq.${user.id},email.eq.${user.email}`)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (mounted && data) {
+          const isSubscribed = data.subscribed || (data.subscription_end && new Date(data.subscription_end) > new Date());
+          setSubscribed(isSubscribed);
+          
+          if (!isSubscribed && data.trial_end) {
+            const now = Date.now();
+            const t = new Date(data.trial_end).getTime();
+            setDaysRemaining(Math.max(0, Math.ceil((t - now) / (1000 * 60 * 60 * 24))));
+          } else {
+            setDaysRemaining(null);
+          }
+        }
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  if (subscribed) return null;
+  
+  if (daysRemaining === null) return null;
+
+  return (
+    <div className="px-4 py-3 border-b border-border">
+      <div className="text-xs text-muted-foreground">Trial</div>
+      <div className="text-sm font-medium">
+        {daysRemaining} dia{daysRemaining === 1 ? '' : 's'} restante{daysRemaining === 1 ? '' : 's'}
+      </div>
+    </div>
+  );
+}
+
 export function MondeHeader() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
@@ -41,24 +90,48 @@ export function MondeHeader() {
   const reloadUserData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name, email, avatar_url')
-        .eq('id', user.id)
-        .maybeSingle();
+      // Verificar se é admin primeiro
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+      const userIsAdmin = roles?.some(r => r.role === 'admin') || false;
+      setIsAdmin(userIsAdmin);
+      setUserRole(userIsAdmin ? 'Admin' : 'Usuário');
 
-      if (profile) {
-        setUserName(profile.full_name || profile.email || 'Usuário');
-        setAvatarUrl(profile.avatar_url || '');
-        
-        // Verificar se é admin
-        const { data: roles } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id);
-        const userIsAdmin = roles?.some(r => r.role === 'admin') || false;
-        setUserRole(userIsAdmin ? 'Admin' : 'Usuário');
-        setIsAdmin(userIsAdmin);
+      if (userIsAdmin) {
+        // Para admin, puxar do Supabase profiles
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name, email, avatar_url')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (profile) {
+          setUserName(profile.full_name || profile.email || 'Usuário');
+          setAvatarUrl(profile.avatar_url || '');
+        }
+      } else {
+        // Para usuário não-admin, puxar da API do Monde
+        try {
+          const currentUser = await api.getCurrentUser();
+          const attrs = currentUser.data.attributes;
+          setUserName(attrs.name || attrs.login || user.email || 'Usuário');
+          setAvatarUrl(''); // API do Monde não tem avatar
+        } catch (error) {
+          console.log('Fallback to Supabase profile for non-admin user');
+          // Fallback para profile do Supabase se API do Monde falhar
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name, email, avatar_url')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          if (profile) {
+            setUserName(profile.full_name || profile.email || 'Usuário');
+            setAvatarUrl(profile.avatar_url || '');
+          }
+        }
       }
     }
   };
@@ -184,7 +257,10 @@ export function MondeHeader() {
           </Button>
           
             {userDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-lg shadow-lg py-1 z-50">
+              <div className="absolute right-0 mt-2 w-64 bg-card border border-border rounded-lg shadow-lg py-1 z-50">
+                {!isAdmin && (
+                  <TrialStatus />
+                )}
                 {isAdmin && (
                   <button onClick={() => { navigate("/admin"); setUserDropdownOpen(false); }} className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted">
                     Admin

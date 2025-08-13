@@ -499,19 +499,22 @@ class MondeAPI {
     return this.request<ApiResponse<City[]>>("/cities");
   }
 
-  async getCity(id: string): Promise<ApiResponse<City>> {
-    return this.request<ApiResponse<City>>(`/cities/${id}`);
-  }
-
-  // User profile endpoint - Tentativas múltiplas de endpoints
+  // Método para obter informações do usuário logado (endpoint /me)
   async getCurrentUser(): Promise<ApiResponse<any>> {
-    // Primeiro tentar endpoint de perfil do usuário atual
     try {
       return await this.request<ApiResponse<any>>("/me");
-    } catch (error) {
-      console.warn('Endpoint /me não disponível, tentando alternativa...');
+    } catch (error: any) {
+      if (error?.status === 404) {
+        console.log("Endpoint /me não disponível, tentando alternativa...");
+        // Se /me não estiver disponível, tentar obter de outra forma
+        throw new Error("Perfil não encontrado");
+      }
       throw error;
     }
+  }
+
+  async getCity(id: string): Promise<ApiResponse<City>> {
+    return this.request<ApiResponse<City>>(`/cities/${id}`);
   }
 
   // Método alternativo para perfil

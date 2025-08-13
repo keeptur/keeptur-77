@@ -326,7 +326,7 @@ const handleCreateUser = async () => {
                           {initials}
                         </div>
                         <div>
-                          <p className="text-sm font-medium">{u.full_name || '—'}</p>
+                          <p className="text-sm font-medium">{u.full_name?.split(' ')[0] || u.email.split('@')[0]}</p>
                           <p className="text-xs text-muted-foreground">ID: {idShort}</p>
                         </div>
                       </div>
@@ -396,6 +396,14 @@ const handleCreateUser = async () => {
                     </td>
                     <td className="py-3 px-2">
                       <div className="flex gap-1">
+                        <Button
+                          onClick={() => addDaysTo(u, 'subscription_end', 365)}
+                          variant="outline"
+                          size="sm"
+                          className="text-xs px-2 py-1 h-auto"
+                        >
+                          Ativar
+                        </Button>
                         {u.id && !isAdmin(u.id) && (
                           <Button
                             size="sm"

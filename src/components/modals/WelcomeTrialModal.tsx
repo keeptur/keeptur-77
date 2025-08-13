@@ -10,6 +10,8 @@ const DEFAULT_TRIAL_DAYS = 7; // fallback when settings are not available
 export function WelcomeTrialModal() {
   const [open, setOpen] = useState(false);
   const [allowed, setAllowed] = useState(false);
+  const [isReturning, setIsReturning] = useState(false);
+  const [realTrialDays, setRealTrialDays] = useState<number | null>(null);
 
   useEffect(() => {
     // Não exibe no admin
@@ -28,7 +30,25 @@ export function WelcomeTrialModal() {
           .select('role')
           .eq('user_id', user.id);
         const isAdmin = (roles || []).some(r => r.role === 'admin');
-        setAllowed(!isAdmin);
+        
+        if (!isAdmin) {
+          setAllowed(true);
+          // Buscar dados reais de trial do usuário
+          const { data: subscriber } = await supabase
+            .from('subscribers')
+            .select('trial_end, subscribed')
+            .or(`user_id.eq.${user.id},email.eq.${user.email}`)
+            .maybeSingle();
+          
+          if (subscriber?.trial_end && !subscriber?.subscribed) {
+            const now = Date.now();
+            const trialEnd = new Date(subscriber.trial_end).getTime();
+            const remainingDays = Math.max(0, Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24)));
+            setRealTrialDays(remainingDays);
+          }
+        } else {
+          setAllowed(false);
+        }
       }
     })();
   }, []);
@@ -36,7 +56,13 @@ export function WelcomeTrialModal() {
   useEffect(() => {
     if (!allowed) return;
     const alreadyShown = localStorage.getItem(WELCOME_KEY);
-    if (!alreadyShown) {
+    
+    if (alreadyShown) {
+      // Se já mostrou antes, é usuário retornando
+      setIsReturning(true);
+      setOpen(true);
+    } else {
+      // Primeira vez
       if (!localStorage.getItem(TRIAL_START_KEY)) {
         localStorage.setItem(TRIAL_START_KEY, new Date().toISOString());
       }
@@ -45,6 +71,12 @@ export function WelcomeTrialModal() {
   }, [allowed]);
 
   const daysRemaining = useMemo(() => {
+    // Se temos dados reais do trial, usar esses
+    if (realTrialDays !== null) {
+      return realTrialDays;
+    }
+    
+    // Fallback para cálculo local
     const startIso = localStorage.getItem(TRIAL_START_KEY);
     const start = startIso ? new Date(startIso) : new Date();
     const end = new Date(start);
@@ -52,7 +84,7 @@ export function WelcomeTrialModal() {
     const diffMs = end.getTime() - Date.now();
     const days = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
     return days;
-  }, [open]);
+  }, [open, realTrialDays]);
 
   const handleClose = () => {
     localStorage.setItem(WELCOME_KEY, "true");
@@ -63,21 +95,28 @@ export function WelcomeTrialModal() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="sm:max-w-md animate-enter">
         <DialogHeader>
-          <DialogTitle className="text-2xl">Bem-vindo ao Keeptur! 🎉</DialogTitle>
+          <DialogTitle className="text-2xl">
+            {isReturning ? 'Bem-vindo de volta!' : 'Bem-vindo ao Keeptur! 🎉'}
+          </DialogTitle>
           <DialogDescription>
-            Aproveite sua experiência com um período de avaliação gratuito.
+            {isReturning 
+              ? 'Continue aproveitando sua experiência com o Keeptur.' 
+              : 'Aproveite sua experiência com um período de avaliação gratuito.'
+            }
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <p className="text-base">
-            Você tem <span className="font-semibold text-primary">{daysRemaining} dia{daysRemaining === 1 ? '' : 's'}</span> de trial para explorar todos os recursos.
+            Você ainda tem <span className="font-semibold text-primary">{daysRemaining} dia{daysRemaining === 1 ? '' : 's'}</span> de trial para explorar todos os recursos.
           </p>
           <p className="text-sm text-muted-foreground">
             O período de teste pode ser ajustado pelo administrador a qualquer momento.
           </p>
         </div>
         <div className="flex justify-end pt-2">
-          <Button onClick={handleClose}>Começar</Button>
+          <Button onClick={handleClose}>
+            {isReturning ? 'Continuar' : 'Começar'}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
