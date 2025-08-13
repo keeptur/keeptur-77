@@ -12,6 +12,7 @@ export function WelcomeTrialModal() {
   const [allowed, setAllowed] = useState(false);
   const [isReturning, setIsReturning] = useState(false);
   const [realTrialDays, setRealTrialDays] = useState<number | null>(null);
+  const [configuredTrialDays, setConfiguredTrialDays] = useState<number>(DEFAULT_TRIAL_DAYS);
 
   useEffect(() => {
     // Não exibe no admin
@@ -21,6 +22,17 @@ export function WelcomeTrialModal() {
     }
 
     (async () => {
+      // Buscar configurações de trial do admin
+      const { data: settings } = await supabase
+        .from('settings')
+        .select('trial_days')
+        .limit(1)
+        .maybeSingle();
+      
+      if (settings?.trial_days) {
+        setConfiguredTrialDays(settings.trial_days);
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setAllowed(true);
@@ -76,15 +88,15 @@ export function WelcomeTrialModal() {
       return realTrialDays;
     }
     
-    // Fallback para cálculo local
+    // Fallback para cálculo local com dias configurados pelo admin
     const startIso = localStorage.getItem(TRIAL_START_KEY);
     const start = startIso ? new Date(startIso) : new Date();
     const end = new Date(start);
-    end.setDate(end.getDate() + DEFAULT_TRIAL_DAYS);
+    end.setDate(end.getDate() + configuredTrialDays);
     const diffMs = end.getTime() - Date.now();
     const days = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
     return days;
-  }, [open, realTrialDays]);
+  }, [open, realTrialDays, configuredTrialDays]);
 
   const handleClose = () => {
     localStorage.setItem(WELCOME_KEY, "true");

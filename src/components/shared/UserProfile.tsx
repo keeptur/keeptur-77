@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -51,8 +52,7 @@ export function UserProfile({ userId, showFullProfile = false }: UserProfileProp
 
           const isAdmin = roles?.some(r => r.role === 'admin') || false;
 
-          // Formatar data para compatibilidade
-          setUserProfile({
+          let finalProfile = {
             id: profile.id,
             type: "users",
             attributes: {
@@ -65,8 +65,37 @@ export function UserProfile({ userId, showFullProfile = false }: UserProfileProp
               avatar: profile.avatar_url,
               "last-login": new Date().toISOString(),
               "created-at": profile.created_at,
+              "company-name": undefined as string | undefined,
+              code: undefined as string | undefined,
+              kind: undefined as string | undefined,
             }
-          });
+          };
+
+          // Para usuários não-admin, tentar puxar dados da API do Monde
+          if (!isAdmin) {
+            try {
+              const mondeUser = await api.getCurrentUser();
+              const attrs = mondeUser.data.attributes;
+              
+              // Usar dados do Monde quando disponíveis
+              finalProfile.attributes = {
+                ...finalProfile.attributes,
+                name: attrs.name || attrs.login || finalProfile.attributes.name,
+                phone: attrs["mobile-phone"] || attrs.phone || finalProfile.attributes.phone,
+                "mobile-phone": attrs["mobile-phone"] || finalProfile.attributes["mobile-phone"],
+                "birth-date": attrs["birth-date"] || finalProfile.attributes["birth-date"],
+                "company-name": attrs["company-name"],
+                code: attrs.code,
+                kind: attrs.kind,
+                "last-login": attrs["last-login"] || finalProfile.attributes["last-login"],
+                "created-at": attrs["created-at"] || finalProfile.attributes["created-at"],
+              };
+            } catch (error) {
+              console.log('Usando dados do Supabase para usuário não-admin (API Monde indisponível)');
+            }
+          }
+
+          setUserProfile(finalProfile);
         } else {
           throw new Error('Perfil não encontrado');
         }

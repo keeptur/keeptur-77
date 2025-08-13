@@ -32,7 +32,16 @@ function TrialStatus() {
           const isSubscribed = data.subscribed || (data.subscription_end && new Date(data.subscription_end) > new Date());
           setSubscribed(isSubscribed);
           
-          if (!isSubscribed && data.trial_end) {
+          if (isSubscribed) {
+            // Mostrar quando termina a assinatura se estiver ativo
+            if (data.subscription_end) {
+              const now = Date.now();
+              const subEnd = new Date(data.subscription_end).getTime();
+              const daysLeft = Math.max(0, Math.ceil((subEnd - now) / (1000 * 60 * 60 * 24)));
+              setDaysRemaining(daysLeft);
+            }
+          } else if (data.trial_end) {
+            // Mostrar trial restante
             const now = Date.now();
             const t = new Date(data.trial_end).getTime();
             setDaysRemaining(Math.max(0, Math.ceil((t - now) / (1000 * 60 * 60 * 24))));
@@ -45,15 +54,13 @@ function TrialStatus() {
     return () => { mounted = false; };
   }, []);
 
-  if (subscribed) return null;
-  
   if (daysRemaining === null) return null;
 
   return (
     <div className="px-4 py-3 border-b border-border">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Clock className="w-3 h-3" />
-        Trial
+        {subscribed ? 'Assinatura' : 'Trial'}
       </div>
       <div className="text-sm font-medium">
         {daysRemaining} dia{daysRemaining === 1 ? '' : 's'} restante{daysRemaining === 1 ? '' : 's'}
