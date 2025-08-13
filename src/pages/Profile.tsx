@@ -18,31 +18,28 @@ function TrialInfo() {
   const [isSubscribed, setIsSubscribed] = useState(false);
   // Chave usada localmente para armazenar a data de início do trial quando ainda não existe registro no Supabase.
   const TRIAL_START_KEY = "keeptur:trial-start";
-
   useEffect(() => {
     let mounted = true;
     (async () => {
       const {
-        data: { user },
+        data: {
+          user
+        }
       } = await supabase.auth.getUser();
       if (!user?.email) {
         mounted && setDaysRemaining(null);
         return;
       }
       // Buscar configurações dinâmicas para trial
-      const { data: settings } = await supabase
-        .from('settings')
-        .select('trial_days')
-        .limit(1)
-        .maybeSingle();
+      const {
+        data: settings
+      } = await supabase.from('settings').select('trial_days').limit(1).maybeSingle();
       const trialDaysCfg = settings?.trial_days ?? null;
-      const { data } = await supabase
-        .from('subscribers')
-        .select('trial_end, trial_start, subscribed, subscription_end')
-        .or(`user_id.eq.${user.id},email.eq.${user.email}`)
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const {
+        data
+      } = await supabase.from('subscribers').select('trial_end, trial_start, subscribed, subscription_end').or(`user_id.eq.${user.id},email.eq.${user.email}`).order('updated_at', {
+        ascending: false
+      }).limit(1).maybeSingle();
       if (!mounted) return;
       const nowMs = Date.now();
       if (data) {
@@ -92,8 +89,7 @@ function TrialInfo() {
     };
   }, []);
   if (daysRemaining === null) return null;
-  return (
-    <div className="flex items-center justify-between">
+  return <div className="flex items-center justify-between">
       <div>
         <p className="text-sm text-muted-foreground">
           {isSubscribed ? 'Dias restantes de assinatura' : 'Dias restantes de trial'}
@@ -102,37 +98,33 @@ function TrialInfo() {
           {daysRemaining} dia{daysRemaining === 1 ? '' : 's'}
         </p>
       </div>
-    </div>
-  );
+    </div>;
 }
-
 const ProfilePage = () => {
   const [isAdmin, setIsAdmin] = useState(false);
-
   useEffect(() => {
     let mounted = true;
     (async () => {
       const {
-        data: { user },
+        data: {
+          user
+        }
       } = await supabase.auth.getUser();
       if (!user?.id) {
         mounted && setIsAdmin(false);
         return;
       }
-      const { data: roles } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id);
-      const admin = (roles || []).some((r) => r.role === 'admin');
+      const {
+        data: roles
+      } = await supabase.from('user_roles').select('role').eq('user_id', user.id);
+      const admin = (roles || []).some(r => r.role === 'admin');
       mounted && setIsAdmin(admin);
     })();
     return () => {
       // noop
     };
   }, []);
-
-  return (
-    <div className="container mx-auto p-6 max-w-4xl">
+  return <div className="container mx-auto p-6 max-w-4xl">
       <div className="flex items-center gap-2 mb-6">
         <User className="h-6 w-6" />
         <h1 className="text-3xl font-bold">Meu Perfil</h1>
@@ -141,17 +133,7 @@ const ProfilePage = () => {
         {/* Perfil do usuário logado */}
         <UserProfile showFullProfile={true} />
         {/* Exibe informações do trial/assinatura somente para usuários não‑admin. Admins têm acesso vitalício. */}
-        {!isAdmin && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Status do Trial/Assinatura</CardTitle>
-              <CardDescription>Informações sobre seu período de avaliação ou assinatura ativa</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <TrialInfo />
-            </CardContent>
-          </Card>
-        )}
+        {!isAdmin}
         {/* Formulário de perfil (somente admin) */}
         {isAdmin && <AdminProfileForm />}
         {/* Informações adicionais */}
@@ -174,8 +156,6 @@ const ProfilePage = () => {
           </CardContent>
         </Card>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default ProfilePage;
