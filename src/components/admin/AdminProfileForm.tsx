@@ -79,22 +79,36 @@ export default function AdminProfileForm() {
 
   const onSubmit = async (values: FormValues) => {
     if (!uid) return;
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        full_name: values.full_name,
-        email: values.email,
-        avatar_url: values.avatar_url || null,
-        phone: values.phone || null,
-        mobile_phone: values.mobile_phone || null,
-        birth_date: values.birth_date || null,
-      })
-      .eq("id", uid);
+    
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          full_name: values.full_name,
+          email: values.email,
+          avatar_url: values.avatar_url || null,
+          phone: values.phone || null,
+          mobile_phone: values.mobile_phone || null,
+          birth_date: values.birth_date || null,
+        })
+        .eq("id", uid);
 
-    if (error) {
-      toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Perfil atualizado" });
+      if (error) {
+        throw error;
+      }
+
+      toast({ title: "Perfil atualizado com sucesso!" });
+      
+      // Recarregar a página para atualizar o header
+      window.location.reload();
+      
+    } catch (error: any) {
+      console.error('Erro ao salvar perfil:', error);
+      toast({ 
+        title: "Erro ao salvar", 
+        description: error.message || "Erro desconhecido", 
+        variant: "destructive" 
+      });
     }
   };
 

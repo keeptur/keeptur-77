@@ -66,7 +66,13 @@ export function MondeHeader() {
           if (mounted && profile) {
             setUserName(profile.full_name || profile.email || 'Usuário');
             setAvatarUrl(profile.avatar_url || '');
-            setUserRole('Usuário');
+            // Verificar se é admin
+            const { data: roles } = await supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', user.id);
+            const userIsAdmin = roles?.some(r => r.role === 'admin') || false;
+            setUserRole(userIsAdmin ? 'Admin' : 'Usuário');
             return;
           }
         }

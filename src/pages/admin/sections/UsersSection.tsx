@@ -238,33 +238,40 @@ const handleCreateUser = async () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Últimos Usuários Cadastrados</h3>
-        <div className="flex items-center gap-2">
-          {/* Status filter */}
-          <div className="relative">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="px-3 py-1 text-xs rounded-button bg-card border text-muted-foreground"
-            >
-              <option value="all">Todos</option>
-              <option value="active">Ativo</option>
-              <option value="trial">Trial</option>
-              <option value="inactive">Inativo</option>
-            </select>
-          </div>
-          {/* Plan filter */}
-          <div className="relative">
-            <select
-              value={planFilter}
-              onChange={(e) => setPlanFilter(e.target.value as any)}
-              className="px-3 py-1 text-xs rounded-button bg-card border text-muted-foreground"
-            >
-              <option value="all">Planos</option>
-              <option value="basic">Básico</option>
-              <option value="pro">Pro</option>
-              <option value="enterprise">Enterprise</option>
-            </select>
-          </div>
+        <Button onClick={() => setOpen(true)}>Criar Usuário</Button>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex-1">
+          <Input
+            placeholder="Buscar por nome ou email..."
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="w-full"
+          />
+        </div>
+        <div className="flex gap-2">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as any)}
+            className="px-3 py-1 text-xs rounded-button bg-card border text-muted-foreground"
+          >
+            <option value="all">Todos</option>
+            <option value="active">Ativo</option>
+            <option value="trial">Trial</option>
+            <option value="inactive">Inativo</option>
+          </select>
+          <select
+            value={planFilter}
+            onChange={(e) => setPlanFilter(e.target.value as any)}
+            className="px-3 py-1 text-xs rounded-button bg-card border text-muted-foreground"
+          >
+            <option value="all">Planos</option>
+            <option value="basic">Básico</option>
+            <option value="pro">Pro</option>
+            <option value="enterprise">Enterprise</option>
+          </select>
         </div>
       </div>
 
@@ -277,15 +284,18 @@ const handleCreateUser = async () => {
                 <th className="text-left py-3 px-2 font-medium text-xs text-muted-foreground">E-mail</th>
                 <th className="text-left py-3 px-2 font-medium text-xs text-muted-foreground">Plano</th>
                 <th className="text-left py-3 px-2 font-medium text-xs text-muted-foreground">Status</th>
+                <th className="text-left py-3 px-2 font-medium text-xs text-muted-foreground">Trial +Dias</th>
+                <th className="text-left py-3 px-2 font-medium text-xs text-muted-foreground">Assinatura +Dias</th>
+                <th className="text-left py-3 px-2 font-medium text-xs text-muted-foreground">Ações</th>
                 <th className="text-left py-3 px-2 font-medium text-xs text-muted-foreground">Data</th>
               </tr>
             </thead>
             <tbody>
               {loading && (
-                <tr><td className="py-6 px-2 text-sm text-muted-foreground" colSpan={5}>Carregando...</td></tr>
+                <tr><td className="py-6 px-2 text-sm text-muted-foreground" colSpan={8}>Carregando...</td></tr>
               )}
               {!loading && filtered.length === 0 && (
-                <tr><td className="py-6 px-2 text-sm text-muted-foreground" colSpan={5}>Nenhum usuário encontrado.</td></tr>
+                <tr><td className="py-6 px-2 text-sm text-muted-foreground" colSpan={8}>Nenhum usuário encontrado.</td></tr>
               )}
               {!loading && filtered.map((u) => {
                 const initials = (u.full_name || u.email).split(/\s|@/).filter(Boolean).slice(0,2).map(s=>s[0]).join('').toUpperCase();
@@ -332,6 +342,82 @@ const handleCreateUser = async () => {
                         status==='active' ? badgeStyle('status-active') : status==='trial' ? badgeStyle('status-trial') : badgeStyle('status-inactive')
                       }>{status==='active' ? 'Ativo' : status==='trial' ? 'Trial' : 'Inativo'}</span>
                     </td>
+                    <td className="py-3 px-2">
+                      <input
+                        type="number"
+                        placeholder="+"
+                        className="w-16 px-2 py-1 text-xs border rounded text-center"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            const days = parseInt(e.currentTarget.value);
+                            if (days > 0) {
+                              addDaysTo(u, 'trial_end', days);
+                              e.currentTarget.value = '';
+                            }
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const days = parseInt(e.currentTarget.value);
+                          if (days > 0) {
+                            addDaysTo(u, 'trial_end', days);
+                            e.currentTarget.value = '';
+                          }
+                        }}
+                      />
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {u.subscriber?.trial_end ? `${getDaysRemaining(u.subscriber.trial_end) || 0}d` : '-'}
+                      </div>
+                    </td>
+                    <td className="py-3 px-2">
+                      <input
+                        type="number"
+                        placeholder="+"
+                        className="w-16 px-2 py-1 text-xs border rounded text-center"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            const days = parseInt(e.currentTarget.value);
+                            if (days > 0) {
+                              addDaysTo(u, 'subscription_end', days);
+                              e.currentTarget.value = '';
+                            }
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const days = parseInt(e.currentTarget.value);
+                          if (days > 0) {
+                            addDaysTo(u, 'subscription_end', days);
+                            e.currentTarget.value = '';
+                          }
+                        }}
+                      />
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {u.subscriber?.subscription_end ? `${getDaysRemaining(u.subscriber.subscription_end) || 0}d` : '-'}
+                      </div>
+                    </td>
+                    <td className="py-3 px-2">
+                      <div className="flex gap-1">
+                        {u.id && !isAdmin(u.id) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-xs"
+                            onClick={() => promote(u.id!)}
+                          >
+                            Admin
+                          </Button>
+                        )}
+                        {u.id && isAdmin(u.id) && (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="h-6 px-2 text-xs"
+                            onClick={() => demote(u.id!)}
+                          >
+                            Remover
+                          </Button>
+                        )}
+                      </div>
+                    </td>
                     <td className="py-3 px-2 text-xs text-muted-foreground">{dateStr}</td>
                   </tr>
                 );
@@ -340,6 +426,53 @@ const handleCreateUser = async () => {
           </table>
         </div>
       </Card>
+
+      {/* Create User Dialog */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Criar Novo Usuário</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="usuario@exemplo.com"
+              />
+            </div>
+            <div>
+              <Label htmlFor="name">Nome (opcional)</Label>
+              <Input
+                id="name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Nome do usuário"
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                id="admin"
+                type="checkbox"
+                checked={newIsAdmin}
+                onChange={(e) => setNewIsAdmin(e.target.checked)}
+              />
+              <Label htmlFor="admin">Criar como administrador</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateUser} disabled={creating || !newEmail}>
+              {creating ? "Criando..." : "Criar Usuário"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

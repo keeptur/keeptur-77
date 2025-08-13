@@ -159,7 +159,7 @@ export function MondeAppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {(location.pathname.startsWith("/admin") ? adminNavigationItems : navigationItems).map(item => <SidebarMenuItem key={item.title}>
+              {(isAdmin ? adminNavigationItems : navigationItems).map(item => <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={location.pathname === item.url} tooltip={item.title} className={isCollapsed ? "justify-center px-2" : ""}>
                     <NavLink to={item.url} className={`flex items-center text-foreground hover:text-foreground ${isCollapsed ? 'justify-center' : 'space-x-3'}`}>
                       <item.icon className={`h-4 w-4 ${isCollapsed ? 'mx-auto' : ''}`} />
