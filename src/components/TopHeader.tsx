@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Bell, Moon, Sun, ChevronDown, User } from "lucide-react";
@@ -19,36 +20,77 @@ import { api } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { UserProfile } from "@/components/shared/UserProfile";
+import { supabase } from "@/integrations/supabase/client";
 
 export function TopHeader() {
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
 
-  // Buscar dados do usuário atual
+  // Buscar dados do usuário atual (prioriza Supabase > Monde > fallback)
   const { data: userProfile } = useQuery({
     queryKey: ["current-user"],
     queryFn: async () => {
+      // Tenta Supabase
+      const { data: auth } = await supabase.auth.getUser();
+      const sbUser = auth?.user;
+      if (sbUser?.id) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name, email, avatar_url")
+          .eq("id", sbUser.id)
+          .maybeSingle();
+
+        if (profile) {
+          return {
+            name: profile.full_name || profile.email || "Usuário",
+            email: profile.email || "",
+            avatar: profile.avatar_url || "",
+            initials: (profile.full_name || profile.email || "U")
+              .split(/\s|@/)
+              .filter(Boolean)
+              .slice(0, 2)
+              .map((s: string) => s[0])
+              .join("")
+              .toUpperCase(),
+          };
+        }
+      }
+
+      // Se não houver Supabase, tenta Monde API
       try {
         const response = await api.getCurrentUser();
-        return response.data;
-      } catch (error) {
-        // Fallback para dados simulados
+        const data = response.data;
+        const initials = (data?.name || data?.email || "U")
+          .split(/\s|@/)
+          .filter(Boolean)
+          .slice(0, 2)
+          .map((s: string) => s[0])
+          .join("")
+          .toUpperCase();
         return {
-          name: "Usuário Système",
-          email: "usuario@keeptur.com",
+          name: data?.name || "Usuário",
+          email: data?.email || "",
+          avatar: data?.avatar || "",
+          initials,
+        };
+      } catch {
+        // Fallback
+        return {
+          name: "Usuário",
+          email: "",
           avatar: "",
-          initials: "US"
+          initials: "U",
         };
       }
     },
-    staleTime: 5 * 60 * 1000 // 5 minutos
+    staleTime: 5 * 60 * 1000, // 5 minutos
   });
 
   const currentUser = userProfile || {
     name: "Usuário",
-    email: "usuario@keeptur.com", 
+    email: "",
     avatar: "",
-    initials: "U"
+    initials: "U",
   };
 
   const toggleTheme = () => {
@@ -145,6 +187,8 @@ export function TopHeader() {
                   // Limpar token de autenticação
                   localStorage.removeItem('monde_token');
                   localStorage.removeItem('keeptur-theme');
+                  // Também sair do Supabase
+                  supabase.auth.signOut();
                   // Forçar reload para limpar todos os estados
                   window.location.href = '/login';
                 }}
