@@ -152,9 +152,6 @@ export function MondeAppSidebar() {
             {/* Dark mode - collapsed icon */}
             <img src="/lovable-uploads/08d4b994-f038-489c-803a-76276e221ba2.png" alt="Keeptur" className={`absolute left-0 top-0 w-8 h-8 object-contain transition-opacity duration-150 ${isCollapsed ? 'opacity-100' : 'opacity-0'} hidden dark:block`} />
           </div>
-          {!isCollapsed && <SidebarTrigger className="h-6 w-6 ml-2">
-              <ChevronLeft className="h-4 w-4" />
-            </SidebarTrigger>}
         </div>
       </SidebarHeader>
       
@@ -201,11 +198,6 @@ export function MondeAppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        {isCollapsed && <div className="flex justify-center mt-2">
-            <SidebarTrigger className="h-6 w-6">
-              <ChevronRight className="h-4 w-4" />
-            </SidebarTrigger>
-          </div>}
       </div>
     </Sidebar>;
 }

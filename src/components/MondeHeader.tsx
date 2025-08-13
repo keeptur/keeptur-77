@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { useTasks } from "@/hooks/useTasks";
 import { isSameDay, parseISO } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export function MondeHeader() {
   const { state } = useSidebar();
@@ -19,41 +20,16 @@ export function MondeHeader() {
   const location = useLocation();
 
   const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
-  const handleLogout = () => {
+  const handleLogout = async () => {
     try {
       api.logout();
+      await supabase.auth.signOut();
+      localStorage.removeItem('monde_token');
     } finally {
       // Forçar reload para limpar qualquer estado em memória
       window.location.href = "/login";
     }
   };
-
-  // Dados reais do usuário
-  const [userName, setUserName] = useState<string>("...");
-  const [userRole, setUserRole] = useState<string>("Usuário");
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const me = await api.getCurrentUser();
-        const name = me?.data?.attributes?.name || me?.data?.attributes?.login || "Usuário";
-        if (mounted) {
-          setUserName(name);
-          setUserRole(me?.data?.attributes?.role || "Usuário");
-        }
-      } catch {
-        try {
-          const res = await api.getUserFromToken();
-          const name = res?.data?.attributes?.name || "Usuário";
-          if (mounted) {
-            setUserName(name);
-            setUserRole(res?.data?.attributes?.role || "Usuário");
-          }
-        } catch {}
-      }
-    })();
-    return () => { mounted = false; };
-  }, []);
 
   // Check admin role (Supabase)
   const [isAdmin, setIsAdmin] = useState(false);
@@ -71,6 +47,55 @@ export function MondeHeader() {
     })();
     return () => { active = false; };
   }, []);
+
+  // Dados reais do usuário
+  const [userName, setUserName] = useState<string>("...");
+  const [userRole, setUserRole] = useState<string>("Usuário");
+  const [avatarUrl, setAvatarUrl] = useState<string>("");
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.id) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name,email,avatar_url')
+            .eq('id', user.id)
+            .maybeSingle();
+          if (mounted && profile) {
+            setUserName(profile.full_name || profile.email || 'Usuário');
+            setAvatarUrl(profile.avatar_url || '');
+            setUserRole(isAdmin ? 'Admin' : 'Usuário');
+            return;
+          }
+        }
+      } catch {}
+
+      // Fallback para Monde API
+      try {
+        const me = await api.getCurrentUser();
+        const name = me?.data?.attributes?.name || me?.data?.attributes?.login || 'Usuário';
+        if (mounted) {
+          setUserName(name);
+          setAvatarUrl('');
+          setUserRole(me?.data?.attributes?.role || 'Usuário');
+        }
+      } catch {
+        try {
+          const res = await api.getUserFromToken();
+          const name = res?.data?.attributes?.name || 'Usuário';
+          if (mounted) {
+            setUserName(name);
+            setAvatarUrl('');
+            setUserRole(res?.data?.attributes?.role || 'Usuário');
+          }
+        } catch {}
+      }
+    })();
+    return () => { mounted = false; };
+  }, [isAdmin]);
+
 
   const initials = useMemo(() => {
     const parts = (userName || "").split(" ").filter(Boolean);
@@ -112,7 +137,7 @@ export function MondeHeader() {
 
   return (
     <header className="header flex items-center justify-between h-16 px-10 bg-card border-b border-border transition-all duration-300">
-      <div className="flex items-center gap-2"></div>
+      <div className="flex items-center gap-2"><SidebarTrigger /></div>
       
       <div className="flex items-center space-x-4">
         {/* Theme Toggle */}
@@ -157,9 +182,10 @@ export function MondeHeader() {
         {/* User Menu */}
         <div className="relative">
           <Button onClick={() => setUserDropdownOpen(!userDropdownOpen)} variant="outline" className="group flex items-center space-x-3 p-1 rounded-button hover:bg-primary hover:text-primary-foreground">
-            <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center text-white font-medium text-sm">
-              {initials}
-            </div>
+            <Avatar className="h-8 w-8">
+              <AvatarImage src={avatarUrl} alt={userName} />
+              <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+            </Avatar>
             <div className="hidden md:block text-left">
               <p className="text-sm font-medium text-foreground group-hover:text-primary-foreground">{userName}</p>
               <p className="text-xs text-muted-foreground group-hover:text-primary-foreground/90">{userRole}</p>
