@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { supabase } from "@/integrations/supabase/client";
 import { api } from "@/lib/api";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -23,91 +22,79 @@ export function UserProfile({ userId, showFullProfile = false }: UserProfileProp
     const fetchUserProfile = async () => {
       setIsLoading(true);
       try {
-        // Obter usuário atual do Supabase
-        const { data: { user } } = await supabase.auth.getUser();
-        const currentUserId = userId || user?.id;
-
-        if (!currentUserId) {
-          throw new Error('Usuário não autenticado');
-        }
-
-        // Buscar perfil na tabela profiles
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', currentUserId)
-          .maybeSingle();
-
-        if (error) {
-          console.error('Erro ao buscar perfil:', error);
-          throw error;
-        }
-
-        if (profile) {
-          // Buscar se é admin
-          const { data: roles } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', currentUserId);
-
-          const isAdmin = roles?.some(r => r.role === 'admin') || false;
-
-          let finalProfile = {
-            id: profile.id,
-            type: "users",
-            attributes: {
-              name: profile.full_name || profile.email,
-              email: profile.email,
-              role: isAdmin ? 'Admin' : 'Usuário',
-              phone: profile.phone,
-              "mobile-phone": profile.mobile_phone,
-              "birth-date": profile.birth_date,
-              avatar: profile.avatar_url,
-              "last-login": new Date().toISOString(),
-              "created-at": profile.created_at,
-              "company-name": undefined as string | undefined,
-              code: undefined as string | undefined,
-              kind: undefined as string | undefined,
-            }
-          };
-
-          // Para usuários não-admin, tentar puxar dados da API do Monde
-          if (!isAdmin) {
+        let response;
+        
+        if (userId) {
+          // Se temos um ID específico, usar endpoint de pessoa
+          response = await api.getPerson(userId);
+        } else {
+          // Tentar obter dados do usuário atual com fallbacks
+          try {
+            response = await api.getUserFromToken();
+          } catch (tokenError) {
+            console.warn('Erro ao buscar usuário pelo token:', tokenError);
+            
             try {
-              console.log("UserProfile: Fetching data from Monde API for non-admin user");
-              const mondeUser = await api.getCurrentUser();
-              console.log("UserProfile: Monde API response:", mondeUser);
+              response = await api.getCurrentUser();
+            } catch (currentUserError) {
+              console.warn('Erro ao buscar usuário atual:', currentUserError);
               
-              const attrs = mondeUser.data.attributes;
-              
-              // Usar dados do Monde quando disponíveis
-              finalProfile.attributes = {
-                ...finalProfile.attributes,
-                name: attrs.name || attrs.login || finalProfile.attributes.name,
-                phone: attrs["mobile-phone"] || attrs.phone || finalProfile.attributes.phone,
-                "mobile-phone": attrs["mobile-phone"] || finalProfile.attributes["mobile-phone"],
-                "birth-date": attrs["birth-date"] || finalProfile.attributes["birth-date"],
-                "company-name": attrs["company-name"] || "N/A",
-                code: attrs.code,
-                kind: attrs.kind,
-                "last-login": attrs["last-login"] || finalProfile.attributes["last-login"],
-                "created-at": attrs["created-at"] || finalProfile.attributes["created-at"],
-              };
-              
-              console.log("UserProfile: Final profile with Monde data:", finalProfile);
-            } catch (error) {
-              console.error('UserProfile: Error fetching from Monde API:', error);
-              console.log('UserProfile: Using Supabase data for non-admin user (API Monde unavailable)');
+              try {
+                response = await api.getUserProfile();
+              } catch (profileError) {
+                console.warn('Erro ao buscar perfil:', profileError);
+                throw new Error('Nenhum endpoint de usuário disponível');
+              }
             }
           }
-
-          setUserProfile(finalProfile);
-        } else {
-          throw new Error('Perfil não encontrado');
         }
+        
+        setUserProfile(response.data);
       } catch (error) {
         console.error("Error fetching user profile:", error);
-        setUserProfile(null);
+        
+        // Fallback: usar dados baseados no token JWT
+        const userIdFromToken = api.getCurrentUserIdFromToken();
+        
+        // Tentar extrair mais informações do token
+        let tokenData: any = {
+          name: "Usuário Sistema",
+          email: "usuario@monde.com.br",
+          role: "Usuário",
+          issuer: "Monde",
+          schema: undefined
+        };
+        
+        try {
+          const token = localStorage.getItem("monde_token");
+          if (token) {
+            const payload = token.split('.')[1];
+            const decodedPayload = JSON.parse(atob(payload));
+            tokenData = {
+              name: decodedPayload.name || "Usuário Sistema",
+              email: decodedPayload.email || "usuario@monde.com.br",
+              role: decodedPayload.role || "Usuário",
+              issuer: decodedPayload.issuer || "Monde",
+              schema: decodedPayload.schema
+            };
+          }
+        } catch (tokenError) {
+          console.warn('Erro ao decodificar token para fallback:', tokenError);
+        }
+        
+        setUserProfile({
+          id: userIdFromToken || "unknown",
+          type: "users",
+          attributes: {
+            name: tokenData.name,
+            email: tokenData.email, 
+            role: tokenData.role,
+            "last-login": new Date().toISOString(),
+            "created-at": "2024-01-01T00:00:00Z",
+            issuer: tokenData.issuer,
+            schema: tokenData.schema
+          }
+        });
       } finally {
         setIsLoading(false);
       }
