@@ -40,14 +40,7 @@ export default function AdminPage() {
           
           <CardContent>
             <Tabs value={tab} onValueChange={setTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-6">
-                <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-                <TabsTrigger value="users">Usuários</TabsTrigger>
-                <TabsTrigger value="plans">Planos</TabsTrigger>
-                <TabsTrigger value="billing">Billing</TabsTrigger>
-                <TabsTrigger value="settings">Config</TabsTrigger>
-                <TabsTrigger value="emails">Emails</TabsTrigger>
-              </TabsList>
+              
 
               <TabsContent value="dashboard" className="mt-4">
                 <DashboardSection />
