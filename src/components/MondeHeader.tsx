@@ -66,7 +66,7 @@ export function MondeHeader() {
           if (mounted && profile) {
             setUserName(profile.full_name || profile.email || 'Usuário');
             setAvatarUrl(profile.avatar_url || '');
-            setUserRole(isAdmin ? 'Admin' : 'Usuário');
+            setUserRole('Usuário');
             return;
           }
         }
@@ -94,7 +94,7 @@ export function MondeHeader() {
       }
     })();
     return () => { mounted = false; };
-  }, [isAdmin]);
+  }, []);
 
 
   const initials = useMemo(() => {
