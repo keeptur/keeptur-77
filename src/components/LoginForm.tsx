@@ -34,9 +34,11 @@ export default function LoginForm() {
       // 1) Tenta autenticar na Monde
       const token = await api.authenticate(credentials.login, credentials.password);
       try {
-        // sincroniza trial/assinante via Edge Function pública
-        await supabase.functions.invoke('sync-subscriber', { body: { mondeToken: token } });
+        // sincroniza trial/assinante via Edge Function pública (passa email explicitamente)
+        await supabase.functions.invoke('sync-subscriber', { body: { mondeToken: token, email: credentials.login } });
       } catch {}
+      // garante que qualquer sessão Supabase anterior (ex: admin) seja encerrada
+      try { await supabase.auth.signOut(); } catch {}
       toast({ title: "Login realizado com sucesso!", description: "Bem-vindo ao Keeptur" });
       navigate("/");
       return;

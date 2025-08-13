@@ -116,9 +116,13 @@ export function MondeAppSidebar() {
       mounted = false;
     };
   }, [location.pathname]);
-  const handleLogout = () => {
-    api.logout();
-    navigate("/login");
+  const handleLogout = async () => {
+    try {
+      api.logout();
+      await supabase.auth.signOut();
+    } finally {
+      navigate("/login");
+    }
   };
   const handleSubscribe = async () => {
     const {
