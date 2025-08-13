@@ -242,12 +242,10 @@ export function MondeHeader() {
             </div>
           )}
         </div>
-        {/* Trial status no topo (visível apenas para usuários não-admin) */}
-        {!isAdmin && (
-          <div className="hidden md:block">
-            <TrialStatus />
-          </div>
-        )}
+        {/* Trial status no topo: exibe sempre que houver dias restantes (trial ou assinatura) */}
+        <div className="hidden md:block">
+          <TrialStatus />
+        </div>
         {/* User Menu */}
         <div className="relative">
           <Button onClick={() => setUserDropdownOpen(!userDropdownOpen)} variant="outline" className="group flex items-center space-x-3 p-1 rounded-button hover:bg-primary hover:text-primary-foreground">
@@ -269,7 +267,8 @@ export function MondeHeader() {
           </Button>
           {userDropdownOpen && (
             <div className="absolute right-0 mt-2 w-64 bg-card border border-border rounded-lg shadow-lg py-1 z-50">
-              {!isAdmin && <TrialStatus />}
+              {/* Exibe o relógio de trial/assinatura para todos os usuários dentro do menu */}
+              <TrialStatus />
               {isAdmin && (
                 <button onClick={() => { navigate('/admin'); setUserDropdownOpen(false); }} className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted">Admin</button>
               )}
