@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
-export const UserRoute = ({ children }: { children: React.ReactNode }) => {
+export const UserRoute = ({ children, allowAdmin = false }: { children: React.ReactNode; allowAdmin?: boolean }) => {
   const [ready, setReady] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -22,6 +22,6 @@ export const UserRoute = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   if (!ready) return null;
-  if (isAdmin) return <Navigate to="/admin" replace />;
+  if (isAdmin && !allowAdmin) return <Navigate to="/admin" replace />;
   return <>{children}</>;
 };

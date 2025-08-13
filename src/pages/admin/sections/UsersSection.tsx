@@ -4,6 +4,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { addDays } from "date-fns";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 interface ProfileRow {
   id: string;
@@ -21,6 +25,7 @@ interface SubscriberRow {
   id: string;
   user_id: string | null;
   email: string;
+  display_name: string | null;
   subscribed: boolean;
   subscription_tier: string | null;
   trial_start: string | null;
@@ -43,8 +48,47 @@ export default function UsersSection() {
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [roles, setRoles] = useState<RoleRow[]>([]);
   const [subscribers, setSubscribers] = useState<SubscriberRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [q, setQ] = useState(""); // mantido para futura busca, não exibida no layout
+const [loading, setLoading] = useState(true);
+const [q, setQ] = useState("");
+const [periodFilter, setPeriodFilter] = useState<'all'|'7'|'30'|'90'>('all');
+
+const [open, setOpen] = useState(false);
+const [newEmail, setNewEmail] = useState("");
+const [newName, setNewName] = useState("");
+const [newIsAdmin, setNewIsAdmin] = useState(true);
+const [creating, setCreating] = useState(false);
+
+const reload = async () => {
+  const [{ data: p }, { data: r }, { data: s }] = await Promise.all([
+    supabase.from("profiles").select("id, email, full_name, created_at"),
+    supabase.from("user_roles").select("user_id, role"),
+    supabase.from("subscribers").select(
+      "id, user_id, email, display_name, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at, updated_at"
+    ),
+  ]);
+  setProfiles((p || []) as any);
+  setRoles((r || []) as any);
+  setSubscribers((s || []) as any);
+};
+
+const handleCreateUser = async () => {
+  if (!newEmail) return;
+  setCreating(true);
+  try {
+    const { error } = await supabase.functions.invoke('create-admin-user', {
+      body: { email: newEmail, name: newName, makeAdmin: newIsAdmin }
+    });
+    if (error) throw error;
+    toast({ title: "Usuário criado", description: "Convite enviado por e-mail." });
+    setOpen(false);
+    setNewEmail(""); setNewName(""); setNewIsAdmin(true);
+    await reload();
+  } catch (e:any) {
+    toast({ title: "Erro ao criar usuário", description: e.message || String(e), variant: "destructive" });
+  } finally {
+    setCreating(false);
+  }
+};
 
   useEffect(() => {
     const load = async () => {

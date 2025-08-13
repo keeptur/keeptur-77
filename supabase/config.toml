@@ -14,3 +14,7 @@ verify_jwt = false
 
 [functions.sync-subscriber]
 verify_jwt = false
+
+[functions.create-admin-user]
+verify_jwt = true
+

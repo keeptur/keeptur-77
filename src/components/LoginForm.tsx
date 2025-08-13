@@ -88,41 +88,6 @@ export default function LoginForm() {
       setLoading(false);
     }
   };
-  const handleSignUp = async () => {
-    if (!credentials.login || !credentials.password) {
-      toast({
-        title: "Informe e-mail e senha",
-        variant: "destructive"
-      });
-      return;
-    }
-    setLoading(true);
-    try {
-      const redirectUrl = `${window.location.origin}/`;
-      const {
-        error
-      } = await supabase.auth.signUp({
-        email: credentials.login,
-        password: credentials.password,
-        options: {
-          emailRedirectTo: redirectUrl
-        }
-      });
-      if (error) throw error;
-      toast({
-        title: "Conta criada",
-        description: "Verifique seu e-mail para confirmar"
-      });
-    } catch (e: any) {
-      toast({
-        title: "Erro ao criar conta",
-        description: e.message ?? String(e),
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
   return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background p-4">
       <div className="w-full max-w-md">
         {/* Logo/Brand */}
@@ -161,9 +126,6 @@ export default function LoginForm() {
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Entrando...
                   </> : "Entrar"}
-              </Button>
-              <Button type="button" className="w-full mt-2" variant="outline" size="lg" disabled={loading} onClick={handleSignUp}>
-                Criar conta
               </Button>
             </form>
 

@@ -104,7 +104,7 @@ const AppWrapper = () => {
                   </UserRoute>
                 } />
                 <Route path="profile" element={
-                  <UserRoute>
+                  <UserRoute allowAdmin>
                     <ProfilePage />
                   </UserRoute>
                 } />
