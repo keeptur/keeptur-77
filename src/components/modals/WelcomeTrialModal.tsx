@@ -1,11 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 
+// Keys used to persist whether the welcome modal was shown and when the trial started.
 const WELCOME_KEY = "keeptur:welcome-shown";
 const TRIAL_START_KEY = "keeptur:trial-start";
 
+/**
+ * Modal de boas‑vindas exibida para usuários não‑admin logo após o login.
+ *
+ * Esta versão corrige o cálculo do período de trial. O componente agora tenta
+ * obter a data de início e fim do trial diretamente da tabela `subscribers`.
+ * Caso não haja `trial_end`, ele calcula o prazo com base em `trial_start` +
+ * `settings.trial_days` + quaisquer dias adicionais concedidos pelo admin (se
+ * disponíveis). Se nenhuma informação estiver presente, utiliza um valor
+ * configurado por padrão. O valor final é armazenado em `realTrialDays` para
+ * priorizar dados do servidor sobre o cálculo local.
+ */
 export function WelcomeTrialModal() {
   const [open, setOpen] = useState(false);
   const [allowed, setAllowed] = useState(false);
@@ -14,85 +32,82 @@ export function WelcomeTrialModal() {
   const [configuredTrialDays, setConfiguredTrialDays] = useState<number>(2);
 
   useEffect(() => {
-    // Não exibe no admin
-    if (window.location.pathname.startsWith('/admin')) {
+    // Nunca mostrar o modal em páginas do admin
+    if (window.location.pathname.startsWith("/admin")) {
       setAllowed(false);
       return;
     }
 
     (async () => {
-      console.log("WelcomeTrialModal: Starting setup");
-      
-      // Buscar configurações de trial do admin
+      // Carregar configurações do admin (ex.: dias padrão de trial)
       const { data: settings } = await supabase
-        .from('settings')
-        .select('trial_days')
+        .from("settings")
+        .select("trial_days")
         .limit(1)
         .maybeSingle();
-      
-      console.log("WelcomeTrialModal: Settings from DB:", settings);
-      
       if (settings?.trial_days) {
-        console.log("WelcomeTrialModal: Setting trial_days to:", settings.trial_days);
         setConfiguredTrialDays(settings.trial_days);
-      } else {
-        console.log("WelcomeTrialModal: No settings found, using default");
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log("WelcomeTrialModal: Current user:", user?.email);
-      
+      // Obter usuário atual
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      // Usuários anônimos têm o modal liberado
       if (!user) {
-        console.log("WelcomeTrialModal: No user, allowing modal for anonymous");
         setAllowed(true);
-      } else {
-        const { data: roles } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id);
-        const isAdmin = (roles || []).some(r => r.role === 'admin');
-        
-        console.log("WelcomeTrialModal: User roles:", roles);
-        console.log("WelcomeTrialModal: Is admin:", isAdmin);
-        
-        if (!isAdmin) {
-          setAllowed(true);
-          // Buscar dados reais de trial do usuário
-          const { data: subscriber } = await supabase
-            .from('subscribers')
-            .select('trial_end, subscribed, trial_start')
-            .or(`user_id.eq.${user.id},email.eq.${user.email}`)
-            .maybeSingle();
-          
-          console.log("WelcomeTrialModal: Subscriber data:", subscriber);
-          
-          if (subscriber?.trial_end && !subscriber?.subscribed) {
-            const now = Date.now();
-            const trialEnd = new Date(subscriber.trial_end).getTime();
-            const remainingDays = Math.max(0, Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24)));
-            console.log("WelcomeTrialModal: Real trial days calculated:", remainingDays);
-            setRealTrialDays(remainingDays);
-          } else {
-            console.log("WelcomeTrialModal: No active trial found");
-          }
-        } else {
-          console.log("WelcomeTrialModal: Admin user, not showing modal");
-          setAllowed(false);
+        return;
+      }
+      // Verificar se é admin
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id);
+      const isAdmin = (roles || []).some((r) => r.role === "admin");
+      if (isAdmin) {
+        setAllowed(false);
+        return;
+      }
+      // Usuário não admin: mostrar modal e tentar obter trial
+      setAllowed(true);
+      const { data: subscriber } = await supabase
+        .from("subscribers")
+        .select("trial_end, trial_start, subscribed")
+        .or(`user_id.eq.${user.id},email.eq.${user.email}`)
+        .maybeSingle();
+      if (subscriber && !subscriber.subscribed) {
+        const nowMs = Date.now();
+        // Se há data de término do trial, priorize-a
+        if (subscriber.trial_end) {
+          const endMs = new Date(subscriber.trial_end as any).getTime();
+          const days = Math.max(0, Math.ceil((endMs - nowMs) / (1000 * 60 * 60 * 24)));
+          setRealTrialDays(days);
+        } else if (subscriber.trial_start) {
+          // Sem `trial_end`: calcule com base no início + configurações
+          const startDate = new Date(subscriber.trial_start as any);
+          // Data final = início + dias configurados
+          const end = new Date(startDate);
+          end.setDate(end.getDate() + configuredTrialDays);
+          const days = Math.max(
+            0,
+            Math.ceil((end.getTime() - nowMs) / (1000 * 60 * 60 * 24))
+          );
+          setRealTrialDays(days);
         }
       }
     })();
   }, []);
 
+  // Controlar exibição da modal com base na permissão e armazenamento local
   useEffect(() => {
     if (!allowed) return;
     const alreadyShown = localStorage.getItem(WELCOME_KEY);
-    
+    // Usuário retornando: já viu antes
     if (alreadyShown) {
-      // Se já mostrou antes, é usuário retornando
       setIsReturning(true);
       setOpen(true);
     } else {
-      // Primeira vez
+      // Primeira visita: armazenar início do trial se ainda não existir
       if (!localStorage.getItem(TRIAL_START_KEY)) {
         localStorage.setItem(TRIAL_START_KEY, new Date().toISOString());
       }
@@ -100,31 +115,16 @@ export function WelcomeTrialModal() {
     }
   }, [allowed]);
 
+  // Cálculo de dias restantes: prioriza `realTrialDays` quando disponível
   const daysRemaining = useMemo(() => {
-    console.log("WelcomeTrialModal: Calculating daysRemaining");
-    console.log("WelcomeTrialModal: realTrialDays:", realTrialDays);
-    console.log("WelcomeTrialModal: configuredTrialDays:", configuredTrialDays);
-    
-    // Priorizar dados reais do Supabase quando disponíveis
-    if (realTrialDays !== null) {
-      console.log("WelcomeTrialModal: Using realTrialDays:", realTrialDays);
-      return realTrialDays;
-    }
-    
-    // Fallback para cálculo local com dias configurados pelo admin
-    console.log("WelcomeTrialModal: Using configuredTrialDays for calculation");
+    if (realTrialDays !== null) return realTrialDays;
+    // Fallback local: usar a data do localStorage e dias configurados
     const startIso = localStorage.getItem(TRIAL_START_KEY);
     const start = startIso ? new Date(startIso) : new Date();
     const end = new Date(start);
     end.setDate(end.getDate() + configuredTrialDays);
     const diffMs = end.getTime() - Date.now();
-    const days = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
-    
-    console.log("WelcomeTrialModal: Calculated days:", days);
-    console.log("WelcomeTrialModal: Trial start:", start);
-    console.log("WelcomeTrialModal: Trial end:", end);
-    
-    return days;
+    return Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
   }, [open, realTrialDays, configuredTrialDays]);
 
   const handleClose = () => {
@@ -137,13 +137,12 @@ export function WelcomeTrialModal() {
       <DialogContent className="sm:max-w-md animate-enter">
         <DialogHeader>
           <DialogTitle className="text-2xl">
-            {isReturning ? 'Bem-vindo de volta!' : 'Bem-vindo ao Keeptur! 🎉'}
+            {isReturning ? "Bem-vindo de volta!" : "Bem-vindo ao Keeptur! "}
           </DialogTitle>
           <DialogDescription>
-            {isReturning 
-              ? 'Continue aproveitando sua experiência com o Keeptur.' 
-              : 'Aproveite sua experiência com um período de avaliação gratuito.'
-            }
+            {isReturning
+              ? "Continue aproveitando sua experiência com o Keeptur."
+              : "Aproveite sua experiência com um período de avaliação gratuito."}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -155,9 +154,7 @@ export function WelcomeTrialModal() {
           </p>
         </div>
         <div className="flex justify-end pt-2">
-          <Button onClick={handleClose}>
-            {isReturning ? 'Continuar' : 'Começar'}
-          </Button>
+          <Button onClick={handleClose}>{isReturning ? "Continuar" : "Começar"}</Button>
         </div>
       </DialogContent>
     </Dialog>
