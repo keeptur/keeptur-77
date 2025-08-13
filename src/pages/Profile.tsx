@@ -15,83 +15,89 @@ import AdminProfileForm from "@/components/admin/AdminProfileForm";
  */
 function TrialInfo() {
   const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
+  const [isSubscribed, setIsSubscribed] = useState(false);
   // Chave usada localmente para armazenar a data de início do trial quando ainda não existe registro no Supabase.
   const TRIAL_START_KEY = "keeptur:trial-start";
 
   useEffect(() => {
     let mounted = true;
     (async () => {
-      // Tenta via sessão do Supabase
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (user?.email) {
-        // Buscar configurações dinâmicas para trial
-        const { data: settings } = await supabase
-          .from('settings')
-          .select('trial_days')
-          .limit(1)
-          .maybeSingle();
-        const trialDaysCfg = settings?.trial_days ?? null;
-
-        const { data } = await supabase
-          .from('subscribers')
-          .select('trial_end, trial_start, subscribed, subscription_end')
-          .or(`user_id.eq.${user.id},email.eq.${user.email}`)
-          .order('updated_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (mounted) {
-          if (data?.subscribed) {
-            // Assinante ativo: não exibir trial
-            setDaysRemaining(null);
-            return;
-          }
-          if (data?.trial_end) {
-            // Calcular com base no trial_end
-            const nowMs = Date.now();
-            const endMs = new Date(data.trial_end).getTime();
-            setDaysRemaining(Math.max(0, Math.ceil((endMs - nowMs) / (1000 * 60 * 60 * 24))));
-            return;
-          }
-          if (data?.trial_start && trialDaysCfg) {
-            // Calcular com base no início + dias de configuração
-            const start = new Date(data.trial_start);
-            const end = new Date(start);
-            end.setDate(end.getDate() + trialDaysCfg);
-            const nowMs = Date.now();
-            const diffMs = end.getTime() - nowMs;
-            setDaysRemaining(Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24))));
-            return;
-          }
-          // Se não há registro de trial no Supabase mas temos configuração, usa a data local para calcular
-          if (trialDaysCfg) {
-            const startIso = localStorage.getItem(TRIAL_START_KEY);
-            const startDate = startIso ? new Date(startIso) : new Date();
-            const end = new Date(startDate);
-            end.setDate(end.getDate() + trialDaysCfg);
-            const nowMs = Date.now();
-            const diffMs = end.getTime() - nowMs;
-            setDaysRemaining(Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24))));
-            return;
-          }
-          setDaysRemaining(null);
-        }
+      if (!user?.email) {
+        mounted && setDaysRemaining(null);
         return;
       }
-      // Usuário sem sessão: não mostrar info
-      mounted && setDaysRemaining(null);
+      // Buscar configurações dinâmicas para trial
+      const { data: settings } = await supabase
+        .from('settings')
+        .select('trial_days')
+        .limit(1)
+        .maybeSingle();
+      const trialDaysCfg = settings?.trial_days ?? null;
+      const { data } = await supabase
+        .from('subscribers')
+        .select('trial_end, trial_start, subscribed, subscription_end')
+        .or(`user_id.eq.${user.id},email.eq.${user.email}`)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!mounted) return;
+      const nowMs = Date.now();
+      if (data) {
+        // Se a assinatura está ativa e tem data de término futura
+        if (data.subscribed && data.subscription_end) {
+          const endMs = new Date(data.subscription_end).getTime();
+          const diff = Math.max(0, Math.ceil((endMs - nowMs) / (1000 * 60 * 60 * 24)));
+          setDaysRemaining(diff);
+          setIsSubscribed(true);
+          return;
+        }
+        // Caso não esteja ativo, mas tenha trial_end
+        if (data.trial_end) {
+          const endMs = new Date(data.trial_end).getTime();
+          const diff = Math.max(0, Math.ceil((endMs - nowMs) / (1000 * 60 * 60 * 24)));
+          setDaysRemaining(diff);
+          setIsSubscribed(false);
+          return;
+        }
+        // Trial com início + dias configurados
+        if (data.trial_start && trialDaysCfg) {
+          const start = new Date(data.trial_start);
+          const end = new Date(start);
+          end.setDate(end.getDate() + trialDaysCfg);
+          const diff = Math.max(0, Math.ceil((end.getTime() - nowMs) / (1000 * 60 * 60 * 24)));
+          setDaysRemaining(diff);
+          setIsSubscribed(false);
+          return;
+        }
+      }
+      // Se não há registro de trial no Supabase mas temos configuração, calcula pelo localStorage
+      if (trialDaysCfg) {
+        const startIso = localStorage.getItem(TRIAL_START_KEY);
+        const startDate = startIso ? new Date(startIso) : new Date();
+        const end = new Date(startDate);
+        end.setDate(end.getDate() + trialDaysCfg);
+        const diff = Math.max(0, Math.ceil((end.getTime() - nowMs) / (1000 * 60 * 60 * 24)));
+        setDaysRemaining(diff);
+        setIsSubscribed(false);
+      } else {
+        setDaysRemaining(null);
+        setIsSubscribed(false);
+      }
     })();
     return () => {
       mounted = false;
     };
   }, []);
-
   if (daysRemaining === null) return null;
   return (
     <div className="flex items-center justify-between">
       <div>
-        <p className="text-sm text-muted-foreground">Dias restantes de trial</p>
+        <p className="text-sm text-muted-foreground">
+          {isSubscribed ? 'Dias restantes de assinatura' : 'Dias restantes de trial'}
+        </p>
         <p className="text-2xl font-semibold">
           {daysRemaining} dia{daysRemaining === 1 ? '' : 's'}
         </p>
@@ -134,18 +140,16 @@ const ProfilePage = () => {
       <div className="grid gap-6">
         {/* Perfil do usuário logado */}
         <UserProfile showFullProfile={true} />
-        {/* Trial info (apenas não-admin) */}
-        {!isAdmin && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Status do Trial</CardTitle>
-              <CardDescription>Informações sobre seu período de avaliação</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <TrialInfo />
-            </CardContent>
-          </Card>
-        )}
+        {/* Informações de trial ou assinatura. Exibe para todos os usuários. */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Status do Trial/Assinatura</CardTitle>
+            <CardDescription>Informações sobre seu período de avaliação ou assinatura ativa</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <TrialInfo />
+          </CardContent>
+        </Card>
         {/* Formulário de perfil (somente admin) */}
         {isAdmin && <AdminProfileForm />}
         {/* Informações adicionais */}
