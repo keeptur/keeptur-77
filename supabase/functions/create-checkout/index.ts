@@ -34,16 +34,16 @@ serve(async (req) => {
 
     const { quantity = 1 } = (await req.json().catch(() => ({}))) as { quantity?: number };
 
-    // Load dynamic settings (price, currency, trial days, keys)
+    // Load dynamic settings (price, currency, trial days)
     const { data: appSettings } = await supabaseService
       .from("settings")
-      .select("price_per_seat_cents, currency, trial_days, stripe_secret_key")
+      .select("price_per_seat_cents, currency, trial_days")
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
 
-    const stripeSecret = appSettings?.stripe_secret_key || fallbackStripeSecret;
-    if (!stripeSecret) throw new Error("Stripe secret key not configured");
+    const stripeSecret = fallbackStripeSecret;
+    if (!stripeSecret) throw new Error("Stripe secret key not configured in environment variables");
 
     const priceCents = Math.max(0, Number(appSettings?.price_per_seat_cents ?? 3990));
     const currency = (appSettings?.currency || "BRL").toLowerCase();

@@ -13,7 +13,6 @@ interface SettingsRow {
   price_per_seat_cents: number;
   currency: string;
   stripe_publishable_key?: string | null;
-  stripe_secret_key?: string | null;
 }
 
 export default function SettingsSection() {
@@ -44,7 +43,6 @@ export default function SettingsSection() {
         trial_days: settings.trial_days,
         price_per_seat_cents: settings.price_per_seat_cents,
         stripe_publishable_key: settings.stripe_publishable_key ?? null,
-        stripe_secret_key: settings.stripe_secret_key ?? null,
       })
       .eq("id", settings.id);
     if (error) {
@@ -101,20 +99,11 @@ export default function SettingsSection() {
               onChange={(e) => setSettings((s) => (s ? { ...s, stripe_publishable_key: e.target.value } : s))}
             />
           </div>
-          <div>
-            <Label>Secret Key</Label>
-            <Input
-              type="password"
-              placeholder="sk_live_... ou sk_test_..."
-              value={settings?.stripe_secret_key ?? ""}
-              onChange={(e) => setSettings((s) => (s ? { ...s, stripe_secret_key: e.target.value } : s))}
-            />
-          </div>
           <div className="md:col-span-2">
             <Button onClick={saveSettings}>Salvar</Button>
           </div>
           <p className="md:col-span-2 text-sm text-muted-foreground">
-            As chaves da Stripe são usadas pelas funções Edge (Checkout/Portal).
+            A chave pública da Stripe é usada no frontend. A chave secreta é configurada de forma segura nas variáveis de ambiente.
           </p>
         </CardContent>
       </Card>

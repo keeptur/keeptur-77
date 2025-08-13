@@ -32,16 +32,9 @@ serve(async (req) => {
     const user = userData.user;
     if (!user?.email) throw new Error("User email not available");
 
-    const { data: appSettings } = await supabaseService
-      .from("settings")
-      .select("stripe_secret_key")
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
+    const stripeSecret = fallbackStripeSecret;
 
-    const stripeSecret = appSettings?.stripe_secret_key || fallbackStripeSecret;
-
-    if (!stripeSecret) throw new Error("Missing STRIPE_SECRET_KEY");
+    if (!stripeSecret) throw new Error("Stripe secret key not configured in environment variables");
 
     const stripe = new Stripe(stripeSecret, { apiVersion: "2023-10-16" });
 
