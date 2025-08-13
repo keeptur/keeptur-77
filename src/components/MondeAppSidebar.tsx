@@ -4,6 +4,7 @@ import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarHead
 import { LayoutDashboard, Users, FileText, Settings, LogOut, ChevronLeft, ChevronRight, CreditCard, Mail, Package } from "lucide-react";
 import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
+
 const navigationItems = [{
   title: "Dashboard",
   url: "/",
@@ -51,32 +52,61 @@ export function MondeAppSidebar() {
   const isCollapsed = state === "collapsed";
   const [trialDays, setTrialDays] = useState<number | null>(null);
   const [loadingTrial, setLoadingTrial] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   useEffect(() => {
     let mounted = true;
     (async () => {
       setLoadingTrial(true);
       try {
-        const {
-          data: {
-            user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          // Check admin role
+          const { data: roles } = await supabase.from('user_roles').select('role').eq('user_id', user.id);
+          const admin = (roles || []).some(r => r.role === 'admin');
+          if (mounted) setIsAdmin(admin);
+          if (admin) {
+            // Super admin: nunca exibir trial
+            if (mounted) setTrialDays(null);
+            return;
           }
-        } = await supabase.auth.getUser();
-        if (!user) {
-          setTrialDays(null);
+          // Non-admin with Supabase session: read subscriber via RLS
+          const { data } = await supabase
+            .from('subscribers')
+            .select('trial_end, subscription_end, subscribed')
+            .or(`user_id.eq.${user.id},email.eq.${user.email}`)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (mounted && data?.trial_end && !data?.subscribed) {
+            const now = Date.now();
+            const t = new Date(data.trial_end).getTime();
+            const days = Math.ceil((t - now) / (1000 * 60 * 60 * 24));
+            setTrialDays(days);
+          } else if (mounted) {
+            setTrialDays(null);
+          }
           return;
         }
-        const {
-          data
-        } = await supabase.from('subscribers').select('trial_end, subscription_end, subscribed').or(`user_id.eq.${user.id},email.eq.${user.email}`).order('updated_at', {
-          ascending: false
-        }).limit(1).maybeSingle();
-        if (mounted && data?.trial_end && !data?.subscribed) {
-          const now = Date.now();
-          const t = new Date(data.trial_end).getTime();
-          const days = Math.ceil((t - now) / (1000 * 60 * 60 * 24));
-          setTrialDays(days);
-        } else if (mounted) {
-          setTrialDays(null);
+        // No Supabase session: try Monde token and edge function
+        const mondeToken = localStorage.getItem('monde_token');
+        if (mondeToken) {
+          try {
+            const { data } = await supabase.functions.invoke('sync-subscriber', { body: { mondeToken } });
+            const trialEnd = (data as any)?.trial_end as string | undefined;
+            const subscribed = !!(data as any)?.subscribed;
+            if (mounted && trialEnd && !subscribed) {
+              const now = Date.now();
+              const t = new Date(trialEnd).getTime();
+              const days = Math.ceil((t - now) / (1000 * 60 * 60 * 24));
+              setTrialDays(days);
+            } else if (mounted) {
+              setTrialDays(null);
+            }
+          } catch {
+            if (mounted) setTrialDays(null);
+          }
+        } else {
+          if (mounted) setTrialDays(null);
         }
       } finally {
         mounted && setLoadingTrial(false);
@@ -143,7 +173,7 @@ export function MondeAppSidebar() {
 
       {/* Footer with trial banner and logout */}
       <div className="mt-auto p-3 border-t border-border">
-        {trialDays !== null && trialDays > 0 && <div className={isCollapsed ? "px-1 mb-2" : "mb-3"}>
+        {!isAdmin && trialDays !== null && trialDays > 0 && <div className={isCollapsed ? "px-1 mb-2" : "mb-3"}>
             <div className="rounded-lg border border-primary/30 bg-primary/10 p-2">
               <div className={isCollapsed ? "flex justify-center" : "flex items-center justify-between gap-2"}>
                 {!isCollapsed && <div>

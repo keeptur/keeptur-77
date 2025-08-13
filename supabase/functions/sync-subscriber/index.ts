@@ -73,39 +73,50 @@ serve(async (req) => {
     // Try to find an existing subscriber by email
     const { data: existing } = await admin
       .from("subscribers")
-      .select("id, user_id, trial_start, trial_end")
+      .select("id, user_id, trial_start, trial_end, subscribed, display_name, email")
       .eq("email", email)
       .maybeSingle();
+
+    let subId: string | null = existing?.id ?? null;
+    let trial_start = existing?.trial_start ?? null as string | null;
+    let trial_end = existing?.trial_end ?? null as string | null;
+    let subscribed = existing?.subscribed ?? false;
 
     if (existing?.id) {
       const update: any = {
         email,
         last_login_at: now.toISOString(),
-        display_name: display_name || null,
+        display_name: display_name || existing.display_name || null,
         source,
       };
       // If there is no trial yet, start now
       if (!existing.trial_start || !existing.trial_end) {
-        update.trial_start = now.toISOString();
-        update.trial_end = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000).toISOString();
+        trial_start = now.toISOString();
+        trial_end = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000).toISOString();
+        update.trial_start = trial_start;
+        update.trial_end = trial_end;
       }
       if (!existing.user_id && user_id) update.user_id = user_id;
 
       await admin.from("subscribers").update(update).eq("id", existing.id);
     } else {
-      await admin.from("subscribers").insert({
+      trial_start = now.toISOString();
+      trial_end = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000).toISOString();
+      const { data: inserted } = await admin.from("subscribers").insert({
         email,
         user_id,
         display_name: display_name || null,
         last_login_at: now.toISOString(),
-        trial_start: now.toISOString(),
-        trial_end: new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000).toISOString(),
+        trial_start,
+        trial_end,
         subscribed: false,
         source,
-      });
+      }).select('id').single();
+      subId = inserted?.id ?? null;
+      subscribed = false;
     }
 
-    return new Response(JSON.stringify({ ok: true }), {
+    return new Response(JSON.stringify({ ok: true, id: subId, email, trial_start, trial_end, subscribed }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });

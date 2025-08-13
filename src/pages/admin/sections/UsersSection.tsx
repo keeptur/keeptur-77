@@ -70,6 +70,8 @@ export default function UsersSection() {
   const [planFilter, setPlanFilter] = useState<'all' | 'basic' | 'pro' | 'enterprise'>('all');
 
   const getStatus = (u: CombinedUser): 'active' | 'trial' | 'inactive' => {
+    const uid = (u.id || u.user_id || '');
+    if (uid && isAdmin(uid)) return 'active'; // Super admin sempre ativo/vitalício
     const now = new Date();
     const sub = u.subscriber;
     const active = !!(sub?.subscribed || (sub?.subscription_end && new Date(sub.subscription_end) > now));
