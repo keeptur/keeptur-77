@@ -74,7 +74,10 @@ export function UserProfile({ userId, showFullProfile = false }: UserProfileProp
           // Para usuários não-admin, tentar puxar dados da API do Monde
           if (!isAdmin) {
             try {
+              console.log("UserProfile: Fetching data from Monde API for non-admin user");
               const mondeUser = await api.getCurrentUser();
+              console.log("UserProfile: Monde API response:", mondeUser);
+              
               const attrs = mondeUser.data.attributes;
               
               // Usar dados do Monde quando disponíveis
@@ -84,14 +87,17 @@ export function UserProfile({ userId, showFullProfile = false }: UserProfileProp
                 phone: attrs["mobile-phone"] || attrs.phone || finalProfile.attributes.phone,
                 "mobile-phone": attrs["mobile-phone"] || finalProfile.attributes["mobile-phone"],
                 "birth-date": attrs["birth-date"] || finalProfile.attributes["birth-date"],
-                "company-name": attrs["company-name"],
+                "company-name": attrs["company-name"] || "N/A",
                 code: attrs.code,
                 kind: attrs.kind,
                 "last-login": attrs["last-login"] || finalProfile.attributes["last-login"],
                 "created-at": attrs["created-at"] || finalProfile.attributes["created-at"],
               };
+              
+              console.log("UserProfile: Final profile with Monde data:", finalProfile);
             } catch (error) {
-              console.log('Usando dados do Supabase para usuário não-admin (API Monde indisponível)');
+              console.error('UserProfile: Error fetching from Monde API:', error);
+              console.log('UserProfile: Using Supabase data for non-admin user (API Monde unavailable)');
             }
           }
 

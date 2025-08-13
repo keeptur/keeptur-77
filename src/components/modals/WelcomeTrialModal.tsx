@@ -5,14 +5,13 @@ import { supabase } from "@/integrations/supabase/client";
 
 const WELCOME_KEY = "keeptur:welcome-shown";
 const TRIAL_START_KEY = "keeptur:trial-start";
-const DEFAULT_TRIAL_DAYS = 7; // fallback when settings are not available
 
 export function WelcomeTrialModal() {
   const [open, setOpen] = useState(false);
   const [allowed, setAllowed] = useState(false);
   const [isReturning, setIsReturning] = useState(false);
   const [realTrialDays, setRealTrialDays] = useState<number | null>(null);
-  const [configuredTrialDays, setConfiguredTrialDays] = useState<number>(DEFAULT_TRIAL_DAYS);
+  const [configuredTrialDays, setConfiguredTrialDays] = useState<number>(2);
 
   useEffect(() => {
     // Não exibe no admin
@@ -22,6 +21,8 @@ export function WelcomeTrialModal() {
     }
 
     (async () => {
+      console.log("WelcomeTrialModal: Starting setup");
+      
       // Buscar configurações de trial do admin
       const { data: settings } = await supabase
         .from('settings')
@@ -29,12 +30,20 @@ export function WelcomeTrialModal() {
         .limit(1)
         .maybeSingle();
       
+      console.log("WelcomeTrialModal: Settings from DB:", settings);
+      
       if (settings?.trial_days) {
+        console.log("WelcomeTrialModal: Setting trial_days to:", settings.trial_days);
         setConfiguredTrialDays(settings.trial_days);
+      } else {
+        console.log("WelcomeTrialModal: No settings found, using default");
       }
 
       const { data: { user } } = await supabase.auth.getUser();
+      console.log("WelcomeTrialModal: Current user:", user?.email);
+      
       if (!user) {
+        console.log("WelcomeTrialModal: No user, allowing modal for anonymous");
         setAllowed(true);
       } else {
         const { data: roles } = await supabase
@@ -43,22 +52,31 @@ export function WelcomeTrialModal() {
           .eq('user_id', user.id);
         const isAdmin = (roles || []).some(r => r.role === 'admin');
         
+        console.log("WelcomeTrialModal: User roles:", roles);
+        console.log("WelcomeTrialModal: Is admin:", isAdmin);
+        
         if (!isAdmin) {
           setAllowed(true);
           // Buscar dados reais de trial do usuário
           const { data: subscriber } = await supabase
             .from('subscribers')
-            .select('trial_end, subscribed')
+            .select('trial_end, subscribed, trial_start')
             .or(`user_id.eq.${user.id},email.eq.${user.email}`)
             .maybeSingle();
+          
+          console.log("WelcomeTrialModal: Subscriber data:", subscriber);
           
           if (subscriber?.trial_end && !subscriber?.subscribed) {
             const now = Date.now();
             const trialEnd = new Date(subscriber.trial_end).getTime();
             const remainingDays = Math.max(0, Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24)));
+            console.log("WelcomeTrialModal: Real trial days calculated:", remainingDays);
             setRealTrialDays(remainingDays);
+          } else {
+            console.log("WelcomeTrialModal: No active trial found");
           }
         } else {
+          console.log("WelcomeTrialModal: Admin user, not showing modal");
           setAllowed(false);
         }
       }
