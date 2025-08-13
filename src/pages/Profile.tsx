@@ -15,6 +15,8 @@ import AdminProfileForm from "@/components/admin/AdminProfileForm";
  */
 function TrialInfo() {
   const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
+  // Chave usada localmente para armazenar a data de início do trial quando ainda não existe registro no Supabase.
+  const TRIAL_START_KEY = "keeptur:trial-start";
 
   useEffect(() => {
     let mounted = true;
@@ -56,6 +58,17 @@ function TrialInfo() {
             // Calcular com base no início + dias de configuração
             const start = new Date(data.trial_start);
             const end = new Date(start);
+            end.setDate(end.getDate() + trialDaysCfg);
+            const nowMs = Date.now();
+            const diffMs = end.getTime() - nowMs;
+            setDaysRemaining(Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24))));
+            return;
+          }
+          // Se não há registro de trial no Supabase mas temos configuração, usa a data local para calcular
+          if (trialDaysCfg) {
+            const startIso = localStorage.getItem(TRIAL_START_KEY);
+            const startDate = startIso ? new Date(startIso) : new Date();
+            const end = new Date(startDate);
             end.setDate(end.getDate() + trialDaysCfg);
             const nowMs = Date.now();
             const diffMs = end.getTime() - nowMs;
