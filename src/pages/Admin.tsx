@@ -9,7 +9,6 @@ import PlansSection from "./admin/sections/PlansSection";
 import SubscriptionSection from "./admin/sections/SubscriptionSection";
 import SettingsSection from "./admin/sections/SettingsSection";
 import EmailsSection from "./admin/sections/EmailsSection";
-import LogsSection from "./admin/sections/LogsSection";
 export default function AdminPage() {
   const [tab, setTab] = useState("dashboard");
   const [searchParams, setSearchParams] = useSearchParams();
@@ -41,7 +40,14 @@ export default function AdminPage() {
           
           <CardContent>
             <Tabs value={tab} onValueChange={setTab} className="w-full">
-              
+              <TabsList className="grid w-full grid-cols-6">
+                <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+                <TabsTrigger value="users">Usuários</TabsTrigger>
+                <TabsTrigger value="plans">Planos</TabsTrigger>
+                <TabsTrigger value="billing">Billing</TabsTrigger>
+                <TabsTrigger value="settings">Config</TabsTrigger>
+                <TabsTrigger value="emails">Emails</TabsTrigger>
+              </TabsList>
 
               <TabsContent value="dashboard" className="mt-4">
                 <DashboardSection />
@@ -65,10 +71,6 @@ export default function AdminPage() {
 
               <TabsContent value="emails" className="mt-4">
                 <EmailsSection />
-              </TabsContent>
-
-              <TabsContent value="logs" className="mt-4">
-                <LogsSection />
               </TabsContent>
             </Tabs>
           </CardContent>

@@ -124,10 +124,16 @@ export default function UsersSection() {
     if (uid && isAdmin(uid)) return 'active'; // Super admin sempre ativo/vitalício
     const now = new Date();
     const sub = u.subscriber;
-    const active = !!(sub?.subscribed || sub?.subscription_end && new Date(sub.subscription_end) > now);
-    if (active) return 'active';
-    const inTrial = !!(sub?.trial_end && new Date(sub.trial_end) > now);
-    return inTrial ? 'trial' : 'inactive';
+    
+    // Verificar se tem assinatura ativa
+    const hasActiveSubscription = !!(sub?.subscribed && sub?.subscription_end && new Date(sub.subscription_end) > now);
+    if (hasActiveSubscription) return 'active';
+    
+    // Verificar se está em trial válido
+    const inValidTrial = !!(sub?.trial_end && new Date(sub.trial_end) > now);
+    if (inValidTrial) return 'trial';
+    
+    return 'inactive';
   };
   const combinedUsers = useMemo<CombinedUser[]>(() => {
     const byEmail = new Map<string, CombinedUser>();
@@ -363,7 +369,7 @@ export default function UsersSection() {
                           {initials}
                         </div>
                         <div>
-                          <p className="text-sm font-medium">{u.full_name?.split(' ')[0] || u.email.split('@')[0]}</p>
+                          <p className="text-sm font-medium">{u.full_name || u.email}</p>
                           
                         </div>
                       </div>

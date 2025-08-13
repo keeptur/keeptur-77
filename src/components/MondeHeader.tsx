@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Moon, Sun, Bell, ChevronDown, X } from "lucide-react";
+import { Moon, Sun, Bell, ChevronDown, X, Clock } from "lucide-react";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { useTheme } from "next-themes";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -51,7 +51,10 @@ function TrialStatus() {
 
   return (
     <div className="px-4 py-3 border-b border-border">
-      <div className="text-xs text-muted-foreground">Trial</div>
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Clock className="w-3 h-3" />
+        Trial
+      </div>
       <div className="text-sm font-medium">
         {daysRemaining} dia{daysRemaining === 1 ? '' : 's'} restante{daysRemaining === 1 ? '' : 's'}
       </div>
@@ -99,34 +102,32 @@ export function MondeHeader() {
       setIsAdmin(userIsAdmin);
       setUserRole(userIsAdmin ? 'Admin' : 'Usuário');
 
-      if (userIsAdmin) {
-        // Para admin, puxar do Supabase profiles
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('full_name, email, avatar_url')
-          .eq('id', user.id)
-          .maybeSingle();
+      // Primeiro, sempre tenta pegar o profile do Supabase
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, email, avatar_url')
+        .eq('id', user.id)
+        .maybeSingle();
 
+      if (userIsAdmin) {
+        // Para admin, usar dados do Supabase
         if (profile) {
           setUserName(profile.full_name || profile.email || 'Usuário');
           setAvatarUrl(profile.avatar_url || '');
         }
       } else {
-        // Para usuário não-admin, puxar da API do Monde
+        // Para usuário não-admin, priorizar nome da API do Monde
         try {
           const currentUser = await api.getCurrentUser();
           const attrs = currentUser.data.attributes;
-          setUserName(attrs.name || attrs.login || user.email || 'Usuário');
-          setAvatarUrl(''); // API do Monde não tem avatar
+          const mondeName = attrs.name || attrs.login;
+          
+          // Usar nome do Monde se existir, senão usar Supabase
+          setUserName(mondeName || profile?.full_name || profile?.email || user.email || 'Usuário');
+          setAvatarUrl(profile?.avatar_url || ''); // Avatar sempre do Supabase
         } catch (error) {
           console.log('Fallback to Supabase profile for non-admin user');
           // Fallback para profile do Supabase se API do Monde falhar
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('full_name, email, avatar_url')
-            .eq('id', user.id)
-            .maybeSingle();
-
           if (profile) {
             setUserName(profile.full_name || profile.email || 'Usuário');
             setAvatarUrl(profile.avatar_url || '');
