@@ -140,16 +140,18 @@ const ProfilePage = () => {
       <div className="grid gap-6">
         {/* Perfil do usuário logado */}
         <UserProfile showFullProfile={true} />
-        {/* Informações de trial ou assinatura. Exibe para todos os usuários. */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Status do Trial/Assinatura</CardTitle>
-            <CardDescription>Informações sobre seu período de avaliação ou assinatura ativa</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <TrialInfo />
-          </CardContent>
-        </Card>
+        {/* Exibe informações do trial/assinatura somente para usuários não‑admin. Admins têm acesso vitalício. */}
+        {!isAdmin && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Status do Trial/Assinatura</CardTitle>
+              <CardDescription>Informações sobre seu período de avaliação ou assinatura ativa</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TrialInfo />
+            </CardContent>
+          </Card>
+        )}
         {/* Formulário de perfil (somente admin) */}
         {isAdmin && <AdminProfileForm />}
         {/* Informações adicionais */}
