@@ -22,37 +22,49 @@ export function useSubscriberSync() {
 
     const sync = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return; // require supabase session to respect RLS
 
+      const mondeToken = localStorage.getItem("monde_token");
       const monde = getMondeTokenPayload();
-      const email = monde?.email || user.email;
-      if (!email) return;
 
-      // Try to fetch existing subscriber (allowed by RLS for the current user)
-      const { data: existing } = await supabase
-        .from("subscribers")
-        .select("id, trial_start, trial_end")
-        .or(`user_id.eq.${user.id},email.eq.${email}`)
-        .maybeSingle();
+      // 1) If we have a Supabase user, sync via direct table access (respecting RLS)
+      if (user) {
+        const email = monde?.email || user.email;
+        if (!email) return;
 
-      const now = new Date();
-      const baseStart = existing?.trial_start ? new Date(existing.trial_start) : now;
-      const trialStart = existing?.trial_start || baseStart.toISOString();
-      const trialEnd = existing?.trial_end || new Date(baseStart.getTime() + DEFAULT_TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+        // Try to fetch existing subscriber (allowed by RLS for the current user)
+        const { data: existing } = await supabase
+          .from("subscribers")
+          .select("id, trial_start, trial_end")
+          .or(`user_id.eq.${user.id},email.eq.${email}`)
+          .maybeSingle();
 
-      const payload: any = {
-        email,
-        user_id: user.id,
-        display_name: monde?.name || user.user_metadata?.name || null,
-        last_login_at: now.toISOString(),
-        trial_start: trialStart,
-        trial_end: trialEnd,
-      };
+        const now = new Date();
+        const baseStart = existing?.trial_start ? new Date(existing.trial_start) : now;
+        const trialStart = existing?.trial_start || baseStart.toISOString();
+        const trialEnd = existing?.trial_end || new Date(baseStart.getTime() + DEFAULT_TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
-      if (existing?.id) {
-        await supabase.from("subscribers").update(payload).eq("id", existing.id);
-      } else {
-        await supabase.from("subscribers").insert(payload);
+        const payload: any = {
+          email,
+          user_id: user.id,
+          display_name: monde?.name || user.user_metadata?.name || null,
+          last_login_at: now.toISOString(),
+          trial_start: trialStart,
+          trial_end: trialEnd,
+        };
+
+        if (existing?.id) {
+          await supabase.from("subscribers").update(payload).eq("id", existing.id);
+        } else {
+          await supabase.from("subscribers").insert(payload);
+        }
+        return;
+      }
+
+      // 2) If there's no Supabase session but we have a Monde token, sync via Edge Function (service role)
+      if (mondeToken || monde?.email) {
+        await supabase.functions.invoke("sync-subscriber", {
+          body: { mondeToken, email: monde?.email, name: monde?.name, source: "monde" },
+        }).catch(() => {/* silent */});
       }
     };
 

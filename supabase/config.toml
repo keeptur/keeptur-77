@@ -11,3 +11,6 @@ verify_jwt = true
 
 [functions.bootstrap-admin]
 verify_jwt = false
+
+[functions.sync-subscriber]
+verify_jwt = false
