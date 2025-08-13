@@ -216,45 +216,33 @@ export default function UsersSection() {
     }
 
     try {
-      // Remover do subscribers
-      if (user.subscriber) {
-        const { error: subscriberError } = await supabase
-          .from('subscribers')
-          .delete()
-          .eq('id', user.subscriber.id);
-        if (subscriberError) throw subscriberError;
+      // Usar edge function para deletar com permissões adequadas
+      const userId = user.id || user.user_id;
+      if (!userId) {
+        toast({ 
+          title: 'Erro ao deletar usuário', 
+          description: 'ID do usuário não encontrado', 
+          variant: 'destructive' 
+        });
+        return;
       }
 
-      // Remover do user_roles se existir
-      if (user.id) {
-        const { error: rolesError } = await supabase
-          .from('user_roles')
-          .delete()
-          .eq('user_id', user.id);
-        if (rolesError) throw rolesError;
-      }
+      const { error } = await supabase.functions.invoke('delete-user', {
+        body: { userId }
+      });
 
-      // Remover do profiles se existir
-      if (user.id) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .delete()
-          .eq('id', user.id);
-        if (profileError) throw profileError;
-      }
-
-      // Remover do auth.users via admin API se existir
-      if (user.id) {
-        const { error: authError } = await supabase.auth.admin.deleteUser(user.id);
-        if (authError) throw authError;
-      }
+      if (error) throw error;
 
       toast({ 
         title: 'Usuário deletado', 
         description: 'Usuário removido completamente do sistema. Se fizer login novamente, terá uma nova conta trial.' 
       });
       
-      await reload();
+      // Atualizar a lista removendo o usuário deletado
+      setProfiles(prev => prev.filter(p => p.id !== userId));
+      setSubscribers(prev => prev.filter(s => s.user_id !== userId));
+      setRoles(prev => prev.filter(r => r.user_id !== userId));
+      
     } catch (e: any) {
       toast({ 
         title: 'Erro ao deletar usuário', 
