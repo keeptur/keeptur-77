@@ -28,75 +28,109 @@ export function WelcomeTrialModal() {
   const [open, setOpen] = useState(false);
   const [allowed, setAllowed] = useState(false);
   const [isReturning, setIsReturning] = useState(false);
+  // Número de dias de trial calculado com base em dados reais do servidor. Quando
+  // `null`, o cálculo local será usado como fallback.
   const [realTrialDays, setRealTrialDays] = useState<number | null>(null);
+  // Configuração de dias de trial definida no painel administrativo. Começa com
+  // um valor de 2 para evitar NaN até carregar as configurações.
   const [configuredTrialDays, setConfiguredTrialDays] = useState<number>(2);
 
+  /**
+   * Recupera as configurações de trial e os dados de trial do usuário atual.
+   * Esta função é invocada sempre que o modal for aberto ou quando as
+   * permissões do usuário mudarem. Ela aguarda o carregamento das
+   * configurações antes de calcular `realTrialDays` para garantir precisão.
+   */
+  const fetchTrialInfo = async () => {
+    if (!allowed) return;
+    // Busca a configuração de dias de trial do admin
+    const { data: settings } = await supabase
+      .from("settings")
+      .select("trial_days")
+      .limit(1)
+      .maybeSingle();
+    const cfgDays = settings?.trial_days ?? configuredTrialDays;
+    setConfiguredTrialDays(cfgDays);
+    // Recupera o usuário logado
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setRealTrialDays(null);
+      return;
+    }
+    // Verifica se o usuário é admin
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id);
+    const isAdmin = (roles || []).some((r) => r.role === "admin");
+    if (isAdmin) {
+      setAllowed(false);
+      return;
+    }
+    // Carrega o registro de subscriber para o usuário (ou pelo email)
+    const { data: subscriber } = await supabase
+      .from("subscribers")
+      .select("trial_end, trial_start, subscribed")
+      .or(`user_id.eq.${user.id},email.eq.${user.email}`)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (subscriber && !subscriber.subscribed) {
+      const nowMs = Date.now();
+      // Se há data de término do trial, priorize-a
+      if (subscriber.trial_end) {
+        const endMs = new Date(subscriber.trial_end as any).getTime();
+        const days = Math.max(0, Math.ceil((endMs - nowMs) / (1000 * 60 * 60 * 24)));
+        setRealTrialDays(days);
+        return;
+      }
+      // Caso contrário, se houver trial_start, usa configuração dinâmica
+      if (subscriber.trial_start) {
+        const startDate = new Date(subscriber.trial_start as any);
+        const end = new Date(startDate);
+        end.setDate(end.getDate() + cfgDays);
+        const days = Math.max(0, Math.ceil((end.getTime() - nowMs) / (1000 * 60 * 60 * 24)));
+        setRealTrialDays(days);
+        return;
+      }
+    }
+    // Se não houver subscriber ou não for possível calcular via servidor,
+    // usa o cálculo local (mantém realTrialDays = null) para fallback
+    setRealTrialDays(null);
+  };
+
+  // Primeiro effect: define se o modal deve ser mostrado (não mostrar para admin)
   useEffect(() => {
-    // Nunca mostrar o modal em páginas do admin
     if (window.location.pathname.startsWith("/admin")) {
       setAllowed(false);
       return;
     }
-
     (async () => {
-      // Carregar configurações do admin (ex.: dias padrão de trial)
-      const { data: settings } = await supabase
-        .from("settings")
-        .select("trial_days")
-        .limit(1)
-        .maybeSingle();
-      if (settings?.trial_days) {
-        setConfiguredTrialDays(settings.trial_days);
-      }
-
-      // Obter usuário atual
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      // Usuários anônimos têm o modal liberado
       if (!user) {
         setAllowed(true);
         return;
       }
-      // Verificar se é admin
       const { data: roles } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id);
       const isAdmin = (roles || []).some((r) => r.role === "admin");
-      if (isAdmin) {
-        setAllowed(false);
-        return;
-      }
-      // Usuário não admin: mostrar modal e tentar obter trial
-      setAllowed(true);
-      const { data: subscriber } = await supabase
-        .from("subscribers")
-        .select("trial_end, trial_start, subscribed")
-        .or(`user_id.eq.${user.id},email.eq.${user.email}`)
-        .maybeSingle();
-      if (subscriber && !subscriber.subscribed) {
-        const nowMs = Date.now();
-        // Se há data de término do trial, priorize-a
-        if (subscriber.trial_end) {
-          const endMs = new Date(subscriber.trial_end as any).getTime();
-          const days = Math.max(0, Math.ceil((endMs - nowMs) / (1000 * 60 * 60 * 24)));
-          setRealTrialDays(days);
-        } else if (subscriber.trial_start) {
-          // Sem `trial_end`: calcule com base no início + configurações
-          const startDate = new Date(subscriber.trial_start as any);
-          // Data final = início + dias configurados
-          const end = new Date(startDate);
-          end.setDate(end.getDate() + configuredTrialDays);
-          const days = Math.max(
-            0,
-            Math.ceil((end.getTime() - nowMs) / (1000 * 60 * 60 * 24))
-          );
-          setRealTrialDays(days);
-        }
-      }
+      setAllowed(!isAdmin);
     })();
   }, []);
+
+  // Segundo effect: sempre que permitido ou a modal abrir, recarrega dados de trial
+  useEffect(() => {
+    if (allowed) {
+      fetchTrialInfo().catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allowed, open]);
 
   // Controlar exibição da modal com base na permissão e armazenamento local
   useEffect(() => {
