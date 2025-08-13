@@ -33,73 +33,55 @@ export function MondeHeader() {
 
   // Check admin role (Supabase)
   const [isAdmin, setIsAdmin] = useState(false);
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const uid = session?.user?.id;
-        if (!uid) return;
-        const { data } = await supabase.from('user_roles').select('role').eq('user_id', uid);
-        const admin = (data || []).some(r => r.role === 'admin');
-        if (active) setIsAdmin(admin);
-      } catch {}
-    })();
-    return () => { active = false; };
-  }, []);
-
-  // Dados reais do usuário
   const [userName, setUserName] = useState<string>("...");
   const [userRole, setUserRole] = useState<string>("Usuário");
   const [avatarUrl, setAvatarUrl] = useState<string>("");
+
+  // Função para recarregar dados do usuário
+  const reloadUserData = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, email, avatar_url')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profile) {
+        setUserName(profile.full_name || profile.email || 'Usuário');
+        setAvatarUrl(profile.avatar_url || '');
+        
+        // Verificar se é admin
+        const { data: roles } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id);
+        const userIsAdmin = roles?.some(r => r.role === 'admin') || false;
+        setUserRole(userIsAdmin ? 'Admin' : 'Usuário');
+        setIsAdmin(userIsAdmin);
+      }
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
-    (async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user?.id) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('full_name,email,avatar_url')
-            .eq('id', user.id)
-            .maybeSingle();
-          if (mounted && profile) {
-            setUserName(profile.full_name || profile.email || 'Usuário');
-            setAvatarUrl(profile.avatar_url || '');
-            // Verificar se é admin
-            const { data: roles } = await supabase
-              .from('user_roles')
-              .select('role')
-              .eq('user_id', user.id);
-            const userIsAdmin = roles?.some(r => r.role === 'admin') || false;
-            setUserRole(userIsAdmin ? 'Admin' : 'Usuário');
-            return;
-          }
-        }
-      } catch {}
-
-      // Fallback para Monde API
-      try {
-        const me = await api.getCurrentUser();
-        const name = me?.data?.attributes?.name || me?.data?.attributes?.login || 'Usuário';
-        if (mounted) {
-          setUserName(name);
-          setAvatarUrl('');
-          setUserRole(me?.data?.attributes?.role || 'Usuário');
-        }
-      } catch {
-        try {
-          const res = await api.getUserFromToken();
-          const name = res?.data?.attributes?.name || 'Usuário';
-          if (mounted) {
-            setUserName(name);
-            setAvatarUrl('');
-            setUserRole(res?.data?.attributes?.role || 'Usuário');
-          }
-        } catch {}
+    
+    // Event listener para recarregar dados quando o perfil for atualizado
+    const handleProfileUpdate = () => {
+      if (mounted) {
+        reloadUserData();
       }
-    })();
-    return () => { mounted = false; };
+    };
+    
+    window.addEventListener('profile-updated', handleProfileUpdate);
+    
+    // Carregar dados iniciais
+    reloadUserData();
+    
+    return () => { 
+      mounted = false; 
+      window.removeEventListener('profile-updated', handleProfileUpdate);
+    };
   }, []);
 
 

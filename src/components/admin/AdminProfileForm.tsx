@@ -81,17 +81,20 @@ export default function AdminProfileForm() {
     if (!uid) return;
     
     try {
+      // Usar upsert ao invés de update para garantir que o registro seja criado se não existir
       const { error } = await supabase
         .from("profiles")
-        .update({
+        .upsert({
+          id: uid,
           full_name: values.full_name,
           email: values.email,
           avatar_url: values.avatar_url || null,
           phone: values.phone || null,
           mobile_phone: values.mobile_phone || null,
           birth_date: values.birth_date || null,
-        })
-        .eq("id", uid);
+        }, {
+          onConflict: 'id'
+        });
 
       if (error) {
         throw error;
@@ -99,8 +102,8 @@ export default function AdminProfileForm() {
 
       toast({ title: "Perfil atualizado com sucesso!" });
       
-      // Recarregar a página para atualizar o header
-      window.location.reload();
+      // Recarregar apenas os dados do header
+      window.dispatchEvent(new Event('profile-updated'));
       
     } catch (error: any) {
       console.error('Erro ao salvar perfil:', error);
