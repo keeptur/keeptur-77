@@ -124,117 +124,98 @@ export function MondeHeader() {
     }
   };
 
-  // Check admin role (Supabase)
-  const [isAdmin, setIsAdmin] = useState(false);
+  // Estados do usuário - Simplificado como no arquivo original
   const [userName, setUserName] = useState<string>("...");
   const [userRole, setUserRole] = useState<string>("Usuário");
   const [avatarUrl, setAvatarUrl] = useState<string>("");
-
-  // Função para recarregar dados do usuário
-  const reloadUserData = async () => {
-    console.log("MondeHeader: Starting reloadUserData");
-    
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      console.log("MondeHeader: No user found");
-      return;
-    }
-    
-    console.log("MondeHeader: User ID:", user.id);
-    console.log("MondeHeader: User email:", user.email);
-
-    // Verificar se é admin primeiro
-    const { data: roles } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id);
-    
-    console.log("MondeHeader: User roles:", roles);
-    
-    const userIsAdmin = roles?.some(r => r.role === 'admin') || false;
-    setIsAdmin(userIsAdmin);
-    setUserRole(userIsAdmin ? 'Admin' : 'Usuário');
-    
-    console.log("MondeHeader: User is admin:", userIsAdmin);
-
-    // Primeiro, sempre tenta pegar o profile do Supabase
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name, email, avatar_url')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    console.log("MondeHeader: Supabase profile:", profile);
-
-    if (userIsAdmin) {
-      // Para admin, usar dados do Supabase
-      if (profile) {
-        const adminName = profile.full_name || profile.email || 'Usuário';
-        console.log("MondeHeader: Setting admin name:", adminName);
-        setUserName(adminName);
-        setAvatarUrl(profile.avatar_url || '');
-      }
-    } else {
-      // Para usuário não-admin, priorizar nome da API do Monde
-      try {
-        console.log("MondeHeader: Trying to get data from Monde API");
-        console.log("MondeHeader: API authenticated:", api.isAuthenticated());
-        
-        const currentUser = await api.getCurrentUser();
-        console.log("MondeHeader: getCurrentUser response:", currentUser);
-        
-        if (currentUser && currentUser.data && currentUser.data.attributes) {
-          const attrs = currentUser.data.attributes;
-          const mondeName = attrs.name || attrs.login;
-          console.log("MondeHeader: Monde name found:", mondeName);
-          
-          // Usar nome do Monde se existir, senão usar Supabase
-          const finalName = mondeName || profile?.full_name || profile?.email || user.email || 'Usuário';
-          console.log("MondeHeader: Setting final name:", finalName);
-          setUserName(finalName);
-          setAvatarUrl(profile?.avatar_url || ''); // Avatar sempre do Supabase
-        } else {
-          throw new Error("Invalid API response structure");
-        }
-      } catch (error) {
-        console.error("MondeHeader: Error getting data from Monde API:", error);
-        console.log("MondeHeader: Fallback to Supabase profile for non-admin user");
-        
-        // Fallback para profile do Supabase se API do Monde falhar
-        if (profile) {
-          const fallbackName = profile.full_name || profile.email || user.email || 'Usuário';
-          console.log("MondeHeader: Setting fallback name:", fallbackName);
-          setUserName(fallbackName);
-          setAvatarUrl(profile.avatar_url || '');
-        } else {
-          console.log("MondeHeader: No profile data available, using email");
-          setUserName(user.email || 'Usuário');
-        }
-      }
-    }
-  };
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     let mounted = true;
     
+    const loadUserData = async () => {
+      try {
+        // 1. Primeiro, tenta buscar dados do Monde (como no arquivo original)
+        const me = await api.getCurrentUser();
+        const mondeName = me?.data?.attributes?.name || me?.data?.attributes?.login;
+        const mondeRole = me?.data?.attributes?.role || "Usuário";
+        
+        if (mounted && mondeName) {
+          setUserName(mondeName);
+          setUserRole(mondeRole);
+        }
+      } catch (error) {
+        console.log("Erro ao buscar dados do Monde, tentando fallback...");
+        
+        // 2. Fallback para getUserFromToken (como no arquivo original)
+        try {
+          const res = await api.getUserFromToken();
+          const fallbackName = res?.data?.attributes?.name || "Usuário";
+          const fallbackRole = res?.data?.attributes?.role || "Usuário";
+          
+          if (mounted) {
+            setUserName(fallbackName);
+            setUserRole(fallbackRole);
+          }
+        } catch (fallbackError) {
+          console.log("Fallback também falhou, usando dados do Supabase...");
+        }
+      }
+
+      // 3. Buscar dados adicionais do Supabase (avatar e admin status)
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && mounted) {
+          // Verificar se é admin
+          const { data: roles } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id);
+          
+          const userIsAdmin = roles?.some(r => r.role === 'admin') || false;
+          setIsAdmin(userIsAdmin);
+          
+          if (userIsAdmin) {
+            setUserRole('Admin');
+          }
+
+          // Buscar avatar do profile
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('avatar_url, full_name')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          if (profile?.avatar_url) {
+            setAvatarUrl(profile.avatar_url);
+          }
+
+          // Se não conseguiu nome do Monde, usar do Supabase como último recurso
+          if (userName === "..." && profile?.full_name) {
+            setUserName(profile.full_name);
+          }
+        }
+      } catch (supabaseError) {
+        console.log("Erro ao buscar dados do Supabase:", supabaseError);
+      }
+    };
+
+    loadUserData();
+
     // Event listener para recarregar dados quando o perfil for atualizado
     const handleProfileUpdate = () => {
       if (mounted) {
-        reloadUserData();
+        loadUserData();
       }
     };
     
     window.addEventListener('profile-updated', handleProfileUpdate);
     
-    // Carregar dados iniciais
-    reloadUserData();
-    
     return () => { 
       mounted = false; 
       window.removeEventListener('profile-updated', handleProfileUpdate);
     };
-  }, []);
-
+  }, [userName]); // Dependency no userName para evitar loop infinito
 
   const initials = useMemo(() => {
     const parts = (userName || "").split(" ").filter(Boolean);
@@ -321,10 +302,17 @@ export function MondeHeader() {
         {/* User Menu */}
         <div className="relative">
           <Button onClick={() => setUserDropdownOpen(!userDropdownOpen)} variant="outline" className="group flex items-center space-x-3 p-1 rounded-button hover:bg-primary hover:text-primary-foreground">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={avatarUrl} alt={userName} />
-              <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-            </Avatar>
+            {/* Avatar - usa componente se tiver URL, senão usa o método original */}
+            {avatarUrl ? (
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={avatarUrl} alt={userName} />
+                <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+              </Avatar>
+            ) : (
+              <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center text-white font-medium text-sm">
+                {initials}
+              </div>
+            )}
             <div className="hidden md:block text-left">
               <p className="text-sm font-medium text-foreground group-hover:text-primary-foreground">{userName}</p>
               <p className="text-xs text-muted-foreground group-hover:text-primary-foreground/90">{userRole}</p>
@@ -334,25 +322,25 @@ export function MondeHeader() {
             </div>
           </Button>
           
-            {userDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-card border border-border rounded-lg shadow-lg py-1 z-50">
-                {!isAdmin && (
-                  <TrialStatus />
-                )}
-                {isAdmin && (
-                  <button onClick={() => { navigate("/admin"); setUserDropdownOpen(false); }} className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted">
-                    Admin
-                  </button>
-                )}
-                <button onClick={() => navigate("/profile")} className="block w-full text-left px-4 py-2 text-sm text-muted-foreground hover:bg-muted">
-                  Meu Perfil
+          {userDropdownOpen && (
+            <div className="absolute right-0 mt-2 w-64 bg-card border border-border rounded-lg shadow-lg py-1 z-50">
+              {!isAdmin && (
+                <TrialStatus />
+              )}
+              {isAdmin && (
+                <button onClick={() => { navigate("/admin"); setUserDropdownOpen(false); }} className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted">
+                  Admin
                 </button>
-                <div className="border-t border-border my-1"></div>
-                <button onClick={handleLogout} className="block w-full text-left px-4 py-2 text-sm text-destructive hover:bg-muted">
-                  Sair
-                </button>
-              </div>
-            )}
+              )}
+              <button onClick={() => { navigate("/profile"); setUserDropdownOpen(false); }} className="block w-full text-left px-4 py-2 text-sm text-muted-foreground hover:bg-muted">
+                Meu Perfil
+              </button>
+              <div className="border-t border-border my-1"></div>
+              <button onClick={handleLogout} className="block w-full text-left px-4 py-2 text-sm text-destructive hover:bg-muted">
+                Sair
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>
