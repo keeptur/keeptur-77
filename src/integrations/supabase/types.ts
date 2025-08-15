@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "13.0.4"
@@ -132,33 +132,81 @@ export type Database = {
           active: boolean
           created_at: string
           currency: string
+          description: string | null
+          features: string[] | null
           id: string
           name: string
           price_cents: number
           seats: number
           sort_order: number
+          stripe_price_id_monthly: string | null
+          stripe_price_id_yearly: string | null
           updated_at: string
         }
         Insert: {
           active?: boolean
           created_at?: string
           currency?: string
+          description?: string | null
+          features?: string[] | null
           id?: string
           name: string
           price_cents: number
           seats: number
           sort_order?: number
+          stripe_price_id_monthly?: string | null
+          stripe_price_id_yearly?: string | null
           updated_at?: string
         }
         Update: {
           active?: boolean
           created_at?: string
           currency?: string
+          description?: string | null
+          features?: string[] | null
           id?: string
           name?: string
           price_cents?: number
           seats?: number
           sort_order?: number
+          stripe_price_id_monthly?: string | null
+          stripe_price_id_yearly?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      plan_settings: {
+        Row: {
+          annual_discount: number
+          auto_billing: boolean
+          auto_trial: boolean
+          coupons_enabled: boolean
+          created_at: string
+          first_purchase_discount: number
+          id: string
+          trial_days: number
+          updated_at: string
+        }
+        Insert: {
+          annual_discount?: number
+          auto_billing?: boolean
+          auto_trial?: boolean
+          coupons_enabled?: boolean
+          created_at?: string
+          first_purchase_discount?: number
+          id?: string
+          trial_days?: number
+          updated_at?: string
+        }
+        Update: {
+          annual_discount?: number
+          auto_billing?: boolean
+          auto_trial?: boolean
+          coupons_enabled?: boolean
+          created_at?: string
+          first_purchase_discount?: number
+          id?: string
+          trial_days?: number
           updated_at?: string
         }
         Relationships: []
@@ -383,8 +431,8 @@ export type Database = {
       }
       has_role: {
         Args: {
-          _user_id: string
           _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
         }
         Returns: boolean
       }

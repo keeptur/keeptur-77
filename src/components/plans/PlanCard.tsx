@@ -5,26 +5,36 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Check, Crown } from "lucide-react";
 
 interface PlanCardProps {
-  plan: {
-    id: string;
-    name: string;
-    seats: number;
-    price_cents: number;
-    currency: string;
-    active: boolean;
-    sort_order: number;
-  };
+  plan: any;
   userCount?: number;
   isPopular?: boolean;
   onToggle: (id: string, active: boolean) => void;
   onEdit: (plan: any) => void;
+  settings?: any;
 }
 
-export default function PlanCard({ plan, userCount = 0, isPopular = false, onToggle, onEdit }: PlanCardProps) {
-  const formatBRL = (cents: number) =>
-    (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+export default function PlanCard({ plan, userCount, isPopular, onToggle, onEdit, settings }: PlanCardProps) {
+  const formatBRL = (cents: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(cents / 100);
+  };
 
-  const features = [
+  const calculateAnnualPrice = (monthlyPrice: number) => {
+    const annualPrice = monthlyPrice * 12;
+    const discount = settings?.annual_discount || 20;
+    return annualPrice * (1 - discount / 100);
+  };
+
+  const handlePurchase = (isAnnual: boolean) => {
+    const url = isAnnual ? plan.stripe_price_id_yearly : plan.stripe_price_id_monthly;
+    if (url) {
+      window.open(url, '_blank');
+    }
+  };
+
+  const features = plan.features || [
     `Até ${plan.seats} usuários`,
     "Suporte técnico",
     "Relatórios básicos",
@@ -44,19 +54,27 @@ export default function PlanCard({ plan, userCount = 0, isPopular = false, onTog
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-foreground">{plan.name}</h3>
-            <p className="text-sm text-muted-foreground">Ideal para pequenas equipes</p>
+            <p className="text-sm text-muted-foreground">{plan.description || "Ideal para pequenas equipes"}</p>
           </div>
-          <Switch
-            checked={plan.active}
-            onCheckedChange={(checked) => onToggle(plan.id, checked)}
-          />
         </div>
         
-        <div>
-          <div className="flex items-baseline">
-            <span className="text-3xl font-bold text-primary">{formatBRL(plan.price_cents)}</span>
-            <span className="text-sm text-muted-foreground ml-1">/mês</span>
+        <div className="space-y-2">
+          <div className="text-3xl font-bold">
+            {formatBRL(plan.price_cents)}
           </div>
+          <div className="text-sm text-muted-foreground">por mês</div>
+          
+          {settings?.annual_discount && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Anual: </span>
+              <span className="font-semibold text-green-600">
+                {formatBRL(calculateAnnualPrice(plan.price_cents))}
+              </span>
+              <span className="text-xs text-muted-foreground ml-1">
+                ({settings.annual_discount}% desc.)
+              </span>
+            </div>
+          )}
         </div>
       </CardHeader>
 
@@ -70,22 +88,42 @@ export default function PlanCard({ plan, userCount = 0, isPopular = false, onTog
           ))}
         </div>
 
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-foreground">
-            Usuários: {userCount}/∞
-          </span>
-          <Badge variant={plan.active ? "default" : "secondary"} className="text-xs">
-            {plan.active ? "Ativo" : "Inativo"}
-          </Badge>
+        <div className="mt-6 space-y-3">
+          <div className="flex gap-2">
+            <Button
+              variant="default"
+              onClick={() => handlePurchase(false)}
+              className="flex-1"
+              disabled={!plan.stripe_price_id_monthly}
+            >
+              Comprar Mensal
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handlePurchase(true)}
+              className="flex-1"
+              disabled={!plan.stripe_price_id_yearly}
+            >
+              Comprar Anual
+            </Button>
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Ativo</span>
+            <Switch
+              checked={plan.active}
+              onCheckedChange={(checked) => onToggle(plan.id, checked)}
+            />
+          </div>
+          
+          <Button
+            variant="outline"
+            onClick={() => onEdit(plan)}
+            className="w-full"
+          >
+            Editar Plano
+          </Button>
         </div>
-
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={() => onEdit(plan)}
-        >
-          Editar Plano
-        </Button>
       </CardContent>
     </Card>
   );

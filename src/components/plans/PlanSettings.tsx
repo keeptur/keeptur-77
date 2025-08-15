@@ -1,9 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export default function PlanSettings() {
+  const { toast } = useToast();
   const [settings, setSettings] = useState({
     trialDays: 14,
     autoTrial: true,
@@ -12,6 +16,80 @@ export default function PlanSettings() {
     couponsEnabled: true,
     firstPurchaseDiscount: 15
   });
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('plan_settings')
+        .select('*')
+        .limit(1)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      if (data) {
+        setSettings({
+          trialDays: data.trial_days,
+          autoTrial: data.auto_trial,
+          autoBilling: data.auto_billing,
+          annualDiscount: data.annual_discount,
+          couponsEnabled: data.coupons_enabled,
+          firstPurchaseDiscount: data.first_purchase_discount
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao carregar configurações:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar configurações dos planos",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveSettings = async () => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('plan_settings')
+        .upsert({
+          trial_days: settings.trialDays,
+          auto_trial: settings.autoTrial,
+          auto_billing: settings.autoBilling,
+          annual_discount: settings.annualDiscount,
+          coupons_enabled: settings.couponsEnabled,
+          first_purchase_discount: settings.firstPurchaseDiscount,
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Configurações salvas com sucesso!",
+      });
+    } catch (error) {
+      console.error('Erro ao salvar configurações:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar configurações",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -116,6 +194,17 @@ export default function PlanSettings() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Botão de Salvar */}
+      <div className="flex justify-end mt-6">
+        <Button 
+          onClick={saveSettings}
+          disabled={saving || loading}
+          className="min-w-32"
+        >
+          {saving ? "Salvando..." : "Salvar Configurações"}
+        </Button>
+      </div>
     </div>
   );
 }

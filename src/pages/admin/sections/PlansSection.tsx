@@ -1,8 +1,7 @@
-
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { Plus } from "lucide-react";
 import PlanCard from "@/components/plans/PlanCard";
 import PlanModal from "@/components/plans/PlanModal";
@@ -17,111 +16,185 @@ interface PlanKit {
   currency: string;
   active: boolean;
   sort_order: number;
+  description?: string;
+  features?: string[];
+  stripe_price_id_monthly?: string;
+  stripe_price_id_yearly?: string;
 }
 
 export default function PlansSection() {
   const { toast } = useToast();
   const [plans, setPlans] = useState<PlanKit[]>([]);
+  const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlanKit | null>(null);
-
-  const loadPlans = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("plan_kits")
-      .select("*")
-      .order("sort_order", { ascending: true });
-
-    if (error) {
-      toast({ 
-        title: "Erro ao carregar planos", 
-        description: error.message, 
-        variant: "destructive" 
-      });
-    } else {
-      setPlans(data || []);
-    }
-    setLoading(false);
-  };
 
   useEffect(() => {
     loadPlans();
+    loadSettings();
   }, []);
 
-  const handleTogglePlan = async (id: string, active: boolean) => {
-    const { error } = await supabase
-      .from("plan_kits")
-      .update({ active })
-      .eq("id", id);
+  const loadSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('plan_settings')
+        .select('*')
+        .limit(1)
+        .single();
 
-    if (error) {
-      toast({ 
-        title: "Erro ao atualizar plano", 
-        description: error.message, 
-        variant: "destructive" 
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      setSettings(data);
+    } catch (error) {
+      console.error('Erro ao carregar configurações:', error);
+    }
+  };
+
+  const loadPlans = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('plan_kits')
+        .select('*')
+        .order('sort_order', { ascending: true });
+
+      if (error) throw error;
+      setPlans(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar planos:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar planos",
+        variant: "destructive",
       });
-    } else {
-      toast({ title: active ? "Plano ativado" : "Plano desativado" });
-      loadPlans();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTogglePlan = async (id: string, active: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('plan_kits')
+        .update({ active, updated_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      toast({
+        title: "Sucesso",
+        description: `Plano ${active ? 'ativado' : 'desativado'} com sucesso!`,
+      });
+      
+      await loadPlans();
+    } catch (error) {
+      console.error('Erro ao atualizar plano:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar plano. Tente novamente.",
+        variant: "destructive",
+      });
     }
   };
 
   const handleEditPlan = (plan: PlanKit) => {
     setEditingPlan(plan);
-    setModalOpen(true);
+    setIsModalOpen(true);
   };
 
   const handleSavePlan = async (planData: any) => {
-    if (editingPlan) {
-      // Update existing plan
-      const { error } = await supabase
-        .from("plan_kits")
-        .update(planData)
-        .eq("id", editingPlan.id);
+    try {
+      if (editingPlan) {
+        const { error } = await supabase
+          .from('plan_kits')
+          .update({
+            name: planData.name,
+            price_cents: planData.price_cents,
+            seats: planData.seats,
+            description: planData.description,
+            features: planData.features,
+            stripe_price_id_monthly: planData.stripe_price_id_monthly,
+            stripe_price_id_yearly: planData.stripe_price_id_yearly,
+            active: planData.active,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', editingPlan.id);
 
-      if (error) {
-        toast({ 
-          title: "Erro ao atualizar plano", 
-          description: error.message, 
-          variant: "destructive" 
+        if (error) throw error;
+        
+        toast({
+          title: "Sucesso",
+          description: "Plano atualizado com sucesso!",
         });
       } else {
-        toast({ title: "Plano atualizado com sucesso" });
-        setModalOpen(false);
-        setEditingPlan(null);
-        loadPlans();
-      }
-    } else {
-      // Create new plan
-      const { error } = await supabase
-        .from("plan_kits")
-        .insert(planData);
+        const { error } = await supabase
+          .from('plan_kits')
+          .insert({
+            name: planData.name,
+            price_cents: planData.price_cents,
+            seats: planData.seats,
+            description: planData.description,
+            features: planData.features,
+            stripe_price_id_monthly: planData.stripe_price_id_monthly,
+            stripe_price_id_yearly: planData.stripe_price_id_yearly,
+            active: planData.active,
+            currency: 'BRL'
+          });
 
-      if (error) {
-        toast({ 
-          title: "Erro ao criar plano", 
-          description: error.message, 
-          variant: "destructive" 
+        if (error) throw error;
+        
+        toast({
+          title: "Sucesso",
+          description: "Plano criado com sucesso!",
         });
-      } else {
-        toast({ title: "Plano criado com sucesso" });
-        setModalOpen(false);
-        loadPlans();
       }
+      
+      await loadPlans();
+      setIsModalOpen(false);
+      setEditingPlan(null);
+    } catch (error) {
+      console.error('Erro ao salvar plano:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar plano. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeletePlan = async (planId: string) => {
+    try {
+      const { error } = await supabase
+        .from('plan_kits')
+        .delete()
+        .eq('id', planId);
+
+      if (error) throw error;
+      
+      toast({
+        title: "Sucesso",
+        description: "Plano excluído com sucesso!",
+      });
+      
+      await loadPlans();
+      setIsModalOpen(false);
+      setEditingPlan(null);
+    } catch (error) {
+      console.error('Erro ao excluir plano:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir plano. Tente novamente.",
+        variant: "destructive",
+      });
     }
   };
 
   const handleAddPlan = () => {
     setEditingPlan(null);
-    setModalOpen(true);
-  };
-
-  // Mock user counts for demonstration
-  const getUserCount = (planId: string) => {
-    const counts = { 0: 247, 1: 684, 2: 316 };
-    const index = plans.findIndex(p => p.id === planId);
-    return counts[index as keyof typeof counts] || 0;
+    setIsModalOpen(true);
   };
 
   if (loading) {
@@ -154,10 +227,10 @@ export default function PlansSection() {
           <PlanCard
             key={plan.id}
             plan={plan}
-            userCount={getUserCount(plan.id)}
-            isPopular={index === 1} // Make middle plan popular
+            isPopular={index === 1}
             onToggle={handleTogglePlan}
             onEdit={handleEditPlan}
+            settings={settings}
           />
         ))}
       </div>
@@ -170,13 +243,14 @@ export default function PlansSection() {
 
       {/* Modal */}
       <PlanModal
-        open={modalOpen}
+        open={isModalOpen}
         onClose={() => {
-          setModalOpen(false);
+          setIsModalOpen(false);
           setEditingPlan(null);
         }}
         plan={editingPlan}
         onSave={handleSavePlan}
+        onDelete={handleDeletePlan}
       />
     </div>
   );
