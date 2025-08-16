@@ -13,6 +13,10 @@ const navigationItems = [{
   title: "Pessoas",
   url: "/people",
   icon: Users
+}, {
+  title: "Assinatura",
+  url: "/subscription",
+  icon: CreditCard
 }];
 const adminNavigationItems = [{
   title: "Dashboard",
@@ -27,13 +31,9 @@ const adminNavigationItems = [{
   url: "/admin?t=plans",
   icon: Package
 }, {
-  title: "Assinatura",
+  title: "Assinaturas",
   url: "/admin?t=billing",
   icon: CreditCard
-}, {
-  title: "Configurações",
-  url: "/admin?t=settings",
-  icon: Settings
 }, {
   title: "E-mails",
   url: "/admin?t=emails",

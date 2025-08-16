@@ -6,8 +6,7 @@ import { AdminRoute } from "@/components/auth/AdminRoute";
 import DashboardSection from "./admin/sections/DashboardSection";
 import UsersSection from "./admin/sections/UsersSection";
 import PlansSection from "./admin/sections/PlansSection";
-import SubscriptionSection from "./admin/sections/SubscriptionSection";
-import SettingsSection from "./admin/sections/SettingsSection";
+import BillingSettingsSection from "./admin/sections/BillingSettingsSection";
 import EmailsSection from "./admin/sections/EmailsSection";
 export default function AdminPage() {
   const [tab, setTab] = useState("dashboard");
@@ -55,11 +54,7 @@ export default function AdminPage() {
               </TabsContent>
 
               <TabsContent value="billing" className="mt-4">
-                <SubscriptionSection />
-              </TabsContent>
-
-              <TabsContent value="settings" className="mt-4">
-                <SettingsSection />
+                <BillingSettingsSection />
               </TabsContent>
 
               <TabsContent value="emails" className="mt-4">

@@ -20,9 +20,8 @@ import { AdminRoute } from "./components/auth/AdminRoute";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
 import AdminPlansPage from "./pages/admin/AdminPlansPage";
-import AdminBillingPage from "./pages/admin/AdminBillingPage";
-import AdminSettingsPage from "./pages/admin/AdminSettingsPage";
 import AdminEmailsPage from "./pages/admin/AdminEmailsPage";
+import SubscriptionPage from "./pages/SubscriptionPage";
 import AdminLogsPage from "./pages/admin/AdminLogsPage";
 import { UserRoute } from "./components/auth/UserRoute";
 
@@ -108,6 +107,11 @@ const AppWrapper = () => {
                     <ProfilePage />
                   </UserRoute>
                 } />
+                <Route path="subscription" element={
+                  <UserRoute>
+                    <SubscriptionPage />
+                  </UserRoute>
+                } />
                 {/* Legacy single admin page (kept) */}
                 <Route path="admin" element={
                   <AdminRoute>
@@ -119,7 +123,6 @@ const AppWrapper = () => {
                 <Route path="admin/users" element={<Navigate to="/admin?t=users" replace />} />
                 <Route path="admin/plans" element={<Navigate to="/admin?t=plans" replace />} />
                 <Route path="admin/billing" element={<Navigate to="/admin?t=billing" replace />} />
-                <Route path="admin/settings" element={<Navigate to="/admin?t=settings" replace />} />
                 <Route path="admin/emails" element={<Navigate to="/admin?t=emails" replace />} />
                 <Route path="admin/logs" element={<Navigate to="/admin?t=logs" replace />} />
               </Route>

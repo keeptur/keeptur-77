@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Check, Crown } from "lucide-react";
+import { Check, Crown, Trash2 } from "lucide-react";
 
 interface PlanCardProps {
   plan: any;
@@ -10,10 +10,11 @@ interface PlanCardProps {
   isPopular?: boolean;
   onToggle: (id: string, active: boolean) => void;
   onEdit: (plan: any) => void;
+  onDelete: (planId: string) => void;
   settings?: any;
 }
 
-export default function PlanCard({ plan, userCount, isPopular, onToggle, onEdit, settings }: PlanCardProps) {
+export default function PlanCard({ plan, userCount, isPopular, onToggle, onEdit, onDelete, settings }: PlanCardProps) {
   const formatBRL = (cents: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -44,7 +45,7 @@ export default function PlanCard({ plan, userCount, isPopular, onToggle, onEdit,
   return (
     <Card className={`relative overflow-hidden transition-all duration-300 hover:shadow-lg ${isPopular ? "border-primary shadow-glow" : ""}`}>
       {isPopular && (
-        <div className="absolute -top-1 -right-8 bg-gradient-to-r from-warning to-orange-500 text-warning-foreground px-8 py-1 text-xs font-semibold transform rotate-45 z-10">
+        <div className="absolute -top-1 -right-8 bg-gradient-to-r from-warning to-orange-500 text-warning-foreground px-8 py-1 text-xs font-semibold transform rotate-45 z-10 whitespace-nowrap">
           <Crown className="w-3 h-3 mr-1 inline" />
           Mais Popular
         </div>
@@ -56,6 +57,14 @@ export default function PlanCard({ plan, userCount, isPopular, onToggle, onEdit,
             <h3 className="text-lg font-semibold text-foreground">{plan.name}</h3>
             <p className="text-sm text-muted-foreground">{plan.description || "Ideal para pequenas equipes"}</p>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onDelete(plan.id)}
+            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
         </div>
         
         <div className="space-y-2">

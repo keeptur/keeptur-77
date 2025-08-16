@@ -5,7 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Plus } from "lucide-react";
 import PlanCard from "@/components/plans/PlanCard";
 import PlanModal from "@/components/plans/PlanModal";
-import PlanCharts from "@/components/plans/PlanCharts";
 import PlanSettings from "@/components/plans/PlanSettings";
 
 interface PlanKit {
@@ -230,13 +229,11 @@ export default function PlansSection() {
             isPopular={index === 1}
             onToggle={handleTogglePlan}
             onEdit={handleEditPlan}
+            onDelete={handleDeletePlan}
             settings={settings}
           />
         ))}
       </div>
-
-      {/* Charts */}
-      <PlanCharts />
 
       {/* Settings */}
       <PlanSettings />
