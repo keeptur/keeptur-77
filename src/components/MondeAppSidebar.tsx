@@ -4,7 +4,6 @@ import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarHead
 import { LayoutDashboard, Users, FileText, Settings, LogOut, ChevronLeft, ChevronRight, CreditCard, Mail, Package } from "lucide-react";
 import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
-
 const navigationItems = [{
   title: "Dashboard",
   url: "/",
@@ -58,10 +57,16 @@ export function MondeAppSidebar() {
     (async () => {
       setLoadingTrial(true);
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: {
+            user
+          }
+        } = await supabase.auth.getUser();
         if (user) {
           // Check admin role
-          const { data: roles } = await supabase.from('user_roles').select('role').eq('user_id', user.id);
+          const {
+            data: roles
+          } = await supabase.from('user_roles').select('role').eq('user_id', user.id);
           const admin = (roles || []).some(r => r.role === 'admin');
           if (mounted) setIsAdmin(admin);
           if (admin) {
@@ -70,13 +75,11 @@ export function MondeAppSidebar() {
             return;
           }
           // Non-admin with Supabase session: read subscriber via RLS
-          const { data } = await supabase
-            .from('subscribers')
-            .select('trial_end, subscription_end, subscribed')
-            .or(`user_id.eq.${user.id},email.eq.${user.email}`)
-            .order('updated_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+          const {
+            data
+          } = await supabase.from('subscribers').select('trial_end, subscription_end, subscribed').or(`user_id.eq.${user.id},email.eq.${user.email}`).order('updated_at', {
+            ascending: false
+          }).limit(1).maybeSingle();
           if (mounted && data?.trial_end && !data?.subscribed) {
             const now = Date.now();
             const t = new Date(data.trial_end).getTime();
@@ -91,7 +94,13 @@ export function MondeAppSidebar() {
         const mondeToken = localStorage.getItem('monde_token');
         if (mondeToken) {
           try {
-            const { data } = await supabase.functions.invoke('sync-subscriber', { body: { mondeToken } });
+            const {
+              data
+            } = await supabase.functions.invoke('sync-subscriber', {
+              body: {
+                mondeToken
+              }
+            });
             const trialEnd = (data as any)?.trial_end as string | undefined;
             const subscribed = !!(data as any)?.subscribed;
             if (mounted && trialEnd && !subscribed) {
@@ -162,7 +171,7 @@ export function MondeAppSidebar() {
               {(isAdmin ? adminNavigationItems : navigationItems).map(item => <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={location.pathname === item.url} tooltip={item.title} className={isCollapsed ? "justify-center px-2" : ""}>
                     <NavLink to={item.url} className={`flex items-center text-foreground hover:text-foreground ${isCollapsed ? 'justify-center' : 'space-x-3'}`}>
-                      <item.icon className={`h-4 w-4 ${isCollapsed ? 'mx-auto' : ''}`} />
+                      
                       {!isCollapsed && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
