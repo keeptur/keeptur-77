@@ -108,7 +108,6 @@ export function useTasks() {
         // Tentar buscar tarefas excluídas/canceladas também
         try {
           const extraFiltersList: Record<string, string>[] = [
-            { deleted: "true" },
             { excluded: "true" },
             { visible: "false" },
           ];

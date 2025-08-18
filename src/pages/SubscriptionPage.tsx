@@ -210,6 +210,46 @@ export default function SubscriptionPage() {
     }
   };
 
+  const getSubscriptionDuration = () => {
+    if (!subscriptionData.subscription_end) return 'N/A';
+    
+    const now = new Date();
+    const subEnd = new Date(subscriptionData.subscription_end);
+    const diffMs = subEnd.getTime() - now.getTime();
+    const diffDays = Math.abs(Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+    
+    if (diffDays < 30) {
+      return `${diffDays} dias`;
+    } else if (diffDays < 365) {
+      const months = Math.floor(diffDays / 30);
+      return `${months} ${months === 1 ? 'mês' : 'meses'}`;
+    } else {
+      const years = Math.floor(diffDays / 365);
+      const remainingMonths = Math.floor((diffDays % 365) / 30);
+      if (remainingMonths === 0) {
+        return `${years} ${years === 1 ? 'ano' : 'anos'}`;
+      }
+      return `${years} ${years === 1 ? 'ano' : 'anos'} e ${remainingMonths} ${remainingMonths === 1 ? 'mês' : 'meses'}`;
+    }
+  };
+
+  const getTrialDuration = () => {
+    if (!subscriptionData.trial_end) return 'N/A';
+    
+    const now = new Date();
+    const trialEnd = new Date(subscriptionData.trial_end);
+    const diffMs = now.getTime() - (trialEnd.getTime() - (subscriptionData.days_remaining * 24 * 60 * 60 * 1000));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 1) {
+      return 'hoje';
+    } else if (diffDays === 1) {
+      return '1 dia';
+    } else {
+      return `${diffDays} dias`;
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -251,6 +291,14 @@ export default function SubscriptionPage() {
                     : "Assine um plano para continuar usando todos os recursos"
                 }
               </p>
+              {(subscriptionData.subscribed || subscriptionData.trial_active) && (
+                <p className="text-xs text-blue-100 mt-1">
+                  {subscriptionData.subscribed 
+                    ? `Assinando há ${getSubscriptionDuration()}` 
+                    : `Trial iniciado há ${getTrialDuration()}`
+                  }
+                </p>
+              )}
             </div>
             <div className="text-right">
               {subscriptionData.subscribed && subscriptionData.current_plan ? (
