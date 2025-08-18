@@ -3,28 +3,77 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, Calendar, RefreshCw, ArrowUp, X, Download, Users } from "lucide-react";
+import { CreditCard, Calendar, RefreshCw, ArrowUp, X, Download, Users, Star } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-interface SubscriptionData {
+interface CompleteSubscriptionData {
   subscribed: boolean;
   subscription_tier?: string;
   subscription_end?: string;
+  trial_active: boolean;
   trial_end?: string;
+  days_remaining: number;
+  current_plan?: {
+    name: string;
+    price_cents: number;
+    currency: string;
+    seats: number;
+    features: string[];
+    billing_cycle: 'monthly' | 'yearly';
+  };
+  next_billing_date?: string;
+  auto_renewal: boolean;
+  stripe_customer_id?: string;
 }
 
-interface PlanData {
+interface PaymentHistoryItem {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  currency: string;
+  status: 'paid' | 'pending' | 'failed';
+  invoice_url?: string;
+  invoice_pdf?: string;
+}
+
+interface PaymentMethod {
+  id: string;
+  brand: string;
+  last4: string;
+  exp_month: number;
+  exp_year: number;
+  created: number;
+}
+
+interface AvailablePlan {
+  id: string;
   name: string;
+  description?: string;
   price_cents: number;
+  yearly_price_cents: number;
   currency: string;
   seats: number;
+  features: string[];
+  stripe_price_id_monthly?: string;
+  stripe_price_id_yearly?: string;
+  is_current: boolean;
+  is_upgrade: boolean;
+  sort_order: number;
 }
 
 export default function SubscriptionPage() {
   const { toast } = useToast();
-  const [subscriptionData, setSubscriptionData] = useState<SubscriptionData>({ subscribed: false });
-  const [planData, setPlanData] = useState<PlanData | null>(null);
+  const [subscriptionData, setSubscriptionData] = useState<CompleteSubscriptionData>({ 
+    subscribed: false, 
+    trial_active: false, 
+    days_remaining: 0, 
+    auto_renewal: false 
+  });
+  const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryItem[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [availablePlans, setAvailablePlans] = useState<AvailablePlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState({
     autoRenewal: true,
@@ -40,30 +89,33 @@ export default function SubscriptionPage() {
   const loadSubscriptionData = async () => {
     setLoading(true);
     try {
-      // Check subscription status
-      const { data: subData, error: subError } = await supabase.functions.invoke('check-subscription');
-      
-      if (subError) throw subError;
-      
-      setSubscriptionData({
-        subscribed: subData?.subscribed || false,
-        subscription_tier: subData?.subscription_tier,
-        subscription_end: subData?.subscription_end,
-        trial_end: subData?.trial_end
-      });
+      // Load complete subscription data
+      const [subResponse, historyResponse, methodResponse, plansResponse] = await Promise.all([
+        supabase.functions.invoke('get-subscription-data'),
+        supabase.functions.invoke('get-payment-history'),
+        supabase.functions.invoke('get-payment-method'),
+        supabase.functions.invoke('get-available-plans')
+      ]);
 
-      // Load plan details if subscribed
-      if (subData?.subscribed && subData?.subscription_tier) {
-        const { data: planInfo } = await supabase
-          .from('plan_kits')
-          .select('name, price_cents, currency, seats')
-          .eq('name', subData.subscription_tier)
-          .eq('active', true)
-          .maybeSingle();
-        
-        if (planInfo) {
-          setPlanData(planInfo);
-        }
+      if (subResponse.error) throw subResponse.error;
+      if (subResponse.data) {
+        setSubscriptionData(subResponse.data);
+        setSettings(prev => ({
+          ...prev,
+          autoRenewal: subResponse.data.auto_renewal
+        }));
+      }
+
+      if (historyResponse.data?.payment_history) {
+        setPaymentHistory(historyResponse.data.payment_history);
+      }
+
+      if (methodResponse.data?.payment_method) {
+        setPaymentMethod(methodResponse.data.payment_method);
+      }
+
+      if (plansResponse.data?.available_plans) {
+        setAvailablePlans(plansResponse.data.available_plans);
       }
     } catch (error) {
       console.error('Error loading subscription data:', error);
@@ -84,9 +136,38 @@ export default function SubscriptionPage() {
     }).format(cents / 100);
   };
 
-  const handleSubscriptionChange = (plan: string, isAnnual: boolean = false) => {
-    // This would integrate with your plan selection logic
-    console.log(`Changing to ${plan} plan, annual: ${isAnnual}`);
+  const handleSubscriptionChange = async (planId: string, isAnnual: boolean = false) => {
+    try {
+      const plan = availablePlans.find(p => p.id === planId);
+      if (!plan) return;
+
+      const priceId = isAnnual ? plan.stripe_price_id_yearly : plan.stripe_price_id_monthly;
+      if (!priceId) {
+        toast({
+          title: "Erro",
+          description: "Preço não configurado para este plano",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: { price_id: priceId }
+      });
+      
+      if (error) throw error;
+      
+      if (data?.url) {
+        window.open(data.url, '_blank');
+      }
+    } catch (error) {
+      console.error('Error changing subscription:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao alterar plano",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleManagePayment = async () => {
@@ -120,8 +201,14 @@ export default function SubscriptionPage() {
     }));
   };
 
-  const isTrialActive = subscriptionData.trial_end && new Date(subscriptionData.trial_end) > new Date() && !subscriptionData.subscribed;
-  const daysRemaining = isTrialActive ? Math.ceil((new Date(subscriptionData.trial_end!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0;
+  const getCardBrandIcon = (brand: string) => {
+    switch (brand.toLowerCase()) {
+      case 'visa': return '💳';
+      case 'mastercard': return '💳';
+      case 'amex': return '💳';
+      default: return '💳';
+    }
+  };
 
   if (loading) {
     return (
@@ -150,36 +237,36 @@ export default function SubscriptionPage() {
             <div>
               <h2 className="text-xl font-semibold">
                 {subscriptionData.subscribed 
-                  ? `Plano ${planData?.name || subscriptionData.subscription_tier}` 
-                  : isTrialActive 
+                  ? `Plano ${subscriptionData.current_plan?.name || subscriptionData.subscription_tier}` 
+                  : subscriptionData.trial_active 
                     ? "Período de Trial" 
                     : "Sem Assinatura Ativa"
                 }
               </h2>
               <p className="text-blue-100 text-sm">
                 {subscriptionData.subscribed 
-                  ? `Assinatura ativa desde ${subscriptionData.subscription_end ? new Date(subscriptionData.subscription_end).toLocaleDateString('pt-BR') : 'N/A'}`
-                  : isTrialActive
-                    ? `Trial ativo até ${new Date(subscriptionData.trial_end!).toLocaleDateString('pt-BR')}`
+                  ? `Próxima cobrança: ${subscriptionData.next_billing_date ? new Date(subscriptionData.next_billing_date).toLocaleDateString('pt-BR') : 'N/A'}`
+                  : subscriptionData.trial_active
+                    ? `Trial ativo até ${subscriptionData.trial_end ? new Date(subscriptionData.trial_end).toLocaleDateString('pt-BR') : 'N/A'}`
                     : "Assine um plano para continuar usando todos os recursos"
                 }
               </p>
             </div>
             <div className="text-right">
-              {subscriptionData.subscribed && planData ? (
+              {subscriptionData.subscribed && subscriptionData.current_plan ? (
                 <>
                   <div className="flex items-baseline">
-                    <span className="text-2xl font-bold">{formatCurrency(planData.price_cents)}</span>
-                    <span className="text-sm ml-1 text-blue-100">/mês</span>
+                    <span className="text-2xl font-bold">{formatCurrency(subscriptionData.current_plan.price_cents)}</span>
+                    <span className="text-sm ml-1 text-blue-100">/{subscriptionData.current_plan.billing_cycle === 'yearly' ? 'ano' : 'mês'}</span>
                   </div>
                   <p className="text-xs text-blue-100 mt-1">
-                    Próxima cobrança: {subscriptionData.subscription_end ? new Date(subscriptionData.subscription_end).toLocaleDateString('pt-BR') : 'N/A'}
+                    Renovação: {subscriptionData.auto_renewal ? 'Automática' : 'Manual'}
                   </p>
                 </>
-              ) : isTrialActive ? (
+              ) : subscriptionData.trial_active ? (
                 <div className="text-right">
                   <div className="text-2xl font-bold">Gratuito</div>
-                  <p className="text-xs text-blue-100 mt-1">{daysRemaining} dias restantes</p>
+                  <p className="text-xs text-blue-100 mt-1">{subscriptionData.days_remaining} dias restantes</p>
                 </div>
               ) : (
                 <div className="text-right">
@@ -199,7 +286,7 @@ export default function SubscriptionPage() {
                 <div>
                   <p className="text-sm text-blue-100">Usuários</p>
                   <p className="font-semibold">
-                    {planData?.seats ? `${planData.seats} usuários` : 'Ilimitado'}
+                    {subscriptionData.current_plan?.seats ? `${subscriptionData.current_plan.seats} usuários` : 'Ilimitado'}
                   </p>
                 </div>
               </div>
@@ -211,10 +298,10 @@ export default function SubscriptionPage() {
                 </div>
                 <div>
                   <p className="text-sm text-blue-100">
-                    {isTrialActive ? "Dias restantes" : "Status"}
+                    {subscriptionData.trial_active ? "Dias restantes" : "Status"}
                   </p>
                   <p className="font-semibold">
-                    {isTrialActive ? `${daysRemaining} dias` : subscriptionData.subscribed ? "Ativo" : "Inativo"}
+                    {subscriptionData.trial_active ? `${subscriptionData.days_remaining} dias` : subscriptionData.subscribed ? "Ativo" : "Inativo"}
                   </p>
                 </div>
               </div>
@@ -227,7 +314,7 @@ export default function SubscriptionPage() {
                 <div>
                   <p className="text-sm text-blue-100">Renovação</p>
                   <p className="font-semibold">
-                    {subscriptionData.subscribed ? "Automática" : "N/A"}
+                    {subscriptionData.subscribed ? (subscriptionData.auto_renewal ? "Automática" : "Manual") : "N/A"}
                   </p>
                 </div>
               </div>
@@ -236,14 +323,33 @@ export default function SubscriptionPage() {
 
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-3">
-            <Button
-              variant="secondary"
-              onClick={() => handleSubscriptionChange('upgrade')}
-              className="flex items-center space-x-2"
-            >
-              <ArrowUp className="w-4 h-4" />
-              <span>Alterar Plano</span>
-            </Button>
+            {(!subscriptionData.subscribed || subscriptionData.trial_active) && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  const basicPlan = availablePlans.find(p => p.name.toLowerCase().includes('básico') || p.sort_order === 1);
+                  if (basicPlan) handleSubscriptionChange(basicPlan.id);
+                }}
+                className="flex items-center space-x-2"
+              >
+                <Star className="w-4 h-4" />
+                <span>Assinar Plano</span>
+              </Button>
+            )}
+            {subscriptionData.subscribed && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  const currentPlan = availablePlans.find(p => p.is_current);
+                  const upgradePlan = availablePlans.find(p => p.is_upgrade);
+                  if (upgradePlan) handleSubscriptionChange(upgradePlan.id);
+                }}
+                className="flex items-center space-x-2"
+              >
+                <ArrowUp className="w-4 h-4" />
+                <span>Fazer Upgrade</span>
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={handleManagePayment}
@@ -283,7 +389,7 @@ export default function SubscriptionPage() {
                 </p>
               </div>
               <Switch
-                checked={settings.autoRenewal}
+                checked={subscriptionData.auto_renewal}
                 onCheckedChange={() => toggleSetting('autoRenewal')}
               />
             </div>
@@ -324,15 +430,23 @@ export default function SubscriptionPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center space-x-4 p-4 bg-muted rounded-lg">
-              <div className="w-12 h-8 bg-blue-600 rounded flex items-center justify-center">
-                <CreditCard className="w-6 h-4 text-white" />
+            {paymentMethod ? (
+              <div className="flex items-center space-x-4 p-4 bg-muted rounded-lg">
+                <div className="w-12 h-8 bg-blue-600 rounded flex items-center justify-center text-white text-xs font-semibold">
+                  {paymentMethod.brand.toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-sm font-medium">•••• •••• •••• {paymentMethod.last4}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Expira em {paymentMethod.exp_month.toString().padStart(2, '0')}/{paymentMethod.exp_year}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium">•••• •••• •••• 4532</p>
-                <p className="text-xs text-muted-foreground">Expira em 12/2027</p>
+            ) : (
+              <div className="flex items-center justify-center p-8 text-muted-foreground">
+                <p>Nenhum método de pagamento cadastrado</p>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -348,45 +462,67 @@ export default function SubscriptionPage() {
             </Button>
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 font-medium">Data</th>
-                  <th className="text-left py-3 font-medium">Descrição</th>
-                  <th className="text-left py-3 font-medium">Valor</th>
-                  <th className="text-left py-3 font-medium">Status</th>
-                  <th className="text-left py-3 font-medium">Ação</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b">
-                  <td className="py-4 text-muted-foreground">15 Dez 2024</td>
-                  <td className="py-4 text-muted-foreground">Plano Pro - Mensal</td>
-                  <td className="py-4 font-medium">R$ 249,00</td>
-                  <td className="py-4">
-                    <Badge className="bg-green-100 text-green-800">Pago</Badge>
-                  </td>
-                  <td className="py-4">
-                    <Button variant="ghost" size="sm">Baixar</Button>
-                  </td>
-                </tr>
-                <tr className="border-b">
-                  <td className="py-4 text-muted-foreground">15 Nov 2024</td>
-                  <td className="py-4 text-muted-foreground">Plano Pro - Mensal</td>
-                  <td className="py-4 font-medium">R$ 249,00</td>
-                  <td className="py-4">
-                    <Badge className="bg-green-100 text-green-800">Pago</Badge>
-                  </td>
-                  <td className="py-4">
-                    <Button variant="ghost" size="sm">Baixar</Button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
+          <CardContent>
+            {paymentHistory.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-3 font-medium">Data</th>
+                      <th className="text-left py-3 font-medium">Descrição</th>
+                      <th className="text-left py-3 font-medium">Valor</th>
+                      <th className="text-left py-3 font-medium">Status</th>
+                      <th className="text-left py-3 font-medium">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paymentHistory.map((payment) => (
+                      <tr key={payment.id} className="border-b">
+                        <td className="py-4 text-muted-foreground">
+                          {new Date(payment.date).toLocaleDateString('pt-BR')}
+                        </td>
+                        <td className="py-4 text-muted-foreground">{payment.description}</td>
+                        <td className="py-4 font-medium">
+                          {new Intl.NumberFormat('pt-BR', {
+                            style: 'currency',
+                            currency: payment.currency === 'BRL' ? 'BRL' : 'USD'
+                          }).format(payment.amount / 100)}
+                        </td>
+                        <td className="py-4">
+                          <Badge 
+                            className={
+                              payment.status === 'paid' 
+                                ? "bg-green-100 text-green-800" 
+                                : payment.status === 'pending'
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-red-100 text-red-800"
+                            }
+                          >
+                            {payment.status === 'paid' ? 'Pago' : payment.status === 'pending' ? 'Pendente' : 'Falhado'}
+                          </Badge>
+                        </td>
+                        <td className="py-4">
+                          {payment.invoice_url && (
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => window.open(payment.invoice_url, '_blank')}
+                            >
+                              Baixar
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center p-8 text-muted-foreground">
+                <p>Nenhum histórico de pagamento encontrado</p>
+              </div>
+            )}
+          </CardContent>
       </Card>
     </div>
   );
