@@ -32,7 +32,25 @@ serve(async (req) => {
     const user = userData.user;
     if (!user?.email) throw new Error("User email not available");
 
-    const { quantity = 1 } = (await req.json().catch(() => ({}))) as { quantity?: number };
+    const requestBody = await req.json().catch(() => ({})) as { 
+      price_id?: string; 
+      quantity?: number; 
+      users?: Array<{name: string; email: string}>; 
+      billing_cycle?: 'monthly' | 'yearly' 
+    };
+    const { price_id, quantity = 1, users = [], billing_cycle = 'monthly' } = requestBody;
+
+    // If price_id is provided, use the specific plan; otherwise use settings
+    let planData = null;
+    if (price_id) {
+      // Get plan details from price_id
+      const { data: plan } = await supabaseService
+        .from("plan_kits")
+        .select("*")
+        .or(`stripe_price_id_monthly.eq.${price_id},stripe_price_id_yearly.eq.${price_id}`)
+        .maybeSingle();
+      planData = plan;
+    }
 
     // Load dynamic settings (price, currency, trial days)
     const { data: appSettings } = await supabaseService
@@ -62,25 +80,47 @@ serve(async (req) => {
 
     const origin = req.headers.get("origin") || Deno.env.get("SITE_URL") || "https://keeptur.lovable.app";
 
+    let lineItems;
+    
+    if (price_id) {
+      // Use specific Stripe price ID
+      lineItems = [{
+        price: price_id,
+        quantity: Math.max(1, Number(quantity || 1)),
+      }];
+    } else {
+      // Use dynamic pricing
+      lineItems = [{
+        price_data: {
+          currency,
+          product_data: { name: "Keeptur Assinatura por usuário" },
+          unit_amount: priceCents,
+          recurring: { interval: "month" },
+        },
+        quantity: Math.max(1, Number(quantity || 1)),
+      }];
+    }
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "subscription",
-      line_items: [
-        {
-          price_data: {
-            currency,
-            product_data: { name: "Keeptur Assinatura por usuário" },
-            unit_amount: priceCents,
-            recurring: { interval: "month" },
-          },
-          quantity: Math.max(1, Number(quantity || 1)),
-        },
-      ],
+      line_items: lineItems,
       allow_promotion_codes: true,
       success_url: `${origin}/`,
       cancel_url: `${origin}/`,
       subscription_data: {
         trial_period_days: trialDays,
+        metadata: {
+          users: JSON.stringify(users),
+          plan_name: planData?.name || 'Custom Plan',
+          billing_cycle,
+        },
+      },
+      metadata: {
+        users: JSON.stringify(users),
+        plan_name: planData?.name || 'Custom Plan',
+        billing_cycle,
+        user_count: String(quantity),
       },
     });
 

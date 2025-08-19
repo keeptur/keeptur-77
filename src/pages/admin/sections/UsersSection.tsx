@@ -49,6 +49,8 @@ type CombinedUser = {
  * autenticados via Supabase). Isso impede que usuários importados do Monde
  * sejam promovidos erroneamente.
  */
+import { UserManagement } from "@/components/admin/UserManagement";
+
 export default function UsersSection() {
   const { toast } = useToast();
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
@@ -325,6 +327,9 @@ export default function UsersSection() {
 
   return (
     <div className="space-y-6">
+      {/* User Management Component */}
+      <UserManagement />
+      
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Últimos Usuários Cadastrados</h3>
         <Button onClick={() => setOpen(true)}>Criar Usuário</Button>

@@ -3,9 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, Calendar, RefreshCw, ArrowUp, X, Download, Users, Star } from "lucide-react";
+import { CreditCard, Calendar, RefreshCw, ArrowUp, X, Download, Users, Star, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { PlanSelectionModal } from "@/components/modals/PlanSelectionModal";
 
 interface CompleteSubscriptionData {
   subscribed: boolean;
@@ -80,6 +81,7 @@ export default function SubscriptionPage() {
     billingNotifications: true,
     promotionalEmails: false
   });
+  const [showPlanModal, setShowPlanModal] = useState(false);
 
   useEffect(() => {
     document.title = "Assinaturas | Keeptur";
@@ -371,31 +373,24 @@ export default function SubscriptionPage() {
 
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-3">
-            {(!subscriptionData.subscribed || subscriptionData.trial_active) && (
+          {(!subscriptionData.subscribed || subscriptionData.trial_active) && (
               <Button
                 variant="secondary"
-                onClick={() => {
-                  const basicPlan = availablePlans.find(p => p.name.toLowerCase().includes('básico') || p.sort_order === 1);
-                  if (basicPlan) handleSubscriptionChange(basicPlan.id);
-                }}
+                onClick={() => setShowPlanModal(true)}
                 className="flex items-center space-x-2"
               >
-                <Star className="w-4 h-4" />
-                <span>Assinar Plano</span>
+                <Plus className="w-4 h-4" />
+                <span>Escolher Plano</span>
               </Button>
             )}
             {subscriptionData.subscribed && (
               <Button
                 variant="secondary"
-                onClick={() => {
-                  const currentPlan = availablePlans.find(p => p.is_current);
-                  const upgradePlan = availablePlans.find(p => p.is_upgrade);
-                  if (upgradePlan) handleSubscriptionChange(upgradePlan.id);
-                }}
+                onClick={() => setShowPlanModal(true)}
                 className="flex items-center space-x-2"
               >
                 <ArrowUp className="w-4 h-4" />
-                <span>Fazer Upgrade</span>
+                <span>Alterar Plano</span>
               </Button>
             )}
             <Button
@@ -572,6 +567,13 @@ export default function SubscriptionPage() {
             )}
           </CardContent>
       </Card>
+      {/* Plan Selection Modal */}
+      <PlanSelectionModal
+        open={showPlanModal}
+        onOpenChange={setShowPlanModal}
+        plans={availablePlans}
+        onSuccess={loadSubscriptionData}
+      />
     </div>
   );
 }
