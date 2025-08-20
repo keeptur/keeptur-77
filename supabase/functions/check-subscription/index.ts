@@ -31,13 +31,23 @@ serve(async (req) => {
 
     // Require a valid user token
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("No Authorization header provided");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "No Authorization header provided" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
+    
     const token = authHeader.replace("Bearer ", "");
-
     const { data: userData, error: userError } = await supabaseAnon.auth.getUser(token);
-    if (userError) throw new Error(`Auth error: ${userError.message}`);
+    if (userError || !userData.user?.email) {
+      return new Response(JSON.stringify({ error: "Auth error: invalid claim: missing sub claim" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
+    
     const user = userData.user;
-    if (!user?.email) throw new Error("User email not available");
 
     // Load dynamic Stripe key from settings (fallback to secret)
     const { data: appSettings } = await supabaseService

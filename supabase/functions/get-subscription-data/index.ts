@@ -25,13 +25,23 @@ serve(async (req) => {
     const stripe = new Stripe(stripeSecret, { apiVersion: "2023-10-16" });
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("No Authorization header provided");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "No Authorization header provided" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
+    
     const token = authHeader.replace("Bearer ", "");
-
     const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    if (userError) throw new Error(`Auth error: ${userError.message}`);
+    if (userError || !userData.user?.email) {
+      return new Response(JSON.stringify({ error: "Auth error: invalid claim: missing sub claim" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
+    
     const user = userData.user;
-    if (!user?.email) throw new Error("User email not available");
 
     // Get subscriber data
     const { data: subscriber } = await supabase

@@ -7,6 +7,7 @@ import { CreditCard, Calendar, RefreshCw, ArrowUp, X, Download, Users, Star, Plu
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { PlanSelectionModal } from "@/components/modals/PlanSelectionModal";
+import { ReloginModal } from "@/components/modals/ReloginModal";
 
 interface CompleteSubscriptionData {
   subscribed: boolean;
@@ -82,50 +83,73 @@ export default function SubscriptionPage() {
     promotionalEmails: false
   });
   const [showPlanModal, setShowPlanModal] = useState(false);
+  const [showReloginModal, setShowReloginModal] = useState(false);
 
   useEffect(() => {
     document.title = "Assinaturas | Keeptur";
     loadSubscriptionData();
   }, []);
 
-  // Abrir seleção de planos automaticamente quando o usuário não tem assinatura
+  // Automatically open plan selection when user has no subscription and plans are available
   useEffect(() => {
-    if (!loading && availablePlans.length > 0 && !subscriptionData.subscribed) {
+    if (!loading && availablePlans.length > 0 && !subscriptionData.subscribed && !subscriptionData.trial_active) {
       setShowPlanModal(true);
     }
-  }, [loading, availablePlans.length, subscriptionData.subscribed]);
+  }, [loading, availablePlans.length, subscriptionData.subscribed, subscriptionData.trial_active]);
 
   const loadSubscriptionData = async () => {
     setLoading(true);
     try {
+      // Check for Supabase session first
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        setShowReloginModal(true);
+        setLoading(false);
+        return;
+      }
+
+      // Sync subscriber data first
+      await supabase.functions.invoke('sync-subscriber');
+      await supabase.functions.invoke('check-subscription');
+
       // Load complete subscription data
-      const [subResponse, historyResponse, methodResponse, plansResponse] = await Promise.all([
+      const responses = await Promise.allSettled([
         supabase.functions.invoke('get-subscription-data'),
         supabase.functions.invoke('get-payment-history'),
         supabase.functions.invoke('get-payment-method'),
         supabase.functions.invoke('get-available-plans')
       ]);
 
-      if (subResponse.error) throw subResponse.error;
-      if (subResponse.data) {
-        setSubscriptionData(subResponse.data);
+      const [subResponse, historyResponse, methodResponse, plansResponse] = responses;
+
+      // Handle subscription data
+      if (subResponse.status === 'fulfilled' && subResponse.value.data) {
+        setSubscriptionData(subResponse.value.data);
         setSettings(prev => ({
           ...prev,
-          autoRenewal: subResponse.data.auto_renewal
+          autoRenewal: subResponse.value.data.auto_renewal
         }));
+      } else if (subResponse.status === 'rejected' || subResponse.value.error) {
+        console.warn('Subscription data failed:', subResponse);
       }
 
-      if (historyResponse.data?.payment_history) {
-        setPaymentHistory(historyResponse.data.payment_history);
+      // Handle payment history
+      if (historyResponse.status === 'fulfilled' && historyResponse.value.data?.payment_history) {
+        setPaymentHistory(historyResponse.value.data.payment_history);
       }
 
-      if (methodResponse.data?.payment_method) {
-        setPaymentMethod(methodResponse.data.payment_method);
+      // Handle payment method
+      if (methodResponse.status === 'fulfilled' && methodResponse.value.data?.payment_method) {
+        setPaymentMethod(methodResponse.value.data.payment_method);
       }
 
-      if (plansResponse.data?.available_plans) {
-        setAvailablePlans(plansResponse.data.available_plans);
+      // Handle available plans
+      if (plansResponse.status === 'fulfilled' && plansResponse.value.data?.available_plans) {
+        setAvailablePlans(plansResponse.value.data.available_plans);
+      } else {
+        console.warn('Plans data failed:', plansResponse);
       }
+
     } catch (error) {
       console.error('Error loading subscription data:', error);
       toast({
@@ -183,10 +207,31 @@ export default function SubscriptionPage() {
     try {
       const { data, error } = await supabase.functions.invoke('customer-portal');
       
-      if (error) throw error;
+      if (error) {
+        console.error('Customer portal error:', error);
+        if (error.message?.includes('No Authorization header') || error.message?.includes('Auth error')) {
+          toast({
+            title: "Sessão expirada",
+            description: "Faça login novamente para acessar o portal de pagamento",
+            variant: "destructive",
+          });
+          return;
+        }
+        throw error;
+      }
       
       if (data?.url) {
-        window.open(data.url, '_blank');
+        // Open in new tab and reload data when user returns
+        const newWindow = window.open(data.url, '_blank');
+        if (newWindow) {
+          const checkClosed = setInterval(() => {
+            if (newWindow.closed) {
+              clearInterval(checkClosed);
+              // Reload subscription data when user returns
+              setTimeout(() => loadSubscriptionData(), 1000);
+            }
+          }, 1000);
+        }
       }
     } catch (error) {
       console.error('Error opening customer portal:', error);
@@ -580,6 +625,19 @@ export default function SubscriptionPage() {
         onOpenChange={setShowPlanModal}
         plans={availablePlans}
         onSuccess={loadSubscriptionData}
+      />
+
+      {/* Relogin Modal for expired sessions */}
+      <ReloginModal 
+        isOpen={showReloginModal}
+        onRelogin={() => {
+          setShowReloginModal(false);
+          window.location.href = '/login';
+        }}
+        onCancel={() => {
+          setShowReloginModal(false);
+          window.location.href = '/';
+        }}
       />
     </div>
   );

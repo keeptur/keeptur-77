@@ -33,9 +33,24 @@ export default function LoginForm() {
     e.preventDefault();
     setLoading(true);
     setAuthErrorInfo(null);
+    
     try {
-      // 1) Tenta autenticar na Monde
+      // 1) First try Monde API authentication
       await api.authenticate(credentials.login, credentials.password);
+      
+      // 2) Also authenticate with Supabase for subscription features
+      try {
+        const { error: supaError } = await supabase.auth.signInWithPassword({
+          email: credentials.login,
+          password: credentials.password
+        });
+        if (supaError) {
+          console.warn("Supabase auth failed, but Monde succeeded:", supaError.message);
+        }
+      } catch (supaErr) {
+        console.warn("Supabase auth failed, but Monde succeeded:", supaErr);
+      }
+      
       toast({
         title: "Login realizado com sucesso!",
         description: "Bem-vindo ao Keeptur"
@@ -43,28 +58,23 @@ export default function LoginForm() {
       navigate("/");
       return;
     } catch (mondeErr) {
-      // 2) Fallback: tenta autenticar no Supabase com o mesmo email/senha
+      // 3) Fallback: try Supabase-only authentication
       try {
-        const {
-          data,
-          error: supaError
-        } = await supabase.auth.signInWithPassword({
+        const { data, error: supaError } = await supabase.auth.signInWithPassword({
           email: credentials.login,
           password: credentials.password
         });
         if (supaError) throw supaError;
-        // Verifica papel e redireciona
-        const {
-          data: sessionData
-        } = await supabase.auth.getSession();
+        
+        // Check user role and redirect
+        const { data: sessionData } = await supabase.auth.getSession();
         const uid = sessionData.session?.user?.id;
         let isAdmin = false;
         if (uid) {
-          const {
-            data: roles
-          } = await supabase.from('user_roles').select('role').eq('user_id', uid);
+          const { data: roles } = await supabase.from('user_roles').select('role').eq('user_id', uid);
           isAdmin = (roles || []).some(r => r.role === 'admin');
         }
+        
         toast({
           title: isAdmin ? 'Login (Admin) realizado' : 'Login realizado',
           description: 'Sessão Supabase ativa'
