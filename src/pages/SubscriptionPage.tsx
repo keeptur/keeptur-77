@@ -88,6 +88,13 @@ export default function SubscriptionPage() {
     loadSubscriptionData();
   }, []);
 
+  // Abrir seleção de planos automaticamente quando o usuário não tem assinatura
+  useEffect(() => {
+    if (!loading && availablePlans.length > 0 && !subscriptionData.subscribed) {
+      setShowPlanModal(true);
+    }
+  }, [loading, availablePlans.length, subscriptionData.subscribed]);
+
   const loadSubscriptionData = async () => {
     setLoading(true);
     try {

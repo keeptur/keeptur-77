@@ -18,3 +18,14 @@ verify_jwt = false
 [functions.create-admin-user]
 verify_jwt = true
 
+[functions.get-available-plans]
+verify_jwt = true
+
+[functions.get-subscription-data]
+verify_jwt = true
+
+[functions.get-payment-method]
+verify_jwt = true
+
+[functions.get-payment-history]
+verify_jwt = true

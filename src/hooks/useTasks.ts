@@ -105,32 +105,9 @@ export function useTasks() {
           if (batch.length < PAGE_SIZE) break;
         }
 
-        // Tentar buscar tarefas excluídas/canceladas também
-        try {
-          const extraFiltersList: Record<string, string>[] = [
-            { excluded: "true" },
-            { visible: "false" },
-          ];
-          for (const extra of extraFiltersList) {
-            for (let page = 1; page <= MAX_PAGES; page++) {
-              const res2 = await api.getTasks({
-                page,
-                size: PAGE_SIZE,
-                sort,
-                include,
-                filter: extra,
-              });
-              const batch2 = (res2 as any)?.data || [];
-              allTasks.push(...batch2);
-              if (Array.isArray((res2 as any)?.included)) {
-                allIncluded.push(...(res2 as any).included);
-              }
-              if (batch2.length < PAGE_SIZE) break;
-            }
-          }
-        } catch (e) {
-          console.warn("useTasks: Extra fetch for deleted/excluded tasks failed", e);
-        }
+        // Nota: Removido fetch extra por filtros não suportados pela API (excluded/visible)
+        // Isso evitava erros 400 e ruído no console. Mantemos apenas as tarefas principais.
+
 
         // Deduplicar por ID
         const seen = new Set<string>();

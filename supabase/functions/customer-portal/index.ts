@@ -84,12 +84,14 @@ serve(async (req) => {
     });
   } catch (error: any) {
     console.error("Customer portal error:", error);
+    const message = (error && (error as any).message) ? (error as any).message : String(error);
+    const status = message.includes("No Authorization header") || message.toLowerCase().includes("auth error") ? 401 : 500;
     return new Response(JSON.stringify({ 
-      error: error.message || String(error),
-      details: error.stack
+      error: message,
+      details: (error as any)?.stack
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status
     });
   }
 });
