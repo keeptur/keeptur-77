@@ -106,7 +106,7 @@ export function MondeHeader() {
   useEffect(() => {
     let mounted = true;
     const loadUserData = async () => {
-      try {
+try {
         const me = await api.getCurrentUser();
         const mondeName = me?.data?.attributes?.name || me?.data?.attributes?.login;
         const mondeRole = me?.data?.attributes?.role || 'Usuário';

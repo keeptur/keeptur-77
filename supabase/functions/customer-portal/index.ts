@@ -68,13 +68,13 @@ serve(async (req) => {
       console.log("Created new customer:", customerId);
     }
 
-    const origin = req.headers.get("origin") || Deno.env.get("SITE_URL") || "https://keeptur.lovable.app";
-    console.log("Creating portal session with origin:", origin);
+const origin = req.headers.get("origin") || Deno.env.get("SITE_URL") || "https://keeptur.lovable.app";
+console.log("Creating portal session with origin:", origin);
 
-    const portal = await stripe.billingPortal.sessions.create({
-      customer: customerId!,
-      return_url: `${origin}/subscription`,
-    });
+const portal = await stripe.billingPortal.sessions.create({
+  customer: customerId!,
+  return_url: `${origin}/subscription`,
+});
 
     console.log("Portal session created successfully:", portal.id);
 

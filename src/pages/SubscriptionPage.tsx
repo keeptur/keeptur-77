@@ -5,9 +5,10 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { CreditCard, Calendar, RefreshCw, ArrowUp, X, Download, Users, Star, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { PlanSelectionModal } from "@/components/modals/PlanSelectionModal";
-import { ReloginModal } from "@/components/modals/ReloginModal";
+// ReloginModal removed
 
 interface CompleteSubscriptionData {
   subscribed: boolean;
@@ -82,85 +83,81 @@ export default function SubscriptionPage() {
     billingNotifications: true,
     promotionalEmails: false
   });
-  const [showPlanModal, setShowPlanModal] = useState(false);
-  const [showReloginModal, setShowReloginModal] = useState(false);
+const [hasSupabaseSession, setHasSupabaseSession] = useState(false);
 
   useEffect(() => {
     document.title = "Assinaturas | Keeptur";
     loadSubscriptionData();
   }, []);
 
-  // Automatically open plan selection when user has no subscription and plans are available
-  useEffect(() => {
-    if (!loading && availablePlans.length > 0 && !subscriptionData.subscribed && !subscriptionData.trial_active) {
-      setShowPlanModal(true);
+// Automatically open plan selection when user has no subscription and plans are available
+useEffect(() => {
+  if (!loading && availablePlans.length > 0 && !subscriptionData.subscribed && !subscriptionData.trial_active) {
+    setShowPlanModal(true);
+  }
+}, [loading, availablePlans.length, subscriptionData.subscribed, subscriptionData.trial_active]);
+
+const loadSubscriptionData = async () => {
+  setLoading(true);
+  try {
+    // Detect Supabase session, but don't block UI if absent
+    const { data: sessionData } = await supabase.auth.getSession();
+    const hasSession = !!sessionData.session;
+    setHasSupabaseSession(hasSession);
+
+    // Resolve user email (Supabase session -> Monde People fallback)
+    let email: string | undefined = sessionData.session?.user?.email || undefined;
+    const mondeToken = localStorage.getItem("monde_token") || undefined;
+    if (!email) {
+      try {
+        const uid = api.getCurrentUserIdFromToken();
+        if (uid) {
+          const person = await api.getPerson(uid);
+          email = person?.data?.attributes?.email || undefined;
+        }
+      } catch (_) {}
     }
-  }, [loading, availablePlans.length, subscriptionData.subscribed, subscriptionData.trial_active]);
 
-  const loadSubscriptionData = async () => {
-    setLoading(true);
-    try {
-      // Check for Supabase session first
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) {
-        setShowReloginModal(true);
-        setLoading(false);
-        return;
-      }
+    // 1) Sync subscriber (public)
+    await supabase.functions.invoke('sync-subscriber', { body: { email, mondeToken, source: 'monde' } });
 
-      // Sync subscriber data first
-      await supabase.functions.invoke('sync-subscriber');
-      await supabase.functions.invoke('check-subscription');
+    // 2) Load data (public + session-optional)
+    const responses = await Promise.allSettled([
+      supabase.functions.invoke('get-subscription-data', { body: { email, mondeToken } }),
+      supabase.functions.invoke('get-available-plans'),
+      hasSession ? supabase.functions.invoke('get-payment-history') : Promise.resolve({ value: { data: { payment_history: [] } } } as any),
+      hasSession ? supabase.functions.invoke('get-payment-method') : Promise.resolve({ value: { data: { payment_method: null } } } as any),
+    ]);
 
-      // Load complete subscription data
-      const responses = await Promise.allSettled([
-        supabase.functions.invoke('get-subscription-data'),
-        supabase.functions.invoke('get-payment-history'),
-        supabase.functions.invoke('get-payment-method'),
-        supabase.functions.invoke('get-available-plans')
-      ]);
+    const [subResponse, plansResponse, historyResponse, methodResponse] = responses as any[];
 
-      const [subResponse, historyResponse, methodResponse, plansResponse] = responses;
-
-      // Handle subscription data
-      if (subResponse.status === 'fulfilled' && subResponse.value.data) {
-        setSubscriptionData(subResponse.value.data);
-        setSettings(prev => ({
-          ...prev,
-          autoRenewal: subResponse.value.data.auto_renewal
-        }));
-      } else if (subResponse.status === 'rejected' || subResponse.value.error) {
-        console.warn('Subscription data failed:', subResponse);
-      }
-
-      // Handle payment history
-      if (historyResponse.status === 'fulfilled' && historyResponse.value.data?.payment_history) {
-        setPaymentHistory(historyResponse.value.data.payment_history);
-      }
-
-      // Handle payment method
-      if (methodResponse.status === 'fulfilled' && methodResponse.value.data?.payment_method) {
-        setPaymentMethod(methodResponse.value.data.payment_method);
-      }
-
-      // Handle available plans
-      if (plansResponse.status === 'fulfilled' && plansResponse.value.data?.available_plans) {
-        setAvailablePlans(plansResponse.value.data.available_plans);
-      } else {
-        console.warn('Plans data failed:', plansResponse);
-      }
-
-    } catch (error) {
-      console.error('Error loading subscription data:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar dados da assinatura",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+    if (subResponse.status === 'fulfilled' && subResponse.value.data) {
+      setSubscriptionData(subResponse.value.data);
+      setSettings(prev => ({ ...prev, autoRenewal: !!subResponse.value.data.auto_renewal }));
     }
-  };
+
+    if (plansResponse.status === 'fulfilled' && plansResponse.value.data?.available_plans) {
+      setAvailablePlans(plansResponse.value.data.available_plans);
+    }
+
+    if (historyResponse.status === 'fulfilled' && historyResponse.value.data?.payment_history) {
+      setPaymentHistory(historyResponse.value.data.payment_history);
+    } else if (!hasSession) {
+      setPaymentHistory([]);
+    }
+
+    if (methodResponse.status === 'fulfilled' && methodResponse.value.data?.payment_method !== undefined) {
+      setPaymentMethod(methodResponse.value.data.payment_method);
+    } else if (!hasSession) {
+      setPaymentMethod(null);
+    }
+  } catch (error) {
+    console.error('Error loading subscription data:', error);
+    toast({ title: 'Erro', description: 'Erro ao carregar dados da assinatura', variant: 'destructive' });
+  } finally {
+    setLoading(false);
+  }
+};
 
   const formatCurrency = (cents: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -620,25 +617,14 @@ export default function SubscriptionPage() {
           </CardContent>
       </Card>
       {/* Plan Selection Modal */}
-      <PlanSelectionModal
-        open={showPlanModal}
-        onOpenChange={setShowPlanModal}
-        plans={availablePlans}
-        onSuccess={loadSubscriptionData}
-      />
+<PlanSelectionModal
+  open={showPlanModal}
+  onOpenChange={setShowPlanModal}
+  plans={availablePlans}
+  onSuccess={loadSubscriptionData}
+/>
 
-      {/* Relogin Modal for expired sessions */}
-      <ReloginModal 
-        isOpen={showReloginModal}
-        onRelogin={() => {
-          setShowReloginModal(false);
-          window.location.href = '/login';
-        }}
-        onCancel={() => {
-          setShowReloginModal(false);
-          window.location.href = '/';
-        }}
-      />
+{/* Relogin modal removed: page now works sem sessão Supabase (modo leitura) */}
     </div>
   );
 }

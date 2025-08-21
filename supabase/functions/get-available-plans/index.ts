@@ -21,31 +21,23 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "No Authorization header provided" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 401,
-      });
-    }
-    
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !userData.user?.email) {
-      return new Response(JSON.stringify({ error: "Auth error: invalid claim: missing sub claim" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 401,
-      });
-    }
-    
-    const user = userData.user;
+const authHeader = req.headers.get("Authorization");
+let userEmail: string | null = null;
+if (authHeader) {
+  const token = authHeader.replace("Bearer ", "");
+  const { data: userData } = await supabase.auth.getUser(token);
+  userEmail = userData.user?.email ?? null;
+}
 
-    // Get current subscriber info
-    const { data: subscriber } = await supabase
-      .from("subscribers")
-      .select("subscription_tier")
-      .eq("email", user.email)
-      .maybeSingle();
+let subscriber: { subscription_tier?: string } | null = null;
+if (userEmail) {
+  const { data } = await supabase
+    .from("subscribers")
+    .select("subscription_tier")
+    .eq("email", userEmail)
+    .maybeSingle();
+  subscriber = data as any;
+}
 
     // Get all active plans
     const { data: plans, error: plansError } = await supabase
@@ -65,35 +57,33 @@ serve(async (req) => {
 
     const annualDiscount = planSettings?.annual_discount || 20;
 
-    const availablePlans = plans?.map(plan => {
-      const yearlyPriceCents = Math.round(plan.price_cents * 12 * (1 - annualDiscount / 100));
-      const isCurrent = subscriber?.subscription_tier === plan.name;
-      
-      return {
-        id: plan.id,
-        name: plan.name,
-        description: plan.description,
-        price_cents: plan.price_cents,
-        yearly_price_cents: yearlyPriceCents,
-        currency: plan.currency,
-        seats: plan.seats,
-        features: plan.features || [],
-        stripe_price_id_monthly: plan.stripe_price_id_monthly,
-        stripe_price_id_yearly: plan.stripe_price_id_yearly,
-        is_current: isCurrent,
-        is_upgrade: !isCurrent && plan.price_cents > (subscriber?.subscription_tier ? 
-          plans?.find(p => p.name === subscriber.subscription_tier)?.price_cents || 0 : 0),
-        sort_order: plan.sort_order
-      };
-    }) || [];
+const availablePlans = (plans || []).map((plan) => {
+  const yearlyPriceCents = Math.round(plan.price_cents * 12 * (1 - annualDiscount / 100));
+  const isCurrent = subscriber?.subscription_tier === plan.name;
+  return {
+    id: plan.id,
+    name: plan.name,
+    description: plan.description,
+    price_cents: plan.price_cents,
+    yearly_price_cents: yearlyPriceCents,
+    currency: plan.currency,
+    seats: plan.seats,
+    features: plan.features || [],
+    stripe_price_id_monthly: plan.stripe_price_id_monthly,
+    stripe_price_id_yearly: plan.stripe_price_id_yearly,
+    is_current: !!isCurrent,
+    is_upgrade: false,
+    sort_order: plan.sort_order,
+  };
+});
 
-    return new Response(JSON.stringify({ 
-      available_plans: availablePlans,
-      annual_discount: annualDiscount 
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+return new Response(JSON.stringify({ 
+  available_plans: availablePlans,
+  annual_discount: annualDiscount 
+}), {
+  headers: { ...corsHeaders, "Content-Type": "application/json" },
+  status: 200,
+});
   } catch (error) {
     console.error("Error in get-available-plans:", error);
     return new Response(JSON.stringify({ error: error.message }), {

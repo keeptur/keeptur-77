@@ -21,29 +21,66 @@ serve(async (req) => {
       throw new Error("Missing required environment variables");
     }
 
-    const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
-    const stripe = new Stripe(stripeSecret, { apiVersion: "2023-10-16" });
+const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+const stripe = new Stripe(stripeSecret, { apiVersion: "2023-10-16" });
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "No Authorization header provided" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 401,
-      });
-    }
-    
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !userData.user?.email) {
-      return new Response(JSON.stringify({ error: "Auth error: invalid claim: missing sub claim" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 401,
-      });
-    }
-    
-    const user = userData.user;
+// Try to resolve user email from Authorization header, or fallback to body/Monde token
+let email: string | null = null;
+const authHeader = req.headers.get("Authorization");
+if (authHeader) {
+  const token = authHeader.replace("Bearer ", "");
+  const { data: userData } = await supabase.auth.getUser(token);
+  email = userData.user?.email ?? null;
+}
 
-    // Get subscriber data
+if (!email) {
+  const body = await req.json().catch(() => ({}));
+  const mondeToken: string | undefined = body?.mondeToken;
+  const emailBody: string | undefined = body?.email;
+  if (emailBody) email = emailBody;
+  if (!email && mondeToken) {
+    const decode = (t: string) => {
+      try { return JSON.parse(atob(t.split(".")[1])); } catch { return null; }
+    };
+    const payload: any = decode(mondeToken);
+    const uid: string | undefined = payload?.uid;
+    if (payload?.email) email = String(payload.email);
+    if (!email && uid) {
+      try {
+        const res = await fetch(`https://web.monde.com.br/api/v2/people/${uid}`, {
+          headers: {
+            Accept: "application/vnd.api+json",
+            "Content-Type": "application/vnd.api+json",
+            Authorization: `Bearer ${mondeToken}`,
+          },
+        });
+        if (res.ok) {
+          const j = await res.json();
+          const attrEmail = j?.data?.attributes?.email;
+          if (attrEmail) email = String(attrEmail);
+        }
+      } catch (_) {}
+    }
+  }
+}
+
+if (!email) {
+  // No email available; return default unsubscribed/trial state gracefully
+  return new Response(JSON.stringify({
+    subscribed: false,
+    subscription_tier: null,
+    subscription_end: null,
+    trial_active: false,
+    trial_end: null,
+    days_remaining: 0,
+    current_plan: null,
+    next_billing_date: null,
+    auto_renewal: false,
+    stripe_customer_id: null
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+}
+
+// Get subscriber data by email
     const { data: subscriber } = await supabase
       .from("subscribers")
       .select("*")
@@ -122,7 +159,7 @@ serve(async (req) => {
       current_plan: currentPlan,
       next_billing_date: subscriptionEnd?.toISOString(),
       auto_renewal: autoRenewal,
-      stripe_customer_id: subscriber.stripe_customer_id
+stripe_customer_id: subscriber.stripe_customer_id || null
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,

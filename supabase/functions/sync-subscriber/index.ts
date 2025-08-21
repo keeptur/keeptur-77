@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 // Helper to decode a JWT without verifying signature (for Monde token payload)
-function decodeJwtPayload(token: string): { email?: string; name?: string } | null {
+function decodeJwtPayload(token: string): { email?: string; name?: string; uid?: string } | null {
   try {
     const payload = token.split(".")[1];
     const json = atob(payload);
@@ -46,27 +46,48 @@ serve(async (req) => {
     let display_name = (nameRaw || "").trim();
     let user_id = (userIdRaw || "").trim() || null;
 
-    if (!email && mondeToken) {
-      const payload = decodeJwtPayload(mondeToken);
-      if (payload?.email) email = String(payload.email);
-      if (payload?.name) display_name = String(payload.name);
-    }
-
-    if (!email) {
-      return new Response(JSON.stringify({ error: "Missing email (or mondeToken with email)" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
+if (!email && mondeToken) {
+  const payload = decodeJwtPayload(mondeToken) as any;
+  const uid: string | undefined = payload?.uid;
+  if (payload?.email) email = String(payload.email);
+  if (payload?.name) display_name = String(payload.name);
+  // Fallback: fetch email from Monde People using uid
+  if (!email && uid) {
+    try {
+      const res = await fetch(`https://web.monde.com.br/api/v2/people/${uid}`, {
+        headers: {
+          Accept: "application/vnd.api+json",
+          "Content-Type": "application/vnd.api+json",
+          Authorization: `Bearer ${mondeToken}`,
+        },
       });
+      if (res.ok) {
+        const data = await res.json();
+        const attrEmail = data?.data?.attributes?.email;
+        const attrName = data?.data?.attributes?.name;
+        if (attrEmail) email = String(attrEmail);
+        if (!display_name && attrName) display_name = String(attrName);
+      }
+    } catch (_) {
+      // ignore network errors
     }
+  }
+}
 
-    // Load settings for dynamic trial days (fallback 7)
-    const { data: settings } = await admin
-      .from("settings")
-      .select("trial_days")
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    const trialDays = Math.max(0, Number(settings?.trial_days ?? 7));
+if (!email) {
+  return new Response(JSON.stringify({ error: "Missing email (or mondeToken with email)" }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    status: 400,
+  });
+}
+
+const { data: settings } = await admin
+  .from("settings")
+  .select("trial_days")
+  .order("created_at", { ascending: true })
+  .limit(1)
+  .maybeSingle();
+const trialDays = Math.max(0, Number(settings?.trial_days ?? 7));
 
     const now = new Date();
 
