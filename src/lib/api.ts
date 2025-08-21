@@ -171,7 +171,7 @@ class MondeAPI {
       return timeUntilExpiry < 300;
     } catch (error) {
       console.warn('Erro ao verificar expiração do token:', error);
-      return true; // Se não conseguir verificar, considere que está expirando
+      return false; // Se não conseguir verificar, não considerar como expirando
     }
   }
 
@@ -187,7 +187,7 @@ class MondeAPI {
       return decodedPayload.exp <= currentTime;
     } catch (error) {
       console.warn('Erro ao verificar expiração do token:', error);
-      return true; // Se não conseguir verificar, considere que está expirado
+      return false; // Se não conseguir verificar, não considerar como expirado
     }
   }
 
@@ -499,17 +499,28 @@ class MondeAPI {
     return this.request<ApiResponse<City[]>>("/cities");
   }
 
-  // Método para obter informações do usuário logado (endpoint /me)
   async getCurrentUser(): Promise<ApiResponse<any>> {
-    try {
-      return await this.request<ApiResponse<any>>("/me");
-    } catch (error: any) {
-      if (error?.status === 404) {
-        console.log("Endpoint /me não disponível, tentando alternativa...");
-        // Se /me não estiver disponível, tentar obter de outra forma
-        throw new Error("Perfil não encontrado");
+    // Tenta /me e, se indisponível, endpoints alternativos. Por fim, fallback para dados do token.
+    const endpoints = ["/me", "/users/current", "/user/profile", "/profile", "/users/me"];
+    for (const endpoint of endpoints) {
+      try {
+        return await this.request<ApiResponse<any>>(endpoint);
+      } catch (error: any) {
+        // 404/405: endpoint inexistente/desabilitado -> tentar o próximo
+        if (error?.status && error.status !== 404 && error.status !== 405) {
+          // Outros erros (ex.: 401) devem ser propagados
+          throw error;
+        }
+        console.log(`Endpoint ${endpoint} indisponível (${error?.status || 'erro'}), tentando próximo...`);
+        continue;
       }
-      throw error;
+    }
+    // Fallback final: derivar do JWT
+    try {
+      const fromToken = await this.getUserFromToken();
+      return fromToken;
+    } catch {
+      throw new Error("Não foi possível obter o perfil do usuário");
     }
   }
 
