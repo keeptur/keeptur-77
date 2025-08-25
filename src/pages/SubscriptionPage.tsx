@@ -83,7 +83,8 @@ export default function SubscriptionPage() {
     billingNotifications: true,
     promotionalEmails: false
   });
-const [hasSupabaseSession, setHasSupabaseSession] = useState(false);
+  const [hasSupabaseSession, setHasSupabaseSession] = useState(false);
+  const [showPlanModal, setShowPlanModal] = useState(false);
 
   useEffect(() => {
     document.title = "Assinaturas | Keeptur";
