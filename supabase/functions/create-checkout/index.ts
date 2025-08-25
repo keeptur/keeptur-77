@@ -18,19 +18,34 @@ serve(async (req) => {
   const fallbackStripeSecret = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
 
   try {
-    if (!serviceKey && !fallbackStripeSecret) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY or STRIPE_SECRET_KEY");
+    console.log("Function started, checking environment variables");
+    if (!serviceKey && !fallbackStripeSecret) {
+      console.error("Missing required environment variables");
+      throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY or STRIPE_SECRET_KEY");
+    }
 
     const supabase = createClient(supabaseUrl, anonKey, { auth: { persistSession: false } });
     const supabaseService = createClient(supabaseUrl, serviceKey || anonKey, { auth: { persistSession: false } });
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("No Authorization header provided");
+    if (!authHeader) {
+      console.error("No authorization header provided");
+      throw new Error("No Authorization header provided");
+    }
     const token = authHeader.replace("Bearer ", "");
+    console.log("Attempting to authenticate user");
 
     const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    if (userError) throw new Error(`Auth error: ${userError.message}`);
+    if (userError) {
+      console.error("Auth error:", userError);
+      throw new Error(`Auth error: ${userError.message}`);
+    }
     const user = userData.user;
-    if (!user?.email) throw new Error("User email not available");
+    if (!user?.email) {
+      console.error("User email not available");
+      throw new Error("User email not available");
+    }
+    console.log("User authenticated successfully:", user.email);
 
     const requestBody = await req.json().catch(() => ({})) as { 
       price_id?: string; 
@@ -129,6 +144,8 @@ serve(async (req) => {
       status: 200,
     });
   } catch (error: any) {
+    console.error("Error in create-checkout:", error);
+    console.error("Error stack:", error.stack);
     return new Response(JSON.stringify({ error: error.message || String(error) }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
