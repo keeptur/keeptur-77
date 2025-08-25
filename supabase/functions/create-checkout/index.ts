@@ -28,32 +28,55 @@ serve(async (req) => {
     const supabaseService = createClient(supabaseUrl, serviceKey || anonKey, { auth: { persistSession: false } });
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      console.error("No authorization header provided");
-      throw new Error("No Authorization header provided");
-    }
-    const token = authHeader.replace("Bearer ", "");
-    console.log("Attempting to authenticate user");
+    let buyerEmail: string | null = null;
+    let user = null as any;
 
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    if (userError) {
-      console.error("Auth error:", userError);
-      throw new Error(`Auth error: ${userError.message}`);
+    if (authHeader) {
+      const token = authHeader.replace("Bearer ", "");
+      console.log("Attempting to authenticate user");
+      const { data: userData, error: userError } = await supabase.auth.getUser(token);
+      if (userError) {
+        console.warn("Auth warning (continuing without Supabase auth):", userError?.message);
+      } else {
+        user = userData.user;
+        buyerEmail = user?.email ?? null;
+        if (buyerEmail) console.log("User authenticated successfully:", buyerEmail);
+      }
+    } else {
+      console.warn("No Authorization header provided - will try monde_token/buyer_email fallback");
     }
-    const user = userData.user;
-    if (!user?.email) {
-      console.error("User email not available");
-      throw new Error("User email not available");
-    }
-    console.log("User authenticated successfully:", user.email);
 
     const requestBody = await req.json().catch(() => ({})) as { 
       price_id?: string; 
       quantity?: number; 
       users?: Array<{name: string; email: string}>; 
-      billing_cycle?: 'monthly' | 'yearly' 
+      billing_cycle?: 'monthly' | 'yearly';
+      monde_token?: string;
+      buyer_email?: string;
     };
-    const { price_id, quantity = 1, users = [], billing_cycle = 'monthly' } = requestBody;
+    const { price_id, quantity = 1, users = [], billing_cycle = 'monthly', monde_token, buyer_email } = requestBody;
+
+    // Resolve buyer email from auth > monde_token > explicit buyer_email
+    if (!buyerEmail) {
+      const decode = (t: string) => {
+        try { return JSON.parse(atob((t || '').split('.')[1] || '')); } catch { return null as any; }
+      };
+      const payload = monde_token ? decode(monde_token) : null;
+      if (payload?.email) buyerEmail = String(payload.email);
+    }
+    if (!buyerEmail && buyer_email) buyerEmail = buyer_email;
+    if (!buyerEmail) throw new Error("Buyer email not available");
+
+    // Validate Monde emails for all assigned users
+    const mondeEmailRegex = /^[^@]+@([a-z0-9-]+\.)*monde\.com\.br$/i;
+    for (const u of users) {
+      if (!mondeEmailRegex.test(u.email)) {
+        return new Response(JSON.stringify({ error: `E-mail inválido: ${u.email}. Use um e-mail @*.monde.com.br` }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
+      }
+    }
 
     // If price_id is provided, use the specific plan; otherwise use settings
     let planData = null;
@@ -85,11 +108,11 @@ serve(async (req) => {
     const stripe = new Stripe(stripeSecret, { apiVersion: "2023-10-16" });
 
     // Reuse customer if exists
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    const customers = await stripe.customers.list({ email: buyerEmail!, limit: 1 });
     let customerId: string | undefined = customers.data[0]?.id;
 
     if (!customerId) {
-      const created = await stripe.customers.create({ email: user.email, name: user.user_metadata?.name });
+      const created = await stripe.customers.create({ email: buyerEmail!, name: user?.user_metadata?.name });
       customerId = created.id;
     }
 
@@ -121,14 +144,15 @@ serve(async (req) => {
       mode: "subscription",
       line_items: lineItems,
       allow_promotion_codes: true,
-      success_url: `${origin}/`,
-      cancel_url: `${origin}/`,
+      success_url: `${origin}/subscription?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/subscription`,
       subscription_data: {
         trial_period_days: trialDays,
         metadata: {
           users: JSON.stringify(users),
           plan_name: planData?.name || 'Custom Plan',
           billing_cycle,
+          buyer_email: buyerEmail!,
         },
       },
       metadata: {
@@ -136,6 +160,7 @@ serve(async (req) => {
         plan_name: planData?.name || 'Custom Plan',
         billing_cycle,
         user_count: String(quantity),
+        buyer_email: buyerEmail!,
       },
     });
 

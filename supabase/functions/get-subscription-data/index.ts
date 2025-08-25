@@ -84,17 +84,32 @@ if (!email) {
     const { data: subscriber } = await supabase
       .from("subscribers")
       .select("*")
-      .eq("email", user.email)
+      .eq("email", email)
       .maybeSingle();
 
     if (!subscriber) {
+      // No subscriber row yet: expose default trial window based on settings
+      const { data: appSettings } = await supabase
+        .from("settings")
+        .select("trial_days")
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      const trialDays = Math.max(0, Number(appSettings?.trial_days ?? 7));
+      const trialEndCalc = new Date();
+      trialEndCalc.setDate(trialEndCalc.getDate() + trialDays);
+
       return new Response(JSON.stringify({
         subscribed: false,
-        trial_active: false,
+        trial_active: trialDays > 0,
+        trial_end: trialEndCalc.toISOString(),
+        days_remaining: trialDays,
         current_plan: null,
-        days_remaining: 0,
         next_billing_date: null,
-        auto_renewal: false
+        auto_renewal: false,
+        subscription_tier: null,
+        subscription_end: null,
+        stripe_customer_id: null,
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,

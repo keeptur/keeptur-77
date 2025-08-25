@@ -97,6 +97,7 @@ export function PlanSelectionModal({ open, onOpenChange, plans, onSuccess }: Pla
   };
 
   const validateUsers = () => {
+    const mondeEmailRegex = /^[^\s@]+@([a-z0-9-]+\.)*monde\.com\.br$/i;
     for (let i = 0; i < userCount; i++) {
       const user = users[i];
       if (!user.name.trim() || !user.email.trim()) {
@@ -107,12 +108,19 @@ export function PlanSelectionModal({ open, onOpenChange, plans, onSuccess }: Pla
         });
         return false;
       }
-      
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(user.email)) {
         toast({
           title: "Erro", 
           description: `E-mail inválido para o usuário ${i + 1}`,
+          variant: "destructive",
+        });
+        return false;
+      }
+      if (!mondeEmailRegex.test(user.email)) {
+        toast({
+          title: "Somente e-mails Monde",
+          description: `O e-mail do usuário ${i + 1} deve ser @*.monde.com.br (ex: nome@equipe.monde.com.br)`,
           variant: "destructive",
         });
         return false;
@@ -142,7 +150,8 @@ export function PlanSelectionModal({ open, onOpenChange, plans, onSuccess }: Pla
           price_id: priceId,
           quantity: userCount,
           users: users.slice(0, userCount),
-          billing_cycle: isAnnual ? 'yearly' : 'monthly'
+          billing_cycle: isAnnual ? 'yearly' : 'monthly',
+          monde_token: localStorage.getItem('monde_token') || undefined,
         }
       });
       
