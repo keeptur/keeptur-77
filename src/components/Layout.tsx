@@ -2,7 +2,7 @@ import { Outlet } from "react-router-dom";
 import { MondeAppSidebar } from "@/components/MondeAppSidebar";
 import { MondeHeader } from "@/components/MondeHeader";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { WelcomeTrialModal as WelcomeTrialModalComponent } from "@/components/modals/WelcomeTrialModal";
+// WelcomeTrialModal temporarily disabled
 export function Layout() {
   return (
     <SidebarProvider defaultOpen={true}>
@@ -12,7 +12,7 @@ export function Layout() {
           <MondeHeader />
           <main className="flex-1 overflow-auto pt-0 pr-14 pb-14 pl-14 sm:pt-5 sm:pr-14 sm:pb-14 sm:pl-14">
             <div className="max-w-7xl mx-auto space-y-6">
-              <WelcomeTrialModalComponent />
+              {/* WelcomeTrialModal temporarily disabled */}
               <Outlet />
             </div>
           </main>
