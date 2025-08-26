@@ -145,13 +145,26 @@ export function PlanSelectionModal({ open, onOpenChange, plans, onSuccess }: Pla
         return;
       }
 
+      // Resolver e-mail do comprador (Supabase -> token Monde -> primeiro usuário)
+      const { data: sessionData } = await supabase.auth.getSession();
+      let buyerEmail: string | undefined = sessionData.session?.user?.email || undefined;
+      const mondeToken = localStorage.getItem('monde_token') || undefined;
+      if (!buyerEmail && mondeToken) {
+        try {
+          const payload = JSON.parse(atob((mondeToken.split('.')[1] || '')));
+          if (payload?.email) buyerEmail = String(payload.email);
+        } catch {}
+      }
+      if (!buyerEmail) buyerEmail = users[0]?.email || undefined;
+
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: { 
           price_id: priceId,
           quantity: userCount,
           users: users.slice(0, userCount),
           billing_cycle: isAnnual ? 'yearly' : 'monthly',
-          monde_token: localStorage.getItem('monde_token') || undefined,
+          monde_token: mondeToken,
+          buyer_email: buyerEmail,
         }
       });
       
@@ -162,17 +175,18 @@ export function PlanSelectionModal({ open, onOpenChange, plans, onSuccess }: Pla
         onOpenChange(false);
         onSuccess?.();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating checkout:', error);
       toast({
         title: "Erro",
-        description: "Erro ao processar checkout. Tente novamente.",
+        description: error?.message || "Erro ao processar checkout. Tente novamente.",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
   };
+
 
   const resetModal = () => {
     setSelectedPlan(null);

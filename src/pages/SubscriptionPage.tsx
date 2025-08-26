@@ -182,8 +182,19 @@ const loadSubscriptionData = async () => {
         return;
       }
 
+      // Resolver e-mail do comprador
+      const { data: sessionData } = await supabase.auth.getSession();
+      let buyerEmail: string | undefined = sessionData.session?.user?.email || undefined;
+      const mondeToken = localStorage.getItem('monde_token') || undefined;
+      if (!buyerEmail && mondeToken) {
+        try {
+          const payload = JSON.parse(atob((mondeToken.split('.')[1] || '')));
+          if (payload?.email) buyerEmail = String(payload.email);
+        } catch {}
+      }
+
       const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { price_id: priceId }
+        body: { price_id: priceId, monde_token: mondeToken, buyer_email: buyerEmail }
       });
       
       if (error) throw error;
@@ -195,7 +206,7 @@ const loadSubscriptionData = async () => {
       console.error('Error changing subscription:', error);
       toast({
         title: "Erro",
-        description: "Erro ao alterar plano",
+        description: (error as any)?.message || "Erro ao alterar plano",
         variant: "destructive",
       });
     }

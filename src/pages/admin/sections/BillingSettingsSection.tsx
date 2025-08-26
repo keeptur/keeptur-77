@@ -101,8 +101,19 @@ export default function BillingSettingsSection() {
 
   const startCheckout = async () => {
     try {
+      // Resolver e-mail do comprador
+      const { data: sessionData } = await supabase.auth.getSession();
+      let buyerEmail: string | undefined = sessionData.session?.user?.email || undefined;
+      const mondeToken = localStorage.getItem('monde_token') || undefined;
+      if (!buyerEmail && mondeToken) {
+        try {
+          const payload = JSON.parse(atob((mondeToken.split('.')[1] || '')));
+          if (payload?.email) buyerEmail = String(payload.email);
+        } catch {}
+      }
+
       const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { quantity }
+        body: { quantity, monde_token: mondeToken, buyer_email: buyerEmail }
       });
 
       if (error) throw error;
@@ -114,7 +125,7 @@ export default function BillingSettingsSection() {
       console.error('Error creating checkout:', error);
       toast({
         title: "Erro",
-        description: "Erro ao iniciar checkout",
+        description: (error as any)?.message || "Erro ao iniciar checkout",
         variant: "destructive",
       });
     }

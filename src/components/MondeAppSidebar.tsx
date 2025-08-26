@@ -134,12 +134,22 @@ export function MondeAppSidebar() {
     }
   };
   const handleSubscribe = async () => {
-    const {
-      data,
-      error
-    } = await supabase.functions.invoke('create-checkout', {
+    // Resolver e-mail do comprador e token Monde
+    const { data: sessionData } = await supabase.auth.getSession();
+    let buyerEmail: string | undefined = sessionData.session?.user?.email || undefined;
+    const mondeToken = localStorage.getItem('monde_token') || undefined;
+    if (!buyerEmail && mondeToken) {
+      try {
+        const payload = JSON.parse(atob((mondeToken.split('.')[1] || '')));
+        if (payload?.email) buyerEmail = String(payload.email);
+      } catch {}
+    }
+
+    const { data, error } = await supabase.functions.invoke('create-checkout', {
       body: {
-        quantity: 1
+        quantity: 1,
+        monde_token: mondeToken,
+        buyer_email: buyerEmail,
       }
     });
     if (!error && (data as any)?.url) {
