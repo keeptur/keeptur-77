@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { useQueryClient } from "@tanstack/react-query"; // Importação adicionada
 
 interface ProfileRow {
   id: string;
@@ -54,7 +53,6 @@ import { UserManagement } from "@/components/admin/UserManagement";
 
 export default function UsersSection() {
   const { toast } = useToast();
-  const queryClient = useQueryClient(); // Inicialização adicionada
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [roles, setRoles] = useState<RoleRow[]>([]);
   const [subscribers, setSubscribers] = useState<SubscriberRow[]>([]);
@@ -194,9 +192,6 @@ export default function UsersSection() {
         setProfiles((prev) => prev.filter((p) => p.id !== userId && p.email !== user.email));
         setSubscribers((prev) => prev.filter((s) => s.user_id !== userId && s.email !== user.email));
         setRoles((prev) => prev.filter((r) => r.user_id !== userId));
-
-        // Adicionado para garantir que a interface de usuário seja atualizada
-        await reload();
       } else {
         // For users without Supabase ID, remove from subscribers table only
         await supabase.from('subscribers').delete().eq('email', user.email);
@@ -319,11 +314,6 @@ export default function UsersSection() {
         if (data) setSubscribers((prev) => [...prev, data as SubscriberRow]);
       }
       toast({ title: 'Prazo atualizado', description: `+${days} dias em ${field === 'trial_end' ? 'trial' : 'assinatura'}.` });
-      
-      // Adicionado: Invalida o cache para forçar a atualização em outros componentes
-      queryClient.invalidateQueries({ queryKey: ["subscriberData"] }); // Use a queryKey que seus outros componentes utilizam para buscar dados do assinante
-      await reload(); // Chamada para recarregar os dados na própria página
-      
     } catch (e: any) {
       toast({ title: 'Erro ao atualizar prazos', description: e.message, variant: 'destructive' });
     }
