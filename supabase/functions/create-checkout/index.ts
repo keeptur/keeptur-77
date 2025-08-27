@@ -78,16 +78,29 @@ serve(async (req) => {
       }
     }
 
-    // If price_id is provided, use the specific plan; otherwise use settings
+    // If price_id is provided, validate it and check if it's a URL or proper ID
     let planData = null;
+    let actualPriceId = price_id;
+    
     if (price_id) {
-      // Get plan details from price_id
-      const { data: plan } = await supabaseService
-        .from("plan_kits")
-        .select("*")
-        .or(`stripe_price_id_monthly.eq.${price_id},stripe_price_id_yearly.eq.${price_id}`)
-        .maybeSingle();
-      planData = plan;
+      // Check if price_id is actually a URL (invalid format)
+      if (price_id.startsWith('http://') || price_id.startsWith('https://')) {
+        console.log(`Invalid price_id format (URL): ${price_id}, falling back to dynamic pricing`);
+        actualPriceId = null;
+      } else {
+        // Get plan details from price_id
+        const { data: plan } = await supabaseService
+          .from("plan_kits")
+          .select("*")
+          .or(`stripe_price_id_monthly.eq.${price_id},stripe_price_id_yearly.eq.${price_id}`)
+          .maybeSingle();
+        planData = plan;
+        
+        if (!planData) {
+          console.log(`No plan found for price_id: ${price_id}, falling back to dynamic pricing`);
+          actualPriceId = null;
+        }
+      }
     }
 
     // Load dynamic settings (price, currency, trial days)
@@ -120,20 +133,23 @@ serve(async (req) => {
 
     let lineItems;
     
-    if (price_id) {
+    if (actualPriceId) {
       // Use specific Stripe price ID
       lineItems = [{
-        price: price_id,
+        price: actualPriceId,
         quantity: Math.max(1, Number(quantity || 1)),
       }];
     } else {
-      // Use dynamic pricing
+      // Use dynamic pricing based on billing cycle
+      const interval = billing_cycle === 'yearly' ? 'year' : 'month';
+      const unitAmount = billing_cycle === 'yearly' ? Math.floor(priceCents * 12 * 0.8) : priceCents; // 20% discount for yearly
+      
       lineItems = [{
         price_data: {
           currency,
-          product_data: { name: "Keeptur Assinatura por usuário" },
-          unit_amount: priceCents,
-          recurring: { interval: "month" },
+          product_data: { name: `Keeptur Assinatura ${billing_cycle === 'yearly' ? 'Anual' : 'Mensal'}` },
+          unit_amount: unitAmount,
+          recurring: { interval },
         },
         quantity: Math.max(1, Number(quantity || 1)),
       }];
@@ -171,7 +187,21 @@ serve(async (req) => {
   } catch (error: any) {
     console.error("Error in create-checkout:", error);
     console.error("Error stack:", error.stack);
-    return new Response(JSON.stringify({ error: error.message || String(error) }), {
+    
+    // Provide more specific error messages for common Stripe issues
+    let errorMessage = error.message || String(error);
+    if (error.type === 'StripeInvalidRequestError') {
+      if (error.message?.includes('No such price')) {
+        errorMessage = "Configuração de preço inválida. Tente novamente ou contate o suporte.";
+      } else if (error.message?.includes('No such customer')) {
+        errorMessage = "Erro na configuração do cliente. Tente novamente.";
+      }
+    }
+    
+    return new Response(JSON.stringify({ 
+      error: errorMessage,
+      details: error.type || 'UnknownError'
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });

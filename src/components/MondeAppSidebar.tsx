@@ -156,10 +156,11 @@ export function MondeAppSidebar() {
       window.location.href = (data as any).url as string;
     }
   };
-  return <Sidebar collapsible="icon" className="border-r border-border bg-background" style={{
+  return <Sidebar collapsible="icon" className="border-r border-border bg-background dark:bg-background" style={{
     width: isCollapsed ? '64px' : '280px'
   }}>
-      <SidebarHeader className="p-4 border-b border-border bg-white">
+      <SidebarHeader className="p-4 border-b border-border bg-background dark:bg-background">
+        <SidebarTrigger className="ml-auto" />
         <div className="flex items-center justify-between h-8">
         <div className="relative flex-1 h-9">
             {/* Light mode - full logo */}
@@ -174,14 +175,14 @@ export function MondeAppSidebar() {
         </div>
       </SidebarHeader>
       
-      <SidebarContent className="px-2 py-4 bg-white">
+      <SidebarContent className="px-2 py-4 bg-background dark:bg-background">
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
               {(isAdmin ? adminNavigationItems : navigationItems).map(item => <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={location.pathname === item.url} tooltip={item.title} className={isCollapsed ? "justify-center px-2" : ""}>
                     <NavLink to={item.url} className={`flex items-center text-foreground hover:text-foreground ${isCollapsed ? 'justify-center' : 'space-x-3'}`}>
-                      
+                      <item.icon className={`h-4 w-4 ${isCollapsed ? 'mx-auto' : ''}`} />
                       {!isCollapsed && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>

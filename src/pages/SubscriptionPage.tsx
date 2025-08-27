@@ -200,7 +200,16 @@ const loadSubscriptionData = async () => {
       if (error) throw error;
       
       if (data?.url) {
-        window.open(data.url, '_blank');
+        const newWindow = window.open(data.url, '_blank');
+        if (newWindow) {
+          const checkClosed = setInterval(() => {
+            if (newWindow.closed) {
+              clearInterval(checkClosed);
+              // Reload subscription data when user returns from checkout
+              setTimeout(() => loadSubscriptionData(), 2000);
+            }
+          }, 1000);
+        }
       }
     } catch (error) {
       console.error('Error changing subscription:', error);
@@ -237,7 +246,7 @@ const loadSubscriptionData = async () => {
             if (newWindow.closed) {
               clearInterval(checkClosed);
               // Reload subscription data when user returns
-              setTimeout(() => loadSubscriptionData(), 1000);
+              setTimeout(() => loadSubscriptionData(), 2000);
             }
           }, 1000);
         }

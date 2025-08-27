@@ -170,11 +170,8 @@ export default function UsersSection() {
   };
 
   /**
-   * Deleta completamente um usuário, removendo todos os seus registros no Supabase.
-   * Caso o usuário possua ID (foi autenticado via Supabase), serão removidos os
-   * registros de `user_roles`, `subscribers` e `profiles` usando esse ID ou o e‑mail.
-   * Se o usuário não tiver ID (foi criado apenas no Monde), a remoção será
-   * baseada somente no e‑mail. Após a exclusão, o estado local é atualizado.
+   * Deleta completamente um usuário usando a edge function delete-user para garantir
+   * remoção completa de todos os registros relacionados.
    */
   const deleteUser = async (user: CombinedUser) => {
     if (!confirm(`Tem certeza que deseja deletar permanentemente o usuário ${user.email}? Esta ação não pode ser desfeita.`)) {
@@ -182,31 +179,28 @@ export default function UsersSection() {
     }
     try {
       const userId = user.id || user.user_id || null;
+      
       if (userId) {
-        // Remove papéis do usuário
-        await supabase.from('user_roles').delete().eq('user_id', userId);
-        // Remove registros de assinante (pode haver duplicidades por id ou email)
-        await supabase.from('subscribers').delete().or(`user_id.eq.${userId},email.eq.${user.email}`);
-        // Remove perfil
-        await supabase.from('profiles').delete().or(`id.eq.${userId},email.eq.${user.email}`);
-        // Remove contas (utilizadas para métricas de assinatura/trial)
-        await supabase.from('accounts').delete().or(`user_id.eq.${userId},email.eq.${user.email}`);
-        // Atualiza listas locais
+        // Use the delete-user edge function for reliable deletion
+        const { error } = await supabase.functions.invoke('delete-user', {
+          body: { userId }
+        });
+        
+        if (error) throw error;
+        
+        // Update local state
         setProfiles((prev) => prev.filter((p) => p.id !== userId && p.email !== user.email));
         setSubscribers((prev) => prev.filter((s) => s.user_id !== userId && s.email !== user.email));
         setRoles((prev) => prev.filter((r) => r.user_id !== userId));
       } else {
-        // Usuário sem ID Supabase (apenas Monde). Remover registros baseados no email.
+        // For users without Supabase ID, remove from subscribers table only
         await supabase.from('subscribers').delete().eq('email', user.email);
-        await supabase.from('profiles').delete().eq('email', user.email);
-        await supabase.from('accounts').delete().eq('email', user.email);
-        // Atualiza estados locais
-        setProfiles((prev) => prev.filter((p) => p.email !== user.email));
         setSubscribers((prev) => prev.filter((s) => s.email !== user.email));
-        // roles permanecem inalterados
       }
+      
       toast({ title: 'Usuário deletado', description: 'Usuário removido completamente do sistema.' });
     } catch (e: any) {
+      console.error('Delete user error:', e);
       toast({ title: 'Erro ao deletar usuário', description: e.message || String(e), variant: 'destructive' });
     }
   };

@@ -177,9 +177,20 @@ export function PlanSelectionModal({ open, onOpenChange, plans, onSuccess }: Pla
       }
     } catch (error: any) {
       console.error('Error creating checkout:', error);
+      
+      let errorMessage = "Erro ao processar checkout. Tente novamente.";
+      if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      // Handle specific error cases
+      if (error?.details === 'StripeInvalidRequestError') {
+        errorMessage = "Erro na configuração de pagamento. Tente novamente ou contate o suporte.";
+      }
+      
       toast({
-        title: "Erro",
-        description: error?.message || "Erro ao processar checkout. Tente novamente.",
+        title: "Erro no Checkout",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

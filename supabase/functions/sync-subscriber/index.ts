@@ -51,6 +51,7 @@ if (!email && mondeToken) {
   const uid: string | undefined = payload?.uid;
   if (payload?.email) email = String(payload.email);
   if (payload?.name) display_name = String(payload.name);
+  
   // Fallback: fetch email from Monde People using uid
   if (!email && uid) {
     try {
@@ -71,6 +72,26 @@ if (!email && mondeToken) {
     } catch (_) {
       // ignore network errors
     }
+  }
+}
+
+// Prioritize @*.monde.com.br emails when monde_token is present
+const mondeEmailRegex = /^[^@]+@([a-z0-9-]+\.)*monde\.com\.br$/i;
+if (mondeToken && email && !mondeEmailRegex.test(email)) {
+  // If we have a monde_token but email is not @*.monde.com.br, 
+  // try to get the Monde email from the token or reject non-Monde emails
+  const payload = decodeJwtPayload(mondeToken) as any;
+  const mondeEmail = payload?.email;
+  if (mondeEmail && mondeEmailRegex.test(mondeEmail)) {
+    email = String(mondeEmail);
+  } else {
+    return new Response(JSON.stringify({ 
+      error: "E-mail deve ser @*.monde.com.br quando usando token Monde",
+      invalid_email: email 
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 400,
+    });
   }
 }
 
@@ -97,6 +118,38 @@ const trialDays = Math.max(0, Number(settings?.trial_days ?? 7));
       .select("id, user_id, trial_start, trial_end, subscribed, display_name, email")
       .eq("email", email)
       .maybeSingle();
+
+    // Check for duplicate users with non-Monde emails when we have a Monde email
+    if (mondeToken && mondeEmailRegex.test(email)) {
+      // Try to find and consolidate any existing non-Monde email records
+      const emailPrefix = email.split('@')[0];
+      const { data: duplicates } = await admin
+        .from("subscribers")
+        .select("id, email, user_id, subscribed, trial_start, trial_end")
+        .like("email", `${emailPrefix}@%`)
+        .neq("email", email);
+      
+      if (duplicates && duplicates.length > 0) {
+        console.log(`Found ${duplicates.length} potential duplicate(s) for ${email}`);
+        // Update or merge data from the most recent duplicate
+        const mostRecent = duplicates[0];
+        if (mostRecent.subscribed || mostRecent.trial_start) {
+          console.log(`Consolidating data from ${mostRecent.email} to ${email}`);
+          // Keep the better subscription status
+          if (!existing && (mostRecent.subscribed || mostRecent.trial_start)) {
+            // Transfer subscription data to the Monde email
+            trial_start = mostRecent.trial_start;
+            trial_end = mostRecent.trial_end;
+            subscribed = mostRecent.subscribed;
+          }
+        }
+        // Remove duplicates
+        for (const dup of duplicates) {
+          await admin.from("subscribers").delete().eq("id", dup.id);
+          console.log(`Removed duplicate subscriber: ${dup.email}`);
+        }
+      }
+    }
 
     let subId: string | null = existing?.id ?? null;
     let trial_start = existing?.trial_start ?? null as string | null;
