@@ -112,13 +112,24 @@ const trialDays = Math.max(0, Number(settings?.trial_days ?? 7));
 
     const now = new Date();
 
-    // Try to find an existing subscriber by email
-    const { data: existing } = await admin
-      .from("subscribers")
-      .select("id, user_id, trial_start, trial_end, subscribed, display_name, email")
-      .eq("email", email)
-      .maybeSingle();
+    // Tenta encontrar um assinante existente pelo user_id ou email
+    let existing;
+    if (user_id) {
+        const { data } = await admin.from("subscribers").select("*").eq("user_id", user_id).maybeSingle();
+        existing = data;
+    }
+    
+    if (!existing && email) {
+        const { data } = await admin.from("subscribers").select("*").eq("email", email).maybeSingle();
+        existing = data;
+    }
 
+    // Se encontrar pelo email mas o user_id for nulo, atualiza o user_id
+    if (existing && !existing.user_id && user_id) {
+        await admin.from("subscribers").update({ user_id }).eq('id', existing.id);
+        existing.user_id = user_id;
+    }
+    
     // Check for duplicate users with non-Monde emails when we have a Monde email
     if (mondeToken && mondeEmailRegex.test(email)) {
       // Try to find and consolidate any existing non-Monde email records
