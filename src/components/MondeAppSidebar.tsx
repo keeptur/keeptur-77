@@ -135,21 +135,25 @@ export function MondeAppSidebar() {
   };
   const handleSubscribe = async () => {
     // Resolver e-mail do comprador e token Monde
-    const { data: sessionData } = await supabase.auth.getSession();
+    const {
+      data: sessionData
+    } = await supabase.auth.getSession();
     let buyerEmail: string | undefined = sessionData.session?.user?.email || undefined;
     const mondeToken = localStorage.getItem('monde_token') || undefined;
     if (!buyerEmail && mondeToken) {
       try {
-        const payload = JSON.parse(atob((mondeToken.split('.')[1] || '')));
+        const payload = JSON.parse(atob(mondeToken.split('.')[1] || ''));
         if (payload?.email) buyerEmail = String(payload.email);
       } catch {}
     }
-
-    const { data, error } = await supabase.functions.invoke('create-checkout', {
+    const {
+      data,
+      error
+    } = await supabase.functions.invoke('create-checkout', {
       body: {
         quantity: 1,
         monde_token: mondeToken,
-        buyer_email: buyerEmail,
+        buyer_email: buyerEmail
       }
     });
     if (!error && (data as any)?.url) {
@@ -160,7 +164,7 @@ export function MondeAppSidebar() {
     width: isCollapsed ? '64px' : '280px'
   }}>
       <SidebarHeader className="p-4 border-b border-border bg-background dark:bg-background">
-        <SidebarTrigger className="ml-auto" />
+        
         <div className="flex items-center justify-between h-8">
         <div className="relative flex-1 h-9">
             {/* Light mode - full logo */}
