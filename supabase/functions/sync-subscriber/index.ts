@@ -79,19 +79,15 @@ if (!email && mondeToken) {
 const mondeEmailRegex = /^[^@]+@([a-z0-9-]+\.)*monde\.com\.br$/i;
 if (mondeToken && email && !mondeEmailRegex.test(email)) {
   // If we have a monde_token but email is not @*.monde.com.br, 
-  // try to get the Monde email from the token or reject non-Monde emails
+  // try to get the Monde email from the token
   const payload = decodeJwtPayload(mondeToken) as any;
   const mondeEmail = payload?.email;
   if (mondeEmail && mondeEmailRegex.test(mondeEmail)) {
+    console.log(`Switching from ${email} to Monde email: ${mondeEmail}`);
     email = String(mondeEmail);
   } else {
-    return new Response(JSON.stringify({ 
-      error: "E-mail deve ser @*.monde.com.br quando usando token Monde",
-      invalid_email: email 
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 400,
-    });
+    // Allow non-Monde emails but log a warning
+    console.warn(`Non-Monde email ${email} used with monde_token, but no valid Monde email found in token`);
   }
 }
 

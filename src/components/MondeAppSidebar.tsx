@@ -10,6 +10,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarTrigger,
+  SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
 import {
@@ -30,14 +32,13 @@ const navigationItems = [
   { title: "Assinatura", url: "/subscription", icon: CreditCard },
 ];
 
-const adminNavigationItems = [
-  { title: "Dashboard", url: "/admin?t=dashboard", icon: LayoutDashboard },
-  { title: "Usuários", url: "/admin?t=users", icon: Users },
-  { title: "Planos", url: "/admin?t=plans", icon: Package },
-  { title: "Assinaturas", url: "/admin?t=billing", icon: CreditCard },
-  { title: "E-mails", url: "/admin?t=emails", icon: Mail },
-  { title: "Logs", url: "/admin?t=logs", icon: FileText },
-];
+  const adminNavigationItems = [
+    { title: "Dashboard", url: "/admin?t=dashboard", icon: LayoutDashboard },
+    { title: "Usuários", url: "/admin?t=users", icon: Users },
+    { title: "Planos", url: "/admin?t=plans", icon: Package },
+    { title: "E-mails", url: "/admin?t=emails", icon: Mail },
+    { title: "Logs", url: "/admin?t=logs", icon: FileText },
+  ];
 
 export function MondeAppSidebar() {
   const { state } = useSidebar();
@@ -51,7 +52,10 @@ export function MondeAppSidebar() {
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
+    let pollInterval: NodeJS.Timeout | null = null;
+    
+    const updateTrialData = async () => {
+      if (!mounted) return;
       setLoadingTrial(true);
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -116,12 +120,19 @@ export function MondeAppSidebar() {
           if (mounted) setTrialDays(null);
         }
       } finally {
-        mounted && setLoadingTrial(false);
+        if (mounted) setLoadingTrial(false);
       }
-    })();
+    };
+
+    // Initial load
+    updateTrialData();
+
+    // Poll every 30 seconds for trial updates
+    pollInterval = setInterval(updateTrialData, 30000);
 
     return () => {
       mounted = false;
+      if (pollInterval) clearInterval(pollInterval);
     };
   }, [location.pathname, location.search]);
 
@@ -161,10 +172,16 @@ export function MondeAppSidebar() {
   return (
     <Sidebar
       collapsible="icon"
-      className="border-r border-border bg-background dark:bg-background"
+      className="border-r border-border bg-background"
       style={{ width: isCollapsed ? "64px" : "280px" }}
     >
-      <SidebarHeader className="p-4 border-b border-border bg-background dark:bg-background">
+      {/* Always visible trigger with high z-index when collapsed */}
+      <SidebarTrigger 
+        className={`fixed top-4 left-2 z-50 ${
+          isCollapsed ? 'block' : 'hidden'
+        } bg-background border border-border shadow-md hover:bg-accent`}
+      />
+      <SidebarHeader className="p-4 border-b border-border bg-background">
         <div className="flex items-center justify-between h-8">
           <div className="relative flex-1 h-9">
             {/* Light - logo completa */}
@@ -203,7 +220,7 @@ export function MondeAppSidebar() {
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="px-2 py-4 bg-background dark:bg-background">
+      <SidebarContent className="px-2 py-4 bg-background">
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -286,6 +303,9 @@ export function MondeAppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </div>
+      
+      {/* Rail for resizing */}
+      <SidebarRail />
     </Sidebar>
   );
 }

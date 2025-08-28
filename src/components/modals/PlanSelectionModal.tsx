@@ -159,7 +159,7 @@ export function PlanSelectionModal({ open, onOpenChange, plans, onSuccess }: Pla
 
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: { 
-          price_id: priceId,
+          plan_id: selectedPlan.id,
           quantity: userCount,
           users: users.slice(0, userCount),
           billing_cycle: isAnnual ? 'yearly' : 'monthly',
@@ -171,7 +171,7 @@ export function PlanSelectionModal({ open, onOpenChange, plans, onSuccess }: Pla
       if (error) throw error;
       
       if (data?.url) {
-        window.open(data.url, '_blank');
+        window.location.href = data.url;
         onOpenChange(false);
         onSuccess?.();
       }

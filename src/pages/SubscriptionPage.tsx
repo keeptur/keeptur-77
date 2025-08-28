@@ -101,14 +101,17 @@ useEffect(() => {
 const loadSubscriptionData = async () => {
   setLoading(true);
   try {
-    // Detect Supabase session, but don't block UI if absent
-    const { data: sessionData } = await supabase.auth.getSession();
-    const hasSession = !!sessionData.session;
+    // Parallel execution for better performance
+    const [sessionResponse, mondeToken] = await Promise.all([
+      supabase.auth.getSession(),
+      Promise.resolve(localStorage.getItem("monde_token") || undefined)
+    ]);
+    
+    const hasSession = !!sessionResponse.data.session;
     setHasSupabaseSession(hasSession);
 
     // Resolve user email (Supabase session -> Monde People fallback)
-    let email: string | undefined = sessionData.session?.user?.email || undefined;
-    const mondeToken = localStorage.getItem("monde_token") || undefined;
+    let email: string | undefined = sessionResponse.data.session?.user?.email || undefined;
     if (!email) {
       try {
         const uid = api.getCurrentUserIdFromToken();
@@ -119,18 +122,16 @@ const loadSubscriptionData = async () => {
       } catch (_) {}
     }
 
-    // 1) Sync subscriber (public)
-    await supabase.functions.invoke('sync-subscriber', { body: { email, mondeToken, source: 'monde' } });
-
-    // 2) Load data (public + session-optional)
-    const responses = await Promise.allSettled([
+    // Parallel execution of all API calls for better performance
+    const [syncResponse, ...dataResponses] = await Promise.allSettled([
+      supabase.functions.invoke('sync-subscriber', { body: { email, mondeToken, source: 'monde' } }),
       supabase.functions.invoke('get-subscription-data', { body: { email, mondeToken } }),
       supabase.functions.invoke('get-available-plans'),
       hasSession ? supabase.functions.invoke('get-payment-history') : Promise.resolve({ value: { data: { payment_history: [] } } } as any),
       hasSession ? supabase.functions.invoke('get-payment-method') : Promise.resolve({ value: { data: { payment_method: null } } } as any),
     ]);
 
-    const [subResponse, plansResponse, historyResponse, methodResponse] = responses as any[];
+    const [subResponse, plansResponse, historyResponse, methodResponse] = dataResponses as any[];
 
     if (subResponse.status === 'fulfilled' && subResponse.value.data) {
       setSubscriptionData(subResponse.value.data);
@@ -200,16 +201,7 @@ const loadSubscriptionData = async () => {
       if (error) throw error;
       
       if (data?.url) {
-        const newWindow = window.open(data.url, '_blank');
-        if (newWindow) {
-          const checkClosed = setInterval(() => {
-            if (newWindow.closed) {
-              clearInterval(checkClosed);
-              // Reload subscription data when user returns from checkout
-              setTimeout(() => loadSubscriptionData(), 2000);
-            }
-          }, 1000);
-        }
+        window.location.href = data.url;
       }
     } catch (error) {
       console.error('Error changing subscription:', error);
@@ -239,17 +231,7 @@ const loadSubscriptionData = async () => {
       }
       
       if (data?.url) {
-        // Open in new tab and reload data when user returns
-        const newWindow = window.open(data.url, '_blank');
-        if (newWindow) {
-          const checkClosed = setInterval(() => {
-            if (newWindow.closed) {
-              clearInterval(checkClosed);
-              // Reload subscription data when user returns
-              setTimeout(() => loadSubscriptionData(), 2000);
-            }
-          }, 1000);
-        }
+        window.location.href = data.url;
       }
     } catch (error) {
       console.error('Error opening customer portal:', error);

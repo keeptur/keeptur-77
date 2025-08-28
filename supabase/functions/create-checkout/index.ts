@@ -47,14 +47,15 @@ serve(async (req) => {
     }
 
     const requestBody = await req.json().catch(() => ({})) as { 
-      price_id?: string; 
+      price_id?: string;
+      plan_id?: string;
       quantity?: number; 
       users?: Array<{name: string; email: string}>; 
       billing_cycle?: 'monthly' | 'yearly';
       monde_token?: string;
       buyer_email?: string;
     };
-    const { price_id, quantity = 1, users = [], billing_cycle = 'monthly', monde_token, buyer_email } = requestBody;
+    const { price_id, plan_id, quantity = 1, users = [], billing_cycle = 'monthly', monde_token, buyer_email } = requestBody;
 
     // Resolve buyer email from auth > monde_token > explicit buyer_email
     if (!buyerEmail) {
@@ -78,11 +79,25 @@ serve(async (req) => {
       }
     }
 
-    // If price_id is provided, validate it and check if it's a URL or proper ID
+    // Get plan data - prioritize plan_id, fallback to price_id
     let planData = null;
     let actualPriceId = price_id;
     
-    if (price_id) {
+    if (plan_id) {
+      // Use plan_id to get plan details
+      const { data: plan } = await supabaseService
+        .from("plan_kits")
+        .select("*")
+        .eq("id", plan_id)
+        .maybeSingle();
+      planData = plan;
+      
+      if (planData) {
+        // Use plan's Stripe price based on billing cycle
+        actualPriceId = billing_cycle === 'yearly' ? planData.stripe_price_id_yearly : planData.stripe_price_id_monthly;
+        console.log(`Using plan ${planData.name} with price_id: ${actualPriceId}`);
+      }
+    } else if (price_id) {
       // Check if price_id is actually a URL (invalid format)
       if (price_id.startsWith('http://') || price_id.startsWith('https://')) {
         console.log(`Invalid price_id format (URL): ${price_id}, falling back to dynamic pricing`);
@@ -140,14 +155,24 @@ serve(async (req) => {
         quantity: Math.max(1, Number(quantity || 1)),
       }];
     } else {
-      // Use dynamic pricing based on billing cycle
+      // Use dynamic pricing based on plan data or default settings
       const interval = billing_cycle === 'yearly' ? 'year' : 'month';
-      const unitAmount = billing_cycle === 'yearly' ? Math.floor(priceCents * 12 * 0.8) : priceCents; // 20% discount for yearly
+      let unitAmount = priceCents;
+      let productName = `Keeptur Assinatura ${billing_cycle === 'yearly' ? 'Anual' : 'Mensal'}`;
+      
+      if (planData) {
+        // Use plan's price
+        unitAmount = billing_cycle === 'yearly' ? planData.yearly_price_cents : planData.price_cents;
+        productName = `${planData.name} - ${billing_cycle === 'yearly' ? 'Anual' : 'Mensal'}`;
+      } else if (billing_cycle === 'yearly') {
+        // Apply 20% discount for yearly
+        unitAmount = Math.floor(priceCents * 12 * 0.8);
+      }
       
       lineItems = [{
         price_data: {
-          currency,
-          product_data: { name: `Keeptur Assinatura ${billing_cycle === 'yearly' ? 'Anual' : 'Mensal'}` },
+          currency: planData?.currency?.toLowerCase() || currency,
+          product_data: { name: productName },
           unit_amount: unitAmount,
           recurring: { interval },
         },

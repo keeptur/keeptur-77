@@ -16,11 +16,16 @@ export default function AdminPage() {
     document.title = "Admin | Keeptur";
   }, []);
 
-  // Sync tab from URL
+  // Sync tab from URL and redirect billing to plans
   useEffect(() => {
     const t = searchParams.get("t");
+    // Redirect billing to plans
+    if (t === "billing") {
+      navigate("/admin?t=plans", { replace: true });
+      return;
+    }
     if (t && t !== tab) setTab(t);
-  }, [searchParams]);
+  }, [searchParams, navigate]);
 
   // Update URL when tab changes
   useEffect(() => {
@@ -51,10 +56,6 @@ export default function AdminPage() {
 
               <TabsContent value="plans" className="mt-4">
                 <PlansSection />
-              </TabsContent>
-
-              <TabsContent value="billing" className="mt-4">
-                <BillingSettingsSection />
               </TabsContent>
 
               <TabsContent value="emails" className="mt-4">
