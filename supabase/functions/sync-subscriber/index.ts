@@ -115,6 +115,16 @@ if (mondeToken && email && !mondeEmailRegex.test(email)) {
   }
 }
 
+// If using monde_token and the resolved email is NOT a Monde email, and there is no Supabase user,
+// skip creating/updating subscriber to avoid spurious users
+if (mondeToken && email && !mondeEmailRegex.test(email) && !supabaseUser) {
+  console.warn(`Skipping upsert for non-Monde email ${email} without Supabase auth`);
+  return new Response(JSON.stringify({ ok: true, skipped: true, reason: 'non-monde-email-with-monde-token' }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    status: 200,
+  });
+}
+
 if (!email) {
   return new Response(JSON.stringify({ error: "Missing email (or mondeToken with email)" }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },

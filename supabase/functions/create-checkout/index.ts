@@ -79,8 +79,8 @@ serve(async (req) => {
       }
     }
 
-    // Require user authentication - no checkout without login
-    if (!user) {
+    // Require identity: allow Supabase user OR buyerEmail from monde_token/buyer_email
+    if (!user && !buyerEmail) {
       return new Response(JSON.stringify({ error: "Login obrigatório para finalizar compra" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 401,

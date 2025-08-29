@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,7 +45,14 @@ export function PlanSelectionModal({ open, onOpenChange, plans, onSuccess }: Pla
   const [isAnnual, setIsAnnual] = useState(false);
   const [userCount, setUserCount] = useState(1);
   const [users, setUsers] = useState<UserInfo[]>([{ name: "", email: "" }]);
-  const [loading, setLoading] = useState(false);
+const [loading, setLoading] = useState(false);
+
+  // Auto-select the provided plan when there's only one (avoid double selection flow)
+  useEffect(() => {
+    if (open && !selectedPlan && plans.length === 1) {
+      setSelectedPlan(plans[0]);
+    }
+  }, [open, plans, selectedPlan]);
 
   const formatCurrency = (cents: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -132,12 +139,12 @@ export function PlanSelectionModal({ open, onOpenChange, plans, onSuccess }: Pla
   const handleCheckout = async () => {
     if (!selectedPlan || !validateUsers()) return;
 
-    // Check if user is logged in
     const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session?.user) {
+    const mondeToken = localStorage.getItem('monde_token');
+    if (!sessionData.session?.user && !mondeToken) {
       toast({
         title: "Login obrigatório",
-        description: "Você precisa estar logado para finalizar a compra",
+        description: "Você precisa estar logado (Monde ou Supabase) para finalizar a compra",
         variant: "destructive",
       });
       return;
@@ -145,7 +152,7 @@ export function PlanSelectionModal({ open, onOpenChange, plans, onSuccess }: Pla
 
     setLoading(true);
     try {
-      const mondeToken = localStorage.getItem('monde_token') || undefined;
+      const mondeTokenToSend = mondeToken || undefined;
 
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: { 
@@ -153,7 +160,7 @@ export function PlanSelectionModal({ open, onOpenChange, plans, onSuccess }: Pla
           quantity: userCount,
           users: users.slice(0, userCount),
           billing_cycle: isAnnual ? 'yearly' : 'monthly',
-          monde_token: mondeToken,
+          monde_token: mondeTokenToSend,
         }
       });
       
