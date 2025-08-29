@@ -23,6 +23,7 @@ import AdminPlansPage from "./pages/admin/AdminPlansPage";
 import AdminEmailsPage from "./pages/admin/AdminEmailsPage";
 import SubscriptionPage from "./pages/SubscriptionPage";
 import AdminLogsPage from "./pages/admin/AdminLogsPage";
+import PlansPage from "./pages/Plans";
 import { UserRoute } from "./components/auth/UserRoute";
 
 const queryClient = new QueryClient();
@@ -110,6 +111,11 @@ const AppWrapper = () => {
                 <Route path="subscription" element={
                   <UserRoute>
                     <SubscriptionPage />
+                  </UserRoute>
+                } />
+                <Route path="plans" element={
+                  <UserRoute>
+                    <PlansPage />
                   </UserRoute>
                 } />
                 {/* Legacy single admin page (kept) */}

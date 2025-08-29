@@ -108,7 +108,7 @@ export function TopHeader() {
     <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-sm border-b border-border">
       <div className="flex h-16 items-center justify-between px-2 sm:px-6 lg:px-8">
         <div className="flex items-center gap-2">
-          <SidebarTrigger className="relative z-[9999] pointer-events-auto" />
+          <SidebarTrigger className="relative z-[9999] pointer-events-auto bg-background border shadow-lg" />
           <div className="hidden sm:block">
             <h2 className="text-lg font-semibold text-foreground leading-tight">
               {getGreeting()}, {currentUser.name}!

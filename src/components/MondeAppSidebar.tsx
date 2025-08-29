@@ -29,7 +29,7 @@ import { supabase } from "@/integrations/supabase/client";
 const navigationItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Pessoas", url: "/people", icon: Users },
-  { title: "Assinatura", url: "/subscription", icon: CreditCard },
+  { title: "Planos", url: "/plans", icon: CreditCard },
 ];
 
   const adminNavigationItems = [

@@ -132,30 +132,20 @@ export function PlanSelectionModal({ open, onOpenChange, plans, onSuccess }: Pla
   const handleCheckout = async () => {
     if (!selectedPlan || !validateUsers()) return;
 
+    // Check if user is logged in
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session?.user) {
+      toast({
+        title: "Login obrigatório",
+        description: "Você precisa estar logado para finalizar a compra",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      const priceId = isAnnual ? selectedPlan.stripe_price_id_yearly : selectedPlan.stripe_price_id_monthly;
-      
-      if (!priceId) {
-        toast({
-          title: "Erro",
-          description: "Configuração de preço não encontrada para este plano",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Resolver e-mail do comprador (Supabase -> token Monde -> primeiro usuário)
-      const { data: sessionData } = await supabase.auth.getSession();
-      let buyerEmail: string | undefined = sessionData.session?.user?.email || undefined;
       const mondeToken = localStorage.getItem('monde_token') || undefined;
-      if (!buyerEmail && mondeToken) {
-        try {
-          const payload = JSON.parse(atob((mondeToken.split('.')[1] || '')));
-          if (payload?.email) buyerEmail = String(payload.email);
-        } catch {}
-      }
-      if (!buyerEmail) buyerEmail = users[0]?.email || undefined;
 
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: { 
@@ -164,7 +154,6 @@ export function PlanSelectionModal({ open, onOpenChange, plans, onSuccess }: Pla
           users: users.slice(0, userCount),
           billing_cycle: isAnnual ? 'yearly' : 'monthly',
           monde_token: mondeToken,
-          buyer_email: buyerEmail,
         }
       });
       

@@ -79,6 +79,14 @@ serve(async (req) => {
       }
     }
 
+    // Require user authentication - no checkout without login
+    if (!user) {
+      return new Response(JSON.stringify({ error: "Login obrigatório para finalizar compra" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
+
     // Get plan data - prioritize plan_id, fallback to price_id
     let planData = null;
     let actualPriceId = price_id;
@@ -96,6 +104,12 @@ serve(async (req) => {
         // Use plan's Stripe price based on billing cycle
         actualPriceId = billing_cycle === 'yearly' ? planData.stripe_price_id_yearly : planData.stripe_price_id_monthly;
         console.log(`Using plan ${planData.name} with price_id: ${actualPriceId}`);
+        
+        // If Stripe price ID is a URL or invalid, use dynamic pricing
+        if (actualPriceId && (actualPriceId.startsWith('http://') || actualPriceId.startsWith('https://'))) {
+          console.log(`Invalid Stripe price_id format (URL): ${actualPriceId}, using dynamic pricing`);
+          actualPriceId = null;
+        }
       }
     } else if (price_id) {
       // Check if price_id is actually a URL (invalid format)
@@ -161,8 +175,12 @@ serve(async (req) => {
       let productName = `Keeptur Assinatura ${billing_cycle === 'yearly' ? 'Anual' : 'Mensal'}`;
       
       if (planData) {
-        // Use plan's price
-        unitAmount = billing_cycle === 'yearly' ? planData.yearly_price_cents : planData.price_cents;
+        // Use plan's price - calculate yearly from monthly if needed
+        if (billing_cycle === 'yearly') {
+          unitAmount = planData.yearly_price_cents || Math.floor(planData.price_cents * 12 * 0.8);
+        } else {
+          unitAmount = planData.price_cents;
+        }
         productName = `${planData.name} - ${billing_cycle === 'yearly' ? 'Anual' : 'Mensal'}`;
       } else if (billing_cycle === 'yearly') {
         // Apply 20% discount for yearly

@@ -75,6 +75,30 @@ if (!email && mondeToken) {
   }
 }
 
+// Get authenticated user info from Supabase
+const authHeader = req.headers.get("Authorization");
+let supabaseUser = null;
+if (authHeader) {
+  try {
+    const token = authHeader.replace("Bearer ", "");
+    const { data: userData } = await supabase.auth.getUser(token);
+    supabaseUser = userData.user;
+    console.log("Authenticated Supabase user:", supabaseUser?.email);
+  } catch (error) {
+    console.warn("Could not authenticate Supabase user:", error);
+  }
+}
+
+// Prioritize authenticated Supabase user data
+if (supabaseUser?.email) {
+  email = supabaseUser.email;
+  user_id = supabaseUser.id;
+  if (!display_name && supabaseUser.user_metadata?.full_name) {
+    display_name = supabaseUser.user_metadata.full_name;
+  }
+  console.log(`Using authenticated Supabase user: ${email}`);
+}
+
 // Prioritize @*.monde.com.br emails when monde_token is present
 const mondeEmailRegex = /^[^@]+@([a-z0-9-]+\.)*monde\.com\.br$/i;
 if (mondeToken && email && !mondeEmailRegex.test(email)) {
