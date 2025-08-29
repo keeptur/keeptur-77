@@ -1,172 +1,199 @@
-// MondeAppSidebar.tsx
 import { useState, useEffect } from "react";
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import { useTheme } from "@/providers/ThemeProvider";
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarTrigger,
-  SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
 import {
-  LayoutDashboard,
+  Home,
+  Calendar,
   Users,
-  FileText,
-  LogOut,
+  Settings,
+  BarChart3,
   CreditCard,
-  Mail,
-  Package,
+  Clock,
 } from "lucide-react";
-import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 
-const navigationItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Pessoas", url: "/people", icon: Users },
-  { title: "Planos", url: "/plans", icon: CreditCard },
-];
-
-  const adminNavigationItems = [
-    { title: "Dashboard", url: "/admin?t=dashboard", icon: LayoutDashboard },
-    { title: "Usuários", url: "/admin?t=users", icon: Users },
-    { title: "Planos", url: "/admin?t=plans", icon: Package },
-    { title: "E-mails", url: "/admin?t=emails", icon: Mail },
-    { title: "Logs", url: "/admin?t=logs", icon: FileText },
-  ];
-
-export function MondeAppSidebar() {
-  const { state } = useSidebar();
-  const location = useLocation();
-  const navigate = useNavigate();
-  const isCollapsed = state === "collapsed";
-
-  const [trialDays, setTrialDays] = useState<number | null>(null);
-  const [loadingTrial, setLoadingTrial] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+function SubscriptionStatus() {
+  const [subscriptionData, setSubscriptionData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
-    let pollInterval: NodeJS.Timeout | null = null;
     
-    const updateTrialData = async () => {
-      if (!mounted) return;
-      setLoadingTrial(true);
+    const fetchSubscriptionData = async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const mondeToken = localStorage.getItem('monde_token');
+        
+        // Get email from session or monde token
+        let email = sessionData.session?.user?.email;
+        if (!email && mondeToken) {
+          try {
+            const payload = JSON.parse(atob((mondeToken.split('.')[1] || '')));
+            email = payload?.email;
+          } catch {}
+        }
+
+        if (!email) {
+          if (mounted) setLoading(false);
+          return;
+        }
+
+        // Get subscription data using get-subscription-data function
+        const { data, error } = await supabase.functions.invoke('get-subscription-data', {
+          body: { email, monde_token: mondeToken }
+        });
+
+        if (mounted && data) {
+          setSubscriptionData(data);
+        }
+      } catch (error) {
+        console.error("Error fetching subscription data:", error);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchSubscriptionData();
+    
+    // Poll every 30 seconds for updates
+    const interval = setInterval(fetchSubscriptionData, 30000);
+    
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  if (loading || !subscriptionData) return null;
+
+  const { subscribed, trial_active, days_remaining, current_plan, subscription_tier } = subscriptionData;
+
+  return (
+    <div className="px-3 pb-3">
+      <div className={`rounded-lg p-3 border ${
+        subscribed 
+          ? 'bg-green-500/10 border-green-500/20' 
+          : trial_active 
+            ? 'bg-primary/10 border-primary/20'
+            : 'bg-muted border-border'
+      }`}>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+          <Clock className="w-3 h-3" />
+          {subscribed ? 'Assinatura' : trial_active ? 'Trial' : 'Inativo'}
+        </div>
+        <div className="text-sm font-medium">
+          {subscribed ? (
+            <>
+              <div>{current_plan?.name || subscription_tier}</div>
+              <div className="text-xs text-muted-foreground">
+                {days_remaining} dias restantes
+              </div>
+            </>
+          ) : trial_active ? (
+            <>
+              {days_remaining} dia{days_remaining === 1 ? '' : 's'} restante{days_remaining === 1 ? '' : 's'}
+            </>
+          ) : (
+            <span className="text-xs">Escolha um plano</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const items = [
+  {
+    title: "Dashboard",
+    url: "/",
+    icon: Home,
+  },
+  {
+    title: "Tarefas",
+    url: "/tasks",
+    icon: Calendar,
+  },
+  {
+    title: "Pessoas",
+    url: "/people",
+    icon: Users,
+  },
+  {
+    title: "Planos",
+    url: "/plans",
+    icon: CreditCard,
+  },
+];
+
+const adminItems = [
+  {
+    title: "Usuários",
+    url: "/admin?t=users",
+    icon: Users,
+  },
+  {
+    title: "Planos",
+    url: "/admin?t=plans",
+    icon: CreditCard,
+  },
+  {
+    title: "E-mails",
+    url: "/admin?t=emails",
+    icon: Settings,
+  },
+  {
+    title: "Logs",
+    url: "/admin?t=logs",
+    icon: BarChart3,
+  },
+];
+
+export function MondeAppSidebar() {
+  const location = useLocation();
+  const { theme } = useTheme();
+  const { state } = useSidebar();
+  const isCollapsed = state === "collapsed";
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-
         if (user) {
-          // Role admin
           const { data: roles } = await supabase
             .from("user_roles")
             .select("role")
             .eq("user_id", user.id);
-
-          const admin = (roles || []).some((r) => r.role === "admin");
-          if (mounted) setIsAdmin(admin);
-
-          if (admin) {
-            if (mounted) setTrialDays(null);
-            return;
-          }
-
-          // Não-admin: checar subscriber via RLS
-          const { data } = await supabase
-            .from("subscribers")
-            .select("trial_end, subscription_end, subscribed")
-            .or(`user_id.eq.${user.id},email.eq.${user.email}`)
-            .order("updated_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (mounted && data?.trial_end && !data?.subscribed) {
-            const now = Date.now();
-            const t = new Date(data.trial_end).getTime();
-            const days = Math.ceil((t - now) / (1000 * 60 * 60 * 24));
-            setTrialDays(days);
-          } else if (mounted) {
-            setTrialDays(null);
-          }
-          return;
+          
+          const userIsAdmin = roles?.some((r) => r.role === "admin") || false;
+          setIsAdmin(userIsAdmin);
         }
-
-        // Sem sessão supabase: usar monde_token e edge function
-        const mondeToken = localStorage.getItem("monde_token");
-        if (mondeToken) {
-          try {
-            const { data } = await supabase.functions.invoke("sync-subscriber", {
-              body: { mondeToken },
-            });
-            const trialEnd = (data as any)?.trial_end as string | undefined;
-            const subscribed = !!(data as any)?.subscribed;
-
-            if (mounted && trialEnd && !subscribed) {
-              const now = Date.now();
-              const t = new Date(trialEnd).getTime();
-              const days = Math.ceil((t - now) / (1000 * 60 * 60 * 24));
-              setTrialDays(days);
-            } else if (mounted) {
-              setTrialDays(null);
-            }
-          } catch {
-            if (mounted) setTrialDays(null);
-          }
-        } else {
-          if (mounted) setTrialDays(null);
-        }
+      } catch (error) {
+        console.error("Error checking admin status:", error);
       } finally {
-        if (mounted) setLoadingTrial(false);
+        setIsLoading(false);
       }
     };
 
-    // Initial load
-    updateTrialData();
+    checkAdminStatus();
+  }, []);
 
-    // Poll every 30 seconds for trial updates
-    pollInterval = setInterval(updateTrialData, 30000);
-
-    return () => {
-      mounted = false;
-      if (pollInterval) clearInterval(pollInterval);
-    };
-  }, [location.pathname, location.search]);
-
-  const handleLogout = async () => {
-    try {
-      api.logout();
-      await supabase.auth.signOut();
-    } finally {
-      navigate("/login");
-    }
-  };
-
-  const handleSubscribe = async () => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    let buyerEmail: string | undefined = sessionData.session?.user?.email || undefined;
-    const mondeToken = localStorage.getItem("monde_token") || undefined;
-
-    if (!buyerEmail && mondeToken) {
-      try {
-        const payload = JSON.parse(atob((mondeToken.split(".")[1] || "")));
-        if (payload?.email) buyerEmail = String(payload.email);
-      } catch {}
-    }
-
-    const { data, error } = await supabase.functions.invoke("create-checkout", {
-      body: { quantity: 1, monde_token: mondeToken, buyer_email: buyerEmail },
-    });
-
-    if (!error && (data as any)?.url) {
-      window.location.href = (data as any).url as string;
-    }
-  };
-
-  const items = isAdmin ? adminNavigationItems : navigationItems;
   const fullPath = `${location.pathname}${location.search || ""}`;
 
   return (
@@ -182,6 +209,8 @@ export function MondeAppSidebar() {
         } bg-background border border-border shadow-md hover:bg-accent pointer-events-auto`}
       />
       <SidebarHeader className="p-4 border-b border-border bg-background">
+        {/* Show subscription status for all users */}
+        <SubscriptionStatus />
         <div className="flex items-center justify-between h-8">
           <div className="relative flex-1 h-9">
             {/* Light - logo completa */}
@@ -238,17 +267,12 @@ export function MondeAppSidebar() {
                       asChild
                       isActive={isActive}
                       tooltip={item.title}
-                      className={isCollapsed ? "justify-center px-2" : ""}
+                      className="transition-colors"
                     >
-                      <NavLink
-                        to={item.url}
-                        className={`flex items-center text-foreground hover:text-foreground ${
-                          isCollapsed ? "justify-center" : "space-x-3"
-                        }`}
-                      >
-                        <item.icon className={`h-4 w-4 ${isCollapsed ? "mx-auto" : ""}`} />
-                        {!isCollapsed && <span>{item.title}</span>}
-                      </NavLink>
+                      <a href={item.url}>
+                        <item.icon className="w-4 h-4" />
+                        <span>{item.title}</span>
+                      </a>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
@@ -256,56 +280,40 @@ export function MondeAppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-      </SidebarContent>
 
-      {/* Footer: trial + sair */}
-      <div className="mt-auto p-3 border-t border-border">
-        {!isAdmin && trialDays !== null && trialDays > 0 && (
-          <div className={isCollapsed ? "px-1 mb-2" : "mb-3"}>
-            <div className="rounded-lg border border-primary/30 bg-primary/10 p-2">
-              <div className={isCollapsed ? "flex justify-center" : "flex items-center justify-between gap-2"}>
-                {!isCollapsed && (
-                  <div>
-                    <div className="text-sm font-medium">Período de Trial</div>
-                    <div className="text-xs text-muted-foreground">
-                      {loadingTrial ? "Carregando…" : `${trialDays} dias restantes`}
-                    </div>
-                  </div>
-                )}
-                <button
-                  onClick={handleSubscribe}
-                  className="px-2 py-1 text-xs rounded-button bg-primary text-primary-foreground hover:opacity-90"
-                >
-                  Assinar agora
-                </button>
-              </div>
-            </div>
-          </div>
+        {!isLoading && isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Administração</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {adminItems.map((item) => {
+                  const isActive =
+                    fullPath === item.url ||
+                    (item.url.startsWith("/admin") &&
+                      location.pathname === "/admin" &&
+                      (item.url.split("?")[1] || "").split("&").every((kv) => location.search.includes(kv)));
+
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        tooltip={item.title}
+                        className="transition-colors"
+                      >
+                        <a href={item.url}>
+                          <item.icon className="w-4 h-4" />
+                          <span>{item.title}</span>
+                        </a>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
         )}
-
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              tooltip="Sair"
-              className={`text-destructive hover:text-destructive hover:bg-destructive/10 ${
-                isCollapsed ? "justify-center px-2" : ""
-              }`}
-            >
-              <button
-                onClick={handleLogout}
-                className={`flex items-center w-full ${isCollapsed ? "justify-center" : "space-x-3"}`}
-              >
-                <LogOut className={`h-4 w-4 ${isCollapsed ? "mx-auto" : ""}`} />
-                {!isCollapsed && <span>Sair</span>}
-              </button>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </div>
-      
-      {/* Rail for resizing */}
-      <SidebarRail />
+      </SidebarContent>
     </Sidebar>
   );
 }
