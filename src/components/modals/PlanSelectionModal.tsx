@@ -158,6 +158,16 @@ const [loading, setLoading] = useState(false);
         buyerEmail = typeof payload?.email === 'string' ? payload.email : undefined;
       } catch {}
     }
+    if (!buyerEmail && mondeToken) {
+      try {
+        const { data } = await supabase.functions.invoke('sync-subscriber', { body: { mondeToken } });
+        if (typeof data?.email === 'string') {
+          buyerEmail = data.email;
+        }
+      } catch (e) {
+        console.warn('sync-subscriber fallback failed', e);
+      }
+    }
     if (!buyerEmail) {
       toast({
         title: "Erro",
