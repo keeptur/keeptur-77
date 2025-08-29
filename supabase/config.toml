@@ -29,3 +29,6 @@ verify_jwt = true
 
 [functions.get-payment-history]
 verify_jwt = true
+
+[functions.merge-subscribers]
+verify_jwt = true

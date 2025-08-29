@@ -177,9 +177,9 @@ export function MondeAppSidebar() {
     >
       {/* Always visible trigger with high z-index when collapsed */}
       <SidebarTrigger 
-        className={`fixed top-4 left-2 z-50 ${
+        className={`fixed top-4 left-2 z-[10000] ${
           isCollapsed ? 'block' : 'hidden'
-        } bg-background border border-border shadow-md hover:bg-accent`}
+        } bg-background border border-border shadow-md hover:bg-accent pointer-events-auto`}
       />
       <SidebarHeader className="p-4 border-b border-border bg-background">
         <div className="flex items-center justify-between h-8">

@@ -203,8 +203,8 @@ serve(async (req) => {
       mode: "subscription",
       line_items: lineItems,
       allow_promotion_codes: true,
-      success_url: `${origin}/subscription?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/subscription`,
+      success_url: `${origin}/plans?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/plans`,
       subscription_data: {
         trial_period_days: trialDays,
         metadata: {
