@@ -42,9 +42,11 @@ serve(async (req) => {
       source?: string;
     };
 
-    let email = (emailRaw || "").trim();
-    let display_name = (nameRaw || "").trim();
-    let user_id = (userIdRaw || "").trim() || null;
+let email = (emailRaw || "").trim();
+let display_name = (nameRaw || "").trim();
+let user_id = (userIdRaw || "").trim() || null;
+let username: string | null = null;
+let mondeAliasEmail: string | null = null;
 
 if (!email && mondeToken) {
   const payload = decodeJwtPayload(mondeToken) as any;
@@ -99,20 +101,19 @@ if (supabaseUser?.email) {
   console.log(`Using authenticated Supabase user: ${email}`);
 }
 
-// Prioritize @*.monde.com.br emails when monde_token is present
+// Determine Monde alias and username (do NOT switch primary email)
 const mondeEmailRegex = /^[^@]+@([a-z0-9-]+\.)*monde\.com\.br$/i;
-if (mondeToken && email && !mondeEmailRegex.test(email)) {
-  // If we have a monde_token but email is not @*.monde.com.br, 
-  // try to get the Monde email from the token
+if (mondeToken) {
   const payload = decodeJwtPayload(mondeToken) as any;
-  const mondeEmail = payload?.email;
-  if (mondeEmail && mondeEmailRegex.test(mondeEmail)) {
-    console.log(`Switching from ${email} to Monde email: ${mondeEmail}`);
-    email = String(mondeEmail);
-  } else {
-    // Allow non-Monde emails but log a warning
-    console.warn(`Non-Monde email ${email} used with monde_token, but no valid Monde email found in token`);
+  const possibleMonde = payload?.email;
+  if (possibleMonde && mondeEmailRegex.test(String(possibleMonde))) {
+    mondeAliasEmail = String(possibleMonde);
+    username = mondeAliasEmail.split('@')[0];
   }
+}
+// If current email itself is a Monde email and username not set, derive username from it
+if (!username && email && mondeEmailRegex.test(email)) {
+  username = email.split('@')[0];
 }
 
 // Allow upsert for non-Monde emails even without Supabase auth when mondeToken is present
@@ -154,37 +155,53 @@ const trialDays = Math.max(0, Number(settings?.trial_days ?? 7));
         existing.user_id = user_id;
     }
     
-    // Check for duplicate users with non-Monde emails when we have a Monde email
-    if (mondeToken && mondeEmailRegex.test(email)) {
-      // Try to find and consolidate any existing non-Monde email records
-      const emailPrefix = email.split('@')[0];
-      const { data: duplicates } = await admin
-        .from("subscribers")
-        .select("id, email, user_id, subscribed, trial_start, trial_end")
-        .like("email", `${emailPrefix}@%`)
-        .neq("email", email);
-      
-      if (duplicates && duplicates.length > 0) {
-        console.log(`Found ${duplicates.length} potential duplicate(s) for ${email}`);
-        // Update or merge data from the most recent duplicate
-        const mostRecent = duplicates[0];
-        if (mostRecent.subscribed || mostRecent.trial_start) {
-          console.log(`Consolidating data from ${mostRecent.email} to ${email}`);
-          // Keep the better subscription status
-          if (!existing && (mostRecent.subscribed || mostRecent.trial_start)) {
-            // Transfer subscription data to the Monde email
-            trial_start = mostRecent.trial_start;
-            trial_end = mostRecent.trial_end;
-            subscribed = mostRecent.subscribed;
-          }
-        }
-        // Remove duplicates
-        for (const dup of duplicates) {
-          await admin.from("subscribers").delete().eq("id", dup.id);
-          console.log(`Removed duplicate subscriber: ${dup.email}`);
-        }
-      }
+// Consolidate duplicates: prefer real email, use Monde email as alias/username
+if (mondeAliasEmail && email && mondeAliasEmail.toLowerCase() !== email.toLowerCase()) {
+  const { data: aliasRow } = await admin
+    .from("subscribers")
+    .select("*")
+    .eq("email", mondeAliasEmail)
+    .maybeSingle();
+
+  const { data: realRow } = await admin
+    .from("subscribers")
+    .select("*")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (aliasRow && realRow) {
+    console.log(`Merging alias ${aliasRow.email} into real ${email}`);
+    const update: any = {};
+    if (!realRow.username) update.username = aliasRow.email.split('@')[0];
+    if (!realRow.stripe_customer_id && aliasRow.stripe_customer_id) update.stripe_customer_id = aliasRow.stripe_customer_id;
+    if (!realRow.subscribed && aliasRow.subscribed) update.subscribed = true;
+    const endReal = realRow.subscription_end ? new Date(realRow.subscription_end).getTime() : 0;
+    const endAlias = aliasRow.subscription_end ? new Date(aliasRow.subscription_end).getTime() : 0;
+    if (endAlias > endReal) {
+      update.subscription_end = aliasRow.subscription_end;
+      if (aliasRow.subscription_tier) update.subscription_tier = aliasRow.subscription_tier;
     }
+    if (!realRow.trial_start && aliasRow.trial_start) update.trial_start = aliasRow.trial_start;
+    if (!realRow.trial_end && aliasRow.trial_end) update.trial_end = aliasRow.trial_end;
+    if (!realRow.display_name && aliasRow.display_name) update.display_name = aliasRow.display_name;
+
+    if (Object.keys(update).length > 0) {
+      update.updated_at = new Date().toISOString();
+      await admin.from("subscribers").update(update).eq("id", realRow.id);
+    }
+    await admin.from("subscribers").delete().eq("id", aliasRow.id);
+    existing = realRow;
+  } else if (aliasRow && !realRow) {
+    console.log(`Renaming alias ${aliasRow.email} to real email ${email}`);
+    const update: any = {
+      email,
+      username: aliasRow.email.split('@')[0],
+      updated_at: new Date().toISOString(),
+    };
+    await admin.from("subscribers").update(update).eq("id", aliasRow.id);
+    existing = { ...aliasRow, ...update } as any;
+  }
+}
 
     let subId: string | null = existing?.id ?? null;
     let trial_start = existing?.trial_start ?? null as string | null;
@@ -196,6 +213,7 @@ const trialDays = Math.max(0, Number(settings?.trial_days ?? 7));
         email,
         last_login_at: now.toISOString(),
         display_name: display_name || existing.display_name || null,
+        username: username || (existing as any).username || null,
         source,
       };
       // If there is no trial yet, start now
@@ -215,6 +233,7 @@ const trialDays = Math.max(0, Number(settings?.trial_days ?? 7));
         email,
         user_id,
         display_name: display_name || null,
+        username: username || null,
         last_login_at: now.toISOString(),
         trial_start,
         trial_end,

@@ -92,6 +92,7 @@ serve(async (req) => {
             source: 'stripe_checkout',
             trial_start: null,
             trial_end: null,
+            username: /@([a-z0-9-]+\.)*monde\.com\.br$/i.test(email) ? email.split('@')[0] : undefined,
             updated_at: new Date().toISOString(),
           }, { onConflict: 'email' });
 
@@ -172,6 +173,45 @@ serve(async (req) => {
             logStep('Error activating plan for buyer', { buyerEmail, error: buyerError.message });
           }
         }
+      }
+
+      // Consolidate duplicate subscribers for this Stripe customer: merge Monde alias into real email
+      try {
+        const { data: custSubs } = await supabaseService
+          .from('subscribers')
+          .select('id,email,display_name,subscribed,subscription_end,subscription_tier,username')
+          .eq('stripe_customer_id', session.customer as string);
+
+        if (custSubs && custSubs.length > 1) {
+          const mondeRegex = /@([a-z0-9-]+\.)*monde\.com\.br$/i;
+          const realSubs = custSubs.filter((s: any) => !mondeRegex.test(s.email));
+          const mondeSubs = custSubs.filter((s: any) => mondeRegex.test(s.email));
+
+          if (realSubs.length > 0 && mondeSubs.length > 0) {
+            const primary = realSubs[0];
+            for (const alias of mondeSubs) {
+              const update: any = {};
+              if (!primary.username) update.username = alias.email.split('@')[0];
+              if (!primary.subscribed && alias.subscribed) update.subscribed = true;
+              if (!primary.subscription_end || (alias.subscription_end && alias.subscription_end > primary.subscription_end)) {
+                update.subscription_end = alias.subscription_end;
+              }
+              if (!primary.subscription_tier && alias.subscription_tier) {
+                update.subscription_tier = alias.subscription_tier;
+              }
+              if (!primary.display_name && alias.display_name) {
+                update.display_name = alias.display_name;
+              }
+              if (Object.keys(update).length > 0) {
+                update.updated_at = new Date().toISOString();
+                await supabaseService.from('subscribers').update(update).eq('id', primary.id);
+              }
+              await supabaseService.from('subscribers').delete().eq('id', alias.id);
+            }
+          }
+        }
+      } catch (e) {
+        logStep('Consolidation error', { message: (e as any)?.message || String(e) });
       }
     }
 
