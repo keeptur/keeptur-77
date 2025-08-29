@@ -150,6 +150,9 @@ const [loading, setLoading] = useState(false);
       return;
     }
 
+    // Determine buyer email: prefer Supabase user email, fallback to first user entered in the list
+    const buyerEmail = sessionData.session?.user?.email || users[0]?.email || undefined;
+
     setLoading(true);
     try {
       const mondeTokenToSend = mondeToken || undefined;
@@ -161,6 +164,7 @@ const [loading, setLoading] = useState(false);
           users: users.slice(0, userCount),
           billing_cycle: isAnnual ? 'yearly' : 'monthly',
           monde_token: mondeTokenToSend,
+          buyer_email: buyerEmail,
         }
       });
       
