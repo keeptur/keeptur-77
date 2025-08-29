@@ -90,6 +90,8 @@ serve(async (req) => {
             subscription_end: subscriptionEnd.toISOString(),
             stripe_customer_id: session.customer as string,
             source: 'stripe_checkout',
+            trial_start: null,
+            trial_end: null,
             updated_at: new Date().toISOString(),
           }, { onConflict: 'email' });
 
@@ -104,20 +106,71 @@ serve(async (req) => {
       if (buyerEmail && !usersData.some((u: any) => u.email === buyerEmail)) {
         logStep("Activating plan for buyer", { buyerEmail });
         
-        const { error: buyerError } = await supabaseService
+        // Se já existir um assinante com o mesmo stripe_customer_id,
+        // atualize esse registro em vez de criar um novo para evitar duplicidade.
+        const userEmails = usersData.map((u: any) => u.email);
+        const { data: existingPreferred, error: findPreferredErr } = await supabaseService
           .from('subscribers')
-          .upsert({
-            email: buyerEmail,
-            subscribed: true,
-            subscription_tier: planName || 'Premium',
-            subscription_end: subscriptionEnd.toISOString(),
-            stripe_customer_id: session.customer as string,
-            source: 'stripe_checkout_buyer',
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'email' });
+          .select('id,email')
+          .eq('stripe_customer_id', session.customer as string)
+          .in('email', userEmails)
+          .limit(1);
 
-        if (buyerError) {
-          logStep("Error activating plan for buyer", { buyerEmail, error: buyerError.message });
+        if (findPreferredErr) {
+          logStep('Error searching preferred buyer by customer id', { error: findPreferredErr.message });
+        }
+
+        const { data: existingByCustomer, error: findByCustomerErr } = await supabaseService
+          .from('subscribers')
+          .select('id,email')
+          .eq('stripe_customer_id', session.customer as string)
+          .limit(1);
+
+        if (findByCustomerErr) {
+          logStep('Error searching buyer by customer id', { error: findByCustomerErr.message });
+        }
+
+        const existing = (existingPreferred && existingPreferred.length > 0)
+          ? existingPreferred[0]
+          : (existingByCustomer && existingByCustomer.length > 0 ? existingByCustomer[0] : null);
+
+        if (existing) {
+          const { error: updateBuyerErr } = await supabaseService
+            .from('subscribers')
+            .update({
+              subscribed: true,
+              subscription_tier: planName || 'Premium',
+              subscription_end: subscriptionEnd.toISOString(),
+              source: 'stripe_checkout_buyer',
+              trial_start: null,
+              trial_end: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existing.id);
+
+          if (updateBuyerErr) {
+            logStep('Error updating existing buyer subscriber', { error: updateBuyerErr.message, existingEmail: existing.email });
+          } else {
+            logStep('Updated existing buyer subscriber', { existingEmail: existing.email });
+          }
+        } else {
+          const { error: buyerError } = await supabaseService
+            .from('subscribers')
+            .upsert({
+              email: buyerEmail,
+              subscribed: true,
+              subscription_tier: planName || 'Premium',
+              subscription_end: subscriptionEnd.toISOString(),
+              stripe_customer_id: session.customer as string,
+              source: 'stripe_checkout_buyer',
+              trial_start: null,
+              trial_end: null,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'email' });
+
+          if (buyerError) {
+            logStep('Error activating plan for buyer', { buyerEmail, error: buyerError.message });
+          }
         }
       }
     }
