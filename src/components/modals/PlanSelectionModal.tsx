@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -150,8 +150,22 @@ const [loading, setLoading] = useState(false);
       return;
     }
 
-    // Use logged-in user email for checkout (billing), not the users from the list
-    const buyerEmail = sessionData.session?.user?.email || undefined;
+    // Use logged-in Supabase email or Monde token email (do NOT use users list)
+    let buyerEmail = sessionData.session?.user?.email as string | undefined;
+    if (!buyerEmail && mondeToken) {
+      try {
+        const payload = JSON.parse(atob((mondeToken.split(".")[1] || "")));
+        buyerEmail = typeof payload?.email === 'string' ? payload.email : undefined;
+      } catch {}
+    }
+    if (!buyerEmail) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível identificar o e-mail do comprador. Faça login novamente.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
     try {
@@ -219,6 +233,7 @@ const [loading, setLoading] = useState(false);
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">Escolher Plano</DialogTitle>
+          <DialogDescription className="sr-only">Revise os dados e finalize a assinatura</DialogDescription>
         </DialogHeader>
 
         {!selectedPlan ? (
