@@ -101,8 +101,10 @@ if (supabaseUser?.email) {
   console.log(`Using authenticated Supabase user: ${email}`);
 }
 
-// Determine Monde alias and username (do NOT switch primary email)
+// Determine Monde alias and username - prioritize real emails
 const mondeEmailRegex = /^[^@]+@([a-z0-9-]+\.)*monde\.com\.br$/i;
+let realEmail: string | null = null;
+
 if (mondeToken) {
   const payload = decodeJwtPayload(mondeToken) as any;
   const possibleMonde = payload?.email;
@@ -111,9 +113,32 @@ if (mondeToken) {
     username = mondeAliasEmail.split('@')[0];
   }
 }
-// If current email itself is a Monde email and username not set, derive username from it
-if (!username && email && mondeEmailRegex.test(email)) {
-  username = email.split('@')[0];
+
+// If current email itself is a Monde email, extract username
+if (email && mondeEmailRegex.test(email)) {
+  if (!username) username = email.split('@')[0];
+  
+  // Try to find real email for this username
+  if (username) {
+    try {
+      const { data: realEmailRecord } = await admin
+        .from('subscribers')
+        .select('email')
+        .eq('username', username)
+        .not('email', 'like', '%monde.com.br%')
+        .maybeSingle();
+        
+      if (realEmailRecord) {
+        realEmail = realEmailRecord.email;
+        console.log(`Found real email for Monde user ${username}: ${realEmail}`);
+      }
+    } catch (error) {
+      console.warn('Error looking for real email:', error);
+    }
+  }
+} else if (email && !mondeEmailRegex.test(email)) {
+  // This is already a real email
+  realEmail = email;
 }
 
 // Allow upsert for non-Monde emails even without Supabase auth when mondeToken is present
@@ -155,51 +180,112 @@ const trialDays = Math.max(0, Number(settings?.trial_days ?? 7));
         existing.user_id = user_id;
     }
     
+// Use real email if found, otherwise use provided email
+const finalEmail = realEmail || email;
+
 // Consolidate duplicates: prefer real email, use Monde email as alias/username
-if (mondeAliasEmail && email && mondeAliasEmail.toLowerCase() !== email.toLowerCase()) {
-  const { data: aliasRow } = await admin
-    .from("subscribers")
-    .select("*")
-    .eq("email", mondeAliasEmail)
-    .maybeSingle();
+const potentialEmails = [finalEmail];
+if (mondeAliasEmail && mondeAliasEmail !== finalEmail) {
+  potentialEmails.push(mondeAliasEmail);
+}
+if (email !== finalEmail) {
+  potentialEmails.push(email);
+}
 
-  const { data: realRow } = await admin
-    .from("subscribers")
-    .select("*")
-    .eq("email", email)
-    .maybeSingle();
+// Find all potential duplicate records
+const { data: allRecords } = await admin
+  .from("subscribers")
+  .select("*")
+  .in("email", potentialEmails);
 
-  if (aliasRow && realRow) {
-    console.log(`Merging alias ${aliasRow.email} into real ${email}`);
-    const update: any = {};
-    if (!realRow.username) update.username = aliasRow.email.split('@')[0];
-    if (!realRow.stripe_customer_id && aliasRow.stripe_customer_id) update.stripe_customer_id = aliasRow.stripe_customer_id;
-    if (!realRow.subscribed && aliasRow.subscribed) update.subscribed = true;
-    const endReal = realRow.subscription_end ? new Date(realRow.subscription_end).getTime() : 0;
-    const endAlias = aliasRow.subscription_end ? new Date(aliasRow.subscription_end).getTime() : 0;
-    if (endAlias > endReal) {
-      update.subscription_end = aliasRow.subscription_end;
-      if (aliasRow.subscription_tier) update.subscription_tier = aliasRow.subscription_tier;
+if (allRecords && allRecords.length > 1) {
+  console.log(`Found ${allRecords.length} potential duplicates, consolidating...`);
+  
+  // Separate real email records from Monde email records
+  const realRecords = allRecords.filter(r => !mondeEmailRegex.test(r.email));
+  const mondeRecords = allRecords.filter(r => mondeEmailRegex.test(r.email));
+  
+  let primaryRecord = realRecords.length > 0 ? realRecords[0] : mondeRecords[0];
+  const duplicateRecords = allRecords.filter(r => r.id !== primaryRecord.id);
+  
+  // If primary is a Monde email but we have a real email, switch to real email
+  if (mondeEmailRegex.test(primaryRecord.email) && realRecords.length > 0) {
+    primaryRecord = realRecords[0];
+  }
+  
+  // Merge data from duplicates into primary record
+  const update: any = {};
+  
+  for (const duplicate of duplicateRecords) {
+    if (!primaryRecord.username && mondeEmailRegex.test(duplicate.email)) {
+      update.username = duplicate.email.split('@')[0];
     }
-    if (!realRow.trial_start && aliasRow.trial_start) update.trial_start = aliasRow.trial_start;
-    if (!realRow.trial_end && aliasRow.trial_end) update.trial_end = aliasRow.trial_end;
-    if (!realRow.display_name && aliasRow.display_name) update.display_name = aliasRow.display_name;
-
-    if (Object.keys(update).length > 0) {
-      update.updated_at = new Date().toISOString();
-      await admin.from("subscribers").update(update).eq("id", realRow.id);
+    if (!primaryRecord.stripe_customer_id && duplicate.stripe_customer_id) {
+      update.stripe_customer_id = duplicate.stripe_customer_id;
     }
-    await admin.from("subscribers").delete().eq("id", aliasRow.id);
-    existing = realRow;
-  } else if (aliasRow && !realRow) {
-    console.log(`Renaming alias ${aliasRow.email} to real email ${email}`);
+    if (!primaryRecord.subscribed && duplicate.subscribed) {
+      update.subscribed = true;
+    }
+    if (!primaryRecord.subscription_tier && duplicate.subscription_tier) {
+      update.subscription_tier = duplicate.subscription_tier;
+    }
+    if (!primaryRecord.trial_start && duplicate.trial_start) {
+      update.trial_start = duplicate.trial_start;
+    }
+    if (!primaryRecord.trial_end && duplicate.trial_end) {
+      update.trial_end = duplicate.trial_end;
+    }
+    if (!primaryRecord.display_name && duplicate.display_name) {
+      update.display_name = duplicate.display_name;
+    }
+    
+    // Use latest subscription end date
+    const primaryEnd = primaryRecord.subscription_end ? new Date(primaryRecord.subscription_end).getTime() : 0;
+    const duplicateEnd = duplicate.subscription_end ? new Date(duplicate.subscription_end).getTime() : 0;
+    if (duplicateEnd > primaryEnd) {
+      update.subscription_end = duplicate.subscription_end;
+    }
+  }
+  
+  // Ensure we're using the real email as primary
+  if (finalEmail !== primaryRecord.email) {
+    update.email = finalEmail;
+    if (mondeEmailRegex.test(primaryRecord.email)) {
+      update.username = primaryRecord.email.split('@')[0];
+    }
+  }
+  
+  // Update primary record with consolidated data
+  if (Object.keys(update).length > 0) {
+    update.updated_at = new Date().toISOString();
+    await admin.from("subscribers").update(update).eq("id", primaryRecord.id);
+    console.log(`Updated primary record with consolidated data:`, update);
+  }
+  
+  // Delete duplicate records
+  for (const duplicate of duplicateRecords) {
+    await admin.from("subscribers").delete().eq("id", duplicate.id);
+    console.log(`Deleted duplicate record: ${duplicate.email}`);
+  }
+  
+  existing = { ...primaryRecord, ...update };
+} else if (allRecords && allRecords.length === 1) {
+  existing = allRecords[0];
+  
+  // If existing record has wrong email (Monde when we have real), update it
+  if (finalEmail !== existing.email) {
     const update: any = {
-      email,
-      username: aliasRow.email.split('@')[0],
-      updated_at: new Date().toISOString(),
+      email: finalEmail,
+      updated_at: new Date().toISOString()
     };
-    await admin.from("subscribers").update(update).eq("id", aliasRow.id);
-    existing = { ...aliasRow, ...update } as any;
+    
+    if (mondeEmailRegex.test(existing.email)) {
+      update.username = existing.email.split('@')[0];
+    }
+    
+    await admin.from("subscribers").update(update).eq("id", existing.id);
+    existing = { ...existing, ...update };
+    console.log(`Updated existing record email from ${allRecords[0].email} to ${finalEmail}`);
   }
 }
 
@@ -210,7 +296,7 @@ if (mondeAliasEmail && email && mondeAliasEmail.toLowerCase() !== email.toLowerC
 
     if (existing?.id) {
       const update: any = {
-        email,
+        email: finalEmail,
         last_login_at: now.toISOString(),
         display_name: display_name || existing.display_name || null,
         username: username || (existing as any).username || null,
@@ -230,7 +316,7 @@ if (mondeAliasEmail && email && mondeAliasEmail.toLowerCase() !== email.toLowerC
       trial_start = now.toISOString();
       trial_end = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000).toISOString();
       const { data: inserted } = await admin.from("subscribers").insert({
-        email,
+        email: finalEmail,
         user_id,
         display_name: display_name || null,
         username: username || null,
@@ -244,7 +330,7 @@ if (mondeAliasEmail && email && mondeAliasEmail.toLowerCase() !== email.toLowerC
       subscribed = false;
     }
 
-    return new Response(JSON.stringify({ ok: true, id: subId, email, trial_start, trial_end, subscribed }), {
+    return new Response(JSON.stringify({ ok: true, id: subId, email: finalEmail, trial_start, trial_end, subscribed }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });

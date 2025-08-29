@@ -79,11 +79,32 @@ serve(async (req) => {
         
         logStep("Activating plan for user", { email, name });
 
+        // Determine if this is a Monde email or real email
+        const isMondeEmail = /@([a-z0-9-]+\.)*monde\.com\.br$/i.test(email);
+        let finalEmail = email;
+        let username = isMondeEmail ? email.split('@')[0] : undefined;
+        
+        // If this is a Monde email, try to find corresponding real email
+        if (isMondeEmail && username) {
+          const { data: realEmailUser } = await supabaseService
+            .from('subscribers')
+            .select('*')
+            .eq('username', username)
+            .not('email', 'like', '%monde.com.br%')
+            .maybeSingle();
+            
+          if (realEmailUser) {
+            // Update existing real email record instead of creating new
+            finalEmail = realEmailUser.email;
+            logStep("Found existing real email for Monde user", { mondeEmail: email, realEmail: finalEmail });
+          }
+        }
+
         // Upsert subscriber record
         const { error: upsertError } = await supabaseService
           .from('subscribers')
           .upsert({
-            email: email,
+            email: finalEmail,
             display_name: name,
             subscribed: true,
             subscription_tier: planName || 'Premium',
@@ -92,7 +113,7 @@ serve(async (req) => {
             source: 'stripe_checkout',
             trial_start: null,
             trial_end: null,
-            username: /@([a-z0-9-]+\.)*monde\.com\.br$/i.test(email) ? email.split('@')[0] : undefined,
+            username: username,
             updated_at: new Date().toISOString(),
           }, { onConflict: 'email' });
 
