@@ -49,6 +49,9 @@ export function MondeAppSidebar() {
   const [trialDays, setTrialDays] = useState<number | null>(null);
   const [loadingTrial, setLoadingTrial] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [subscribed, setSubscribed] = useState<boolean | null>(null);
+  const [subscriptionDays, setSubscriptionDays] = useState<number | null>(null);
+  const [planName, setPlanName] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -75,22 +78,32 @@ export function MondeAppSidebar() {
             return;
           }
 
-          // Não-admin: checar subscriber via RLS
+          // Checar subscriber via RLS
           const { data } = await supabase
             .from("subscribers")
-            .select("trial_end, subscription_end, subscribed")
+            .select("trial_end, subscription_end, subscribed, subscription_tier")
             .or(`user_id.eq.${user.id},email.eq.${user.email}`)
             .order("updated_at", { ascending: false })
             .limit(1)
             .maybeSingle();
 
-          if (mounted && data?.trial_end && !data?.subscribed) {
+          if (mounted) {
             const now = Date.now();
-            const t = new Date(data.trial_end).getTime();
-            const days = Math.ceil((t - now) / (1000 * 60 * 60 * 24));
-            setTrialDays(days);
-          } else if (mounted) {
-            setTrialDays(null);
+            const trialEnd = data?.trial_end ? new Date(data.trial_end).getTime() : null;
+            const subEnd = data?.subscription_end ? new Date(data.subscription_end).getTime() : null;
+            setSubscribed(!!data?.subscribed);
+            setPlanName((data as any)?.subscription_tier || null);
+
+            if (data?.subscribed && subEnd && subEnd > now) {
+              setSubscriptionDays(Math.ceil((subEnd - now) / (1000 * 60 * 60 * 24)));
+              setTrialDays(null);
+            } else if (trialEnd && (!data?.subscribed || !subEnd || subEnd <= now)) {
+              setTrialDays(Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24)));
+              setSubscriptionDays(null);
+            } else {
+              setTrialDays(null);
+              setSubscriptionDays(null);
+            }
           }
           return;
         }
@@ -103,15 +116,25 @@ export function MondeAppSidebar() {
               body: { mondeToken },
             });
             const trialEnd = (data as any)?.trial_end as string | undefined;
-            const subscribed = !!(data as any)?.subscribed;
+            const isSubscribed = !!(data as any)?.subscribed;
+            const subscriptionEnd = (data as any)?.subscription_end as string | undefined;
 
-            if (mounted && trialEnd && !subscribed) {
-              const now = Date.now();
-              const t = new Date(trialEnd).getTime();
-              const days = Math.ceil((t - now) / (1000 * 60 * 60 * 24));
-              setTrialDays(days);
-            } else if (mounted) {
-              setTrialDays(null);
+            if (mounted) {
+              setSubscribed(isSubscribed);
+              if (isSubscribed && subscriptionEnd) {
+                const now = Date.now();
+                const t = new Date(subscriptionEnd).getTime();
+                setSubscriptionDays(Math.ceil((t - now) / (1000 * 60 * 60 * 24)));
+                setTrialDays(null);
+              } else if (trialEnd && !isSubscribed) {
+                const now = Date.now();
+                const t = new Date(trialEnd).getTime();
+                setTrialDays(Math.ceil((t - now) / (1000 * 60 * 60 * 24)));
+                setSubscriptionDays(null);
+              } else {
+                setTrialDays(null);
+                setSubscriptionDays(null);
+              }
             }
           } catch {
             if (mounted) setTrialDays(null);
@@ -175,12 +198,7 @@ export function MondeAppSidebar() {
       className="border-r border-border bg-background"
       style={{ width: isCollapsed ? "64px" : "280px" }}
     >
-      {/* Always visible trigger with high z-index when collapsed */}
-      <SidebarTrigger 
-        className={`fixed top-4 left-2 z-[10000] ${
-          isCollapsed ? 'block' : 'hidden'
-        } bg-background border border-border shadow-md hover:bg-accent pointer-events-auto`}
-      />
+      {/* Trigger moved to global header to avoid duplicates */}
       <SidebarHeader className="p-4 border-b border-border bg-background">
         <div className="flex items-center justify-between h-8">
           <div className="relative flex-1 h-9">
@@ -225,12 +243,11 @@ export function MondeAppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => {
-                const isActive =
-                  fullPath === item.url ||
-                  // Admin: pathname é /admin e o query define a aba
-                  (item.url.startsWith("/admin") &&
-                    location.pathname === "/admin" &&
-                    (item.url.split("?")[1] || "").split("&").every((kv) => location.search.includes(kv)));
+                 const isActive =
+                   fullPath === item.url ||
+                   (item.url.startsWith("/admin") &&
+                     location.pathname === "/admin" &&
+                     (item.url.split("?")[1] || "").split("&").every((kv) => location.search.includes(kv)));
 
                 return (
                   <SidebarMenuItem key={item.title}>
@@ -260,28 +277,36 @@ export function MondeAppSidebar() {
 
       {/* Footer: trial + sair */}
       <div className="mt-auto p-3 border-t border-border">
-        {!isAdmin && trialDays !== null && trialDays > 0 && (
+        {(trialDays !== null && trialDays > 0) || (subscriptionDays !== null && subscriptionDays >= 0) ? (
           <div className={isCollapsed ? "px-1 mb-2" : "mb-3"}>
             <div className="rounded-lg border border-primary/30 bg-primary/10 p-2">
               <div className={isCollapsed ? "flex justify-center" : "flex items-center justify-between gap-2"}>
                 {!isCollapsed && (
                   <div>
-                    <div className="text-sm font-medium">Período de Trial</div>
+                    <div className="text-sm font-medium">
+                      {subscribed ? `Plano ${planName || ''}`.trim() : 'Período de Trial'}
+                    </div>
                     <div className="text-xs text-muted-foreground">
-                      {loadingTrial ? "Carregando…" : `${trialDays} dias restantes`}
+                      {loadingTrial
+                        ? 'Carregando…'
+                        : subscribed && subscriptionDays !== null
+                          ? `${subscriptionDays} dias restantes`
+                          : `${trialDays ?? 0} dias restantes`}
                     </div>
                   </div>
                 )}
-                <button
-                  onClick={handleSubscribe}
-                  className="px-2 py-1 text-xs rounded-button bg-primary text-primary-foreground hover:opacity-90"
-                >
-                  Assinar agora
-                </button>
+                {!subscribed && (
+                  <button
+                    onClick={handleSubscribe}
+                    className="px-2 py-1 text-xs rounded-button bg-primary text-primary-foreground hover:opacity-90"
+                  >
+                    Assinar agora
+                  </button>
+                )}
               </div>
             </div>
           </div>
-        )}
+        ) : null}
 
         <SidebarMenu>
           <SidebarMenuItem>
