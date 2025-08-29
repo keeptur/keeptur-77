@@ -171,7 +171,8 @@ const [loading, setLoading] = useState(false);
       if (error) throw error;
       
       if (data?.url) {
-        window.location.href = data.url;
+        // Open Stripe checkout in a new tab to avoid iframe restrictions
+        window.open(data.url, '_blank');
         onOpenChange(false);
         onSuccess?.();
       }

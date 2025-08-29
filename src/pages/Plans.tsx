@@ -191,7 +191,8 @@ export default function Plans() {
     });
 
     if (!error && (data as any)?.url) {
-      window.location.href = (data as any).url as string;
+      // Open Stripe checkout in a new tab to avoid iframe restrictions
+      window.open((data as any).url as string, '_blank');
     }
   };
 
