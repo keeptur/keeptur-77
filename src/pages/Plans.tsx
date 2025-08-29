@@ -262,13 +262,19 @@ export default function Plans() {
     <div className="min-h-screen bg-muted/30">
       {/* Header com informações do usuário */}
       {!userStatus.isAdmin && (
-        <div className="bg-gradient-to-r from-primary to-blue-600 text-white">
+        <div className={`${
+          userStatus.isSubscribed 
+            ? 'bg-gradient-to-r from-green-600 to-emerald-600' 
+            : 'bg-gradient-to-r from-primary to-blue-600'
+        } text-white`}>
           <div className="container max-w-7xl mx-auto px-4 py-8">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
+                <div className="flex items-center space-x-4">
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                  userStatus.isSubscribed ? 'bg-green-500/20' : 'bg-white/20'
+                }`}>
                   {userStatus.isSubscribed ? (
-                    <Crown className="w-8 h-8" />
+                    <Crown className={`w-8 h-8 ${userStatus.isSubscribed ? 'text-green-300' : 'text-white'}`} />
                   ) : (
                     <Clock className="w-8 h-8" />
                   )}
@@ -281,9 +287,9 @@ export default function Plans() {
                         ? "Período de Trial" 
                         : "Sem Plano Ativo"}
                   </h2>
-                  <p className="text-blue-100">
+                  <p className={userStatus.isSubscribed ? "text-green-100" : "text-blue-100"}>
                     {userStatus.isSubscribed
-                      ? `${userStatus.daysRemaining} dias até próxima cobrança`
+                      ? `${userStatus.daysRemaining} dias de plano ativo`
                       : userStatus.isInTrial
                         ? `${userStatus.daysRemaining} dias restantes`
                         : "Escolha um plano para continuar"}
