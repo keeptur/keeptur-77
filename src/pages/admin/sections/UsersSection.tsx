@@ -79,6 +79,20 @@ export default function UsersSection() {
     setSubscribers((s || []) as any);
   };
 
+  // Run edge function to merge duplicate subscribers (Monde alias -> real email)
+  const consolidateDuplicates = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('merge-subscribers', { body: {} });
+      if (error) throw error;
+      const msg = (data as any)?.message || 'Consolidação executada com sucesso';
+      toast({ title: 'Consolidado', description: msg });
+      await reload();
+    } catch (e: any) {
+      console.error('merge-subscribers error:', e);
+      toast({ title: 'Erro ao consolidar', description: e.message || String(e), variant: 'destructive' });
+    }
+  };
+
   const handleCreateUser = async () => {
     if (!newEmail) return;
     setCreating(true);
@@ -124,6 +138,11 @@ export default function UsersSection() {
       }
     };
     load().catch(() => setLoading(false));
+  }, []);
+
+  // Auto-consolidate duplicates on first load (admin convenience)
+  useEffect(() => {
+    consolidateDuplicates().catch(() => {});
   }, []);
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'trial' | 'inactive'>('all');
@@ -326,7 +345,10 @@ export default function UsersSection() {
       
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Últimos Usuários Cadastrados</h3>
-        <Button onClick={() => setOpen(true)}>Criar Usuário</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={consolidateDuplicates}>Consolidar Duplicados</Button>
+          <Button onClick={() => setOpen(true)}>Criar Usuário</Button>
+        </div>
       </div>
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
