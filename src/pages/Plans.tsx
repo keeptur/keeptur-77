@@ -47,6 +47,7 @@ export default function Plans() {
     isAdmin: false,
     daysRemaining: 0
   });
+  const [paymentStatus, setPaymentStatus] = useState<'checking' | 'success' | 'pending' | null>(null);
 
   const formatCurrency = (cents: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -162,7 +163,57 @@ export default function Plans() {
 
   useEffect(() => {
     Promise.all([loadUserStatus(), fetchPlans()]);
+    
+    // Verificar se voltou do checkout
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session_id');
+    
+    if (sessionId) {
+      verifyPayment(sessionId);
+      // Limpar URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
   }, []);
+
+  const verifyPayment = async (sessionId: string) => {
+    setPaymentStatus('checking');
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-payment', {
+        body: { session_id: sessionId }
+      });
+
+      if (error) throw error;
+
+      if (data?.paid) {
+        setPaymentStatus('success');
+        toast({
+          title: "Pagamento confirmado!",
+          description: `Plano ${data.plan_name} ativado com sucesso para ${data.users_activated} usuário(s).`,
+        });
+        
+        // Recarregar planos para atualizar status
+        setTimeout(() => {
+          Promise.all([loadUserStatus(), fetchPlans()]);
+          setPaymentStatus(null);
+        }, 3000);
+      } else {
+        setPaymentStatus('pending');
+        toast({
+          title: "Pagamento pendente",
+          description: "O pagamento ainda está sendo processado. Verifique novamente em alguns minutos.",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('Error verifying payment:', error);
+      setPaymentStatus('pending');
+      toast({
+        title: "Erro ao verificar pagamento",
+        description: "Não foi possível verificar o status do pagamento. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleSelectPlan = (plan: Plan) => {
     setSelectedPlan(plan);
@@ -256,6 +307,27 @@ export default function Plans() {
 
       {/* Conteúdo principal */}
       <div className="container max-w-7xl mx-auto px-4 py-8">
+        {paymentStatus && (
+          <Card className={`mb-6 border-2 ${
+            paymentStatus === 'success' ? 'border-green-500 bg-green-50' : 
+            paymentStatus === 'checking' ? 'border-blue-500 bg-blue-50' : 
+            'border-yellow-500 bg-yellow-50'
+          }`}>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                {paymentStatus === 'checking' && (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                )}
+                <span className="font-medium">
+                  {paymentStatus === 'success' && "✅ Pagamento confirmado!"}
+                  {paymentStatus === 'checking' && "🔄 Verificando pagamento..."}
+                  {paymentStatus === 'pending' && "⏳ Pagamento pendente"}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold tracking-tight mb-4">Escolha seu Plano</h1>
           <p className="text-xl text-muted-foreground mb-6">
