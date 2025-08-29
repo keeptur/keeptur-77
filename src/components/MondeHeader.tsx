@@ -204,7 +204,7 @@ try {
   return (
     <header className="header flex items-center justify-between h-16 px-10 bg-card border-b border-border transition-all duration-300">
       <div className="flex items-center gap-2">
-        {/* SidebarTrigger removed to avoid duplicate with floating one */}
+        <SidebarTrigger />
       </div>
       <div className="flex items-center space-x-4">
         {/* Theme Toggle */}
