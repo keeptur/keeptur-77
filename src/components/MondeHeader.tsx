@@ -106,7 +106,7 @@ export function MondeHeader() {
   useEffect(() => {
     let mounted = true;
     const loadUserData = async () => {
-try {
+      try {
         const me = await api.getCurrentUser();
         const mondeName = me?.data?.attributes?.name || me?.data?.attributes?.login;
         const mondeRole = me?.data?.attributes?.role || 'Usuário';
@@ -202,7 +202,7 @@ try {
   const visibleNotif = notifItems.filter((n) => !n.hidden);
   const badgeCount = visibleNotif.length;
   return (
-    <header className="header flex items-center justify-between h-16 px-10 bg-card border-b border-border transition-all duration-300">
+    <header className="header relative isolate z-[1000] flex items-center justify-between h-16 px-10 bg-card border-b border-border transition-all duration-300">
       <div className="flex items-center gap-2">
         <SidebarTrigger />
       </div>
@@ -226,7 +226,7 @@ try {
             )}
           </Button>
           {notifOpen && (
-            <div className="absolute right-0 mt-2 w-80 bg-card border border-border rounded-lg shadow-lg py-2 z-50">
+            <div className="absolute right-0 mt-2 w-80 bg-card border border-border rounded-lg shadow-lg py-2 z-[1100]">
               {visibleNotif.length === 0 ? (
                 <div className="px-4 py-3 text-sm text-muted-foreground">Sem notificações</div>
               ) : (
@@ -242,7 +242,7 @@ try {
             </div>
           )}
         </div>
-        {/* Trial status no topo: exibido apenas para usuários não‑admin */}
+        {/* Trial status no topo: exibido apenas para usuários não-admin */}
         <div className="hidden md:block">
           {!isAdmin && <TrialStatus />}
         </div>
@@ -266,7 +266,7 @@ try {
             </div>
           </Button>
           {userDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-64 bg-card border border-border rounded-lg shadow-lg py-1 z-50">
+            <div className="absolute right-0 mt-2 w-64 bg-card border border-border rounded-lg shadow-lg py-1 z-[1100]">
               {/* Exibe o relógio de trial/assinatura para todos os usuários dentro do menu */}
               <TrialStatus />
               {isAdmin && (
