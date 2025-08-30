@@ -39,13 +39,15 @@ serve(async (req) => {
         throw new Error("Could not fetch subscribers");
       }
 
-      const emailPrefixes = new Set();
+      const emailPrefixes = new Set<string>();
+      const mondeRegex = /@([a-z0-9-]+\.)*monde\.com\.br$/i;
+
       for (const sub of subscribers) {
-        const prefix = sub.email.split('@')[0];
-        const mondeEmail = `${prefix}@monde.com.br`;
-        const otherEmail = subscribers.find(s => s.email !== mondeEmail && s.email.startsWith(prefix + '@'));
-        
-        if (otherEmail && !emailPrefixes.has(prefix)) {
+        const prefix = sub.email.split('@')[0].toLowerCase();
+        const group = subscribers.filter(s => s.email.toLowerCase().startsWith(prefix + '@'));
+        const hasMonde = group.some(s => mondeRegex.test(s.email));
+        const hasReal = group.some(s => !mondeRegex.test(s.email));
+        if (hasMonde && hasReal && !emailPrefixes.has(prefix)) {
           emailPrefixes.add(prefix);
           const result = await mergeEmailPrefix(admin, prefix);
           mergeResults.push(result);
@@ -77,79 +79,71 @@ async function mergeEmailPrefix(admin: any, emailPrefix: string) {
   const { data: allSubs } = await admin
     .from("subscribers")
     .select("*")
-    .like("email", `${emailPrefix}@%`)
+    .ilike("email", `${emailPrefix}@%`)
     .order("created_at");
 
   if (!allSubs || allSubs.length <= 1) {
     return { emailPrefix, action: "no_duplicates", count: allSubs?.length || 0 };
   }
 
-  // Prioritize Monde email
+  // Preferir email REAL como principal e usar Monde como username
   const mondeEmailRegex = /^[^@]+@([a-z0-9-]+\.)*monde\.com\.br$/i;
-  const mondeUser = allSubs.find(s => mondeEmailRegex.test(s.email));
-  const nonMondeUsers = allSubs.filter(s => !mondeEmailRegex.test(s.email));
+  const mondeUsers = allSubs.filter(s => mondeEmailRegex.test(s.email));
+  const realUsers = allSubs.filter(s => !mondeEmailRegex.test(s.email));
 
-  if (!mondeUser) {
-    return { emailPrefix, action: "no_monde_email", count: allSubs.length };
+  if (realUsers.length === 0) {
+    // Não há email real para mesclar; apenas garanta username no registro Monde
+    const primary = mondeUsers[0];
+    const update: any = {};
+    if (!primary.username) update.username = emailPrefix;
+    if (Object.keys(update).length > 0) {
+      update.updated_at = new Date().toISOString();
+      await admin.from("subscribers").update(update).eq("id", primary.id);
+    }
+    return { emailPrefix, action: "only_monde", kept: primary.email };
   }
 
-  // Merge data from non-Monde users into Monde user
-  let updatedData = { ...mondeUser };
-  let hasUpdates = false;
+  // Escolhe o real mais antigo como principal
+  const primary = realUsers.sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0];
+  const duplicates = allSubs.filter(s => s.id !== primary.id);
 
-  for (const nonMondeUser of nonMondeUsers) {
-    // Keep better subscription status
-    if (!updatedData.subscribed && nonMondeUser.subscribed) {
-      updatedData.subscribed = nonMondeUser.subscribed;
-      hasUpdates = true;
+  const update: any = {};
+  if (!primary.username) update.username = emailPrefix;
+
+  for (const dup of duplicates) {
+    if (!primary.stripe_customer_id && dup.stripe_customer_id) update.stripe_customer_id = dup.stripe_customer_id;
+    if (!primary.subscribed && dup.subscribed) update.subscribed = true;
+    if (!primary.subscription_tier && dup.subscription_tier) update.subscription_tier = dup.subscription_tier;
+
+    // Mantém trial mais antigo
+    if (!primary.trial_start || (dup.trial_start && new Date(dup.trial_start).getTime() < new Date(primary.trial_start).getTime())) {
+      if (dup.trial_start) update.trial_start = dup.trial_start;
+      if (dup.trial_end) update.trial_end = dup.trial_end;
     }
-    
-    // Keep earlier trial dates
-    if (!updatedData.trial_start && nonMondeUser.trial_start) {
-      updatedData.trial_start = nonMondeUser.trial_start;
-      updatedData.trial_end = nonMondeUser.trial_end;
-      hasUpdates = true;
-    }
-    
-    // Keep Stripe customer ID
-    if (!updatedData.stripe_customer_id && nonMondeUser.stripe_customer_id) {
-      updatedData.stripe_customer_id = nonMondeUser.stripe_customer_id;
-      hasUpdates = true;
-    }
-    
-    // Keep display name if better
-    if (!updatedData.display_name && nonMondeUser.display_name) {
-      updatedData.display_name = nonMondeUser.display_name;
-      hasUpdates = true;
-    }
+
+    // Mantém data de assinatura mais distante no futuro
+    const primaryEnd = primary.subscription_end ? new Date(primary.subscription_end).getTime() : 0;
+    const dupEnd = dup.subscription_end ? new Date(dup.subscription_end).getTime() : 0;
+    if (dupEnd > primaryEnd) update.subscription_end = dup.subscription_end;
+
+    if (!primary.display_name && dup.display_name) update.display_name = dup.display_name;
   }
 
-  // Update Monde user if needed
-  if (hasUpdates) {
-    await admin
-      .from("subscribers")
-      .update({
-        subscribed: updatedData.subscribed,
-        trial_start: updatedData.trial_start,
-        trial_end: updatedData.trial_end,
-        stripe_customer_id: updatedData.stripe_customer_id,
-        display_name: updatedData.display_name,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", mondeUser.id);
+  if (Object.keys(update).length > 0) {
+    update.updated_at = new Date().toISOString();
+    await admin.from("subscribers").update(update).eq("id", primary.id);
   }
 
-  // Delete non-Monde users
-  for (const nonMondeUser of nonMondeUsers) {
-    await admin.from("subscribers").delete().eq("id", nonMondeUser.id);
-    console.log(`Deleted duplicate subscriber: ${nonMondeUser.email}`);
+  // Apaga todos os duplicados (incluindo Monde)
+  for (const dup of duplicates) {
+    await admin.from("subscribers").delete().eq("id", dup.id);
   }
 
-  return { 
-    emailPrefix, 
-    action: "merged", 
-    mondeEmail: mondeUser.email,
-    deletedEmails: nonMondeUsers.map(u => u.email),
-    count: nonMondeUsers.length
+  return {
+    emailPrefix,
+    action: "merged_to_real",
+    keptEmail: primary.email,
+    deletedIds: duplicates.map((d: any) => d.id),
+    count: duplicates.length,
   };
 }

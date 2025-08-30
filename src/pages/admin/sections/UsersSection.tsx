@@ -31,6 +31,7 @@ interface SubscriberRow {
   subscription_end: string | null;
   created_at: string;
   updated_at: string;
+  username?: string | null;
 }
 type CombinedUser = {
   id: string | null; // profile id (supabase auth user id)
@@ -278,7 +279,23 @@ export default function UsersSection() {
     if (planFilter !== 'all') {
       list = list.filter((u) => (u.subscriber?.subscription_tier || '').toLowerCase() === planFilter);
     }
-    return list;
+
+    // Dedup by email prefix: prefer REAL email over Monde alias
+    const mondeRegex = /@([a-z0-9-]+\.)*monde\.com\.br$/i;
+    const byPrefix = new Map<string, CombinedUser>();
+    for (const u of list) {
+      const prefix = (u.email || '').split('@')[0].toLowerCase();
+      const isMonde = mondeRegex.test(u.email);
+      const existing = byPrefix.get(prefix);
+      if (!existing) {
+        byPrefix.set(prefix, u);
+      } else {
+        const existingIsMonde = mondeRegex.test(existing.email);
+        // If existing is Monde and current is real, replace; otherwise keep existing
+        if (existingIsMonde && !isMonde) byPrefix.set(prefix, u);
+      }
+    }
+    return Array.from(byPrefix.values());
   }, [q, combinedUsers, statusFilter, planFilter]);
 
 
