@@ -95,52 +95,81 @@ serve(async (req) => {
 
       logStep("Processing user", { email });
 
-      // Determine if this is a Monde email
+      // Determine if this is a Monde email and attempt to resolve an existing subscriber
       const isMondeEmail = /@([a-z0-9-]+\.)*monde\.com\.br$/i.test(email);
-      let finalEmail = email;
-      let username = isMondeEmail ? email.split('@')[0] : undefined;
+      let username = isMondeEmail ? email.split('@')[0].toLowerCase() : undefined;
 
-      // If Monde email, try to find corresponding real email by username
+      // Resolve target subscriber email (prefer existing non-Monde row)
+      let targetEmail = email;
+      let existing: { id: string; email: string } | null = null;
+
       if (isMondeEmail && username) {
-        const { data: realEmailUser } = await supabase
+        // 1) Existing row that already references this Monde login
+        const { data: byUserEmail } = await supabase
           .from('subscribers')
-          .select('email')
-          .eq('username', username)
-          .not('email', 'like', '%monde.com.br%')
+          .select('id,email')
+          .eq('user_email', email)
           .maybeSingle();
+        if (byUserEmail) existing = byUserEmail as any;
 
-        if (realEmailUser) {
-          finalEmail = realEmailUser.email;
-          logStep("Found existing real email for Monde user", { 
-            mondeEmail: email, 
-            realEmail: finalEmail 
-          });
+        // 2) Existing row by username with real email (non-Monde)
+        if (!existing) {
+          const { data: byUsername } = await supabase
+            .from('subscribers')
+            .select('id,email')
+            .eq('username', username)
+            .not('email', 'ilike', '%monde.com.br%')
+            .maybeSingle();
+          if (byUsername) existing = byUsername as any;
+        }
+
+        // 3) Heuristic: email starts with username and is not Monde domain
+        if (!existing) {
+          const { data: byLocalPart } = await supabase
+            .from('subscribers')
+            .select('id,email')
+            .ilike('email', `${username}@%`)
+            .not('email', 'ilike', '%monde.com.br%')
+            .maybeSingle();
+          if (byLocalPart) existing = byLocalPart as any;
+        }
+
+        if (existing) {
+          targetEmail = existing.email;
+          logStep('Resolved existing subscriber for Monde login', { mondeEmail: email, targetEmail });
         }
       }
 
-      // Upsert subscriber with inherited plan details
+      // Upsert subscriber with inherited plan details (merge into existing if found)
+      const upsertPayload: any = {
+        email: targetEmail,
+        username: username,
+        display_name: email.split('@')[0],
+        subscribed: true,
+        subscription_tier: buyerSubscriber.subscription_tier,
+        subscription_end: subscriptionEnd,
+        stripe_customer_id: buyerSubscriber.stripe_customer_id,
+        source: 'plan_user_added',
+        trial_start: null,
+        trial_end: null,
+        updated_at: new Date().toISOString(),
+      };
+      if (isMondeEmail) upsertPayload.user_email = email;
+
       const { error: upsertError } = await supabase
         .from('subscribers')
-        .upsert({
-          email: finalEmail,
-          user_email: isMondeEmail ? email : undefined,
-          username: username,
-          display_name: email.split('@')[0],
-          subscribed: true,
-          subscription_tier: buyerSubscriber.subscription_tier,
-          subscription_end: subscriptionEnd,
-          stripe_customer_id: buyerSubscriber.stripe_customer_id,
-          source: 'plan_user_added',
-          trial_start: null,
-          trial_end: null,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'email' });
+        .upsert(upsertPayload, { onConflict: 'email' });
 
       if (upsertError) {
         logStep("Error adding user", { email, error: upsertError.message });
       } else {
+        // Clean up potential duplicate record under the Monde login email if we merged into a real email
+        if (isMondeEmail && targetEmail.toLowerCase() !== email.toLowerCase()) {
+          await supabase.from('subscribers').delete().eq('email', email);
+          logStep('Removed duplicate Monde subscriber row if existed', { mondeEmail: email });
+        }
         addedUsers.push(email);
-        logStep("User added successfully", { email: finalEmail });
+        logStep("User added successfully", { merged_into: targetEmail });
       }
     }
 
