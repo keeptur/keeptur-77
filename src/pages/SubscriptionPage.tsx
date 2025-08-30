@@ -657,15 +657,15 @@ export default function SubscriptionPage() {
                       size="lg" 
                       variant={plan.is_current ? "outline" : "default"} 
                       onClick={() => handleSelectPlan(plan)} 
-                      disabled={plan.is_current || (!plan.is_upgrade && subscriptionData.subscribed)}
+                      disabled={plan.is_current}
                     >
                       {plan.is_current ? "Plano Atual" : 
                        plan.is_upgrade ? <>
                           <Zap className="w-4 h-4 mr-2" />
                           Fazer Upgrade
-                        </> : subscriptionData.subscribed ? "Downgrade não permitido" : <>
+                        </> : <>
                           <Zap className="w-4 h-4 mr-2" />
-                          Selecionar Plano
+                          Fazer Downgrade
                         </>}
                     </Button>
                   </CardContent>

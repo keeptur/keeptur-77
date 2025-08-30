@@ -24,30 +24,49 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
     const stripe = new Stripe(stripeSecret, { apiVersion: "2023-10-16" });
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "No Authorization header provided" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 401,
-      });
-    }
+    // Get request body for customer email (admin usage)
+    const body = await req.text();
+    let customerEmail: string | undefined;
     
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !userData.user?.email) {
-      return new Response(JSON.stringify({ error: "Auth error: invalid claim: missing sub claim" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 401,
-      });
+    try {
+      const parsedBody = JSON.parse(body || '{}');
+      customerEmail = parsedBody.customer_email;
+    } catch (e) {
+      // If no body or invalid JSON, proceed with auth header
     }
+
+    let userEmail: string;
     
-    const user = userData.user;
+    if (customerEmail) {
+      // Admin access - allow checking any customer's payment history
+      userEmail = customerEmail;
+    } else {
+      // Regular user access - require authentication
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: "No Authorization header provided" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 401,
+        });
+      }
+      
+      const token = authHeader.replace("Bearer ", "");
+      const { data: userData, error: userError } = await supabase.auth.getUser(token);
+      if (userError || !userData.user?.email) {
+        return new Response(JSON.stringify({ error: "Auth error: invalid claim: missing sub claim" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 401,
+        });
+      }
+      
+      userEmail = userData.user.email;
+    }
 
     // Get customer ID from subscriber (check both email and user_email)
     const { data: subscriber } = await supabase
       .from("subscribers")
       .select("stripe_customer_id")
-      .or(`email.eq.${user.email},user_email.eq.${user.email}`)
+      .or(`email.eq.${userEmail},user_email.eq.${userEmail}`)
       .maybeSingle();
 
     if (!subscriber?.stripe_customer_id) {

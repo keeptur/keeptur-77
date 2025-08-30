@@ -52,6 +52,7 @@ type CombinedUser = {
  * sejam promovidos erroneamente.
  */
 import { UserManagement } from "@/components/admin/UserManagement";
+import PaymentHistorySection from "./PaymentHistorySection";
 
 export default function UsersSection() {
   const { toast } = useToast();
@@ -371,6 +372,9 @@ export default function UsersSection() {
     <div className="space-y-6">
       {/* User Management Component */}
       <UserManagement />
+      
+      {/* Payment History Section */}
+      <PaymentHistorySection />
       
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Últimos Usuários Cadastrados</h3>

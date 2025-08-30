@@ -152,8 +152,7 @@ export function UserManagement({ planSeats, currentUsers, onUsersUpdate }: UserM
           Gerenciar Usuários do Plano
         </CardTitle>
         <CardDescription>
-          Adicione até {planSeats} usuários da sua empresa ao plano. 
-          Usuários ativos: {assignedUsers.length}/{planSeats}
+          {assignedUsers.length} / {planSeats} usuários ativos | {planSeats - assignedUsers.length} disponíveis para associar
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
