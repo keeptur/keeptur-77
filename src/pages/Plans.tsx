@@ -671,21 +671,34 @@ export default function Plans() {
                     ) : (
                       paymentHistory.map((p, idx) => (
                         <tr key={idx} className="border-b">
-                          <td className="py-4 text-muted-foreground">{p.date ? new Date(p.date).toLocaleDateString('pt-BR') : '-'}</td>
-                          <td className="py-4 text-muted-foreground">{p.description || 'Assinatura'}</td>
-                          <td className="py-4 font-medium">{formatCurrency(p.amount_cents || 0)}</td>
+                          <td className="py-4 text-muted-foreground">
+                            {p.date ? new Date(p.date).toLocaleDateString('pt-BR') : '-'}
+                          </td>
+                          <td className="py-4 text-muted-foreground">
+                            {p.description || 'Assinatura'}
+                          </td>
+                          <td className="py-4 font-medium">
+                            {formatCurrency(p.amount_cents || 0)}
+                          </td>
                           <td className="py-4">
-                            <Badge variant="secondary" className={
-                              ((p.status || '').toLowerCase() === 'paid' ? 'bg-green-100 text-green-800' :
-                              (p.status || '').toLowerCase() === 'pending' ? 'bg-amber-100 text-amber-800' :
-                              'bg-gray-100 text-gray-800'))
-                            }>
+                            <Badge 
+                              variant="secondary" 
+                              className={
+                                (p.status || '').toLowerCase() === 'paid' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : (p.status || '').toLowerCase() === 'pending' 
+                                    ? 'bg-amber-100 text-amber-800' 
+                                    : 'bg-gray-100 text-gray-800'
+                              }
+                            >
                               {(p.status || '').toLowerCase() === 'paid' ? 'Pago' : (p.status || '—')}
                             </Badge>
                           </td>
                           <td className="py-4">
                             {p.invoice_url ? (
-                              <a href={p.invoice_url} target="_blank" rel="noreferrer" className="text-primary text-xs">Baixar</a>
+                              <a href={p.invoice_url} target="_blank" rel="noreferrer" className="text-primary text-xs">
+                                Baixar
+                              </a>
                             ) : (
                               <span className="text-muted-foreground text-xs">Indisponível</span>
                             )}
