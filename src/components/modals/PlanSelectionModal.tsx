@@ -92,8 +92,8 @@ const [loading, setLoading] = useState(false);
 
   const calculateTotal = () => {
     if (!selectedPlan) return 0;
-    const perUser = (isAnnual ? selectedPlan.yearly_price_cents / 12 : selectedPlan.price_cents) / Math.max(1, selectedPlan.seats);
-    return perUser * userCount;
+    // Retorna o valor total do plano, não por usuário
+    return isAnnual ? selectedPlan.yearly_price_cents / 12 : selectedPlan.price_cents;
   };
 
   const calculateAnnualSavings = () => {
@@ -265,8 +265,10 @@ const [loading, setLoading] = useState(false);
               {plans.map((plan) => (
                 <Card 
                   key={plan.id}
-                  className={`cursor-pointer transition-all hover:shadow-lg ${
-                    plan.is_current ? 'ring-2 ring-primary' : ''
+                  className={`transition-all hover:shadow-lg ${
+                    plan.is_current 
+                      ? 'ring-2 ring-primary cursor-not-allowed opacity-75' 
+                      : 'cursor-pointer hover:ring-1 hover:ring-primary/50'
                   }`}
                   onClick={() => !plan.is_current && setSelectedPlan(plan)}
                 >
