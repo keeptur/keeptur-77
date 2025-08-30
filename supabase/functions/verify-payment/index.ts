@@ -47,10 +47,10 @@ serve(async (req) => {
     });
 
     const isPaid = session.payment_status === 'paid' || session.status === 'complete';
-    const buyerEmail = session.metadata?.buyer_email;
+    const buyerEmail = session.metadata?.buyer_email || session.metadata?.customer_email || (session as any)?.customer_details?.email || undefined;
     const usersData = session.metadata?.users ? JSON.parse(session.metadata.users) : [];
     const planName = session.metadata?.plan_name;
-    const billingCycle = session.metadata?.billing_cycle;
+    const billingCycle = session.metadata?.billing_cycle || (session.metadata?.is_annual === 'true' ? 'yearly' : 'monthly');
 
     logStep("Payment verification result", { 
       isPaid, 

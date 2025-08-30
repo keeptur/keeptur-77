@@ -139,39 +139,11 @@ serve(async (req) => {
       ? (planData.yearly_price_cents || planData.price_cents * 12)
       : planData.price_cents;
     const perUserAmount = Math.max(50, Math.round(totalAmount / Math.max(1, planData.seats)));
+    const billingCycle = is_annual ? 'yearly' : 'monthly';
 
-    // Upgrade handling helpers
-    let isUpgrade = false;
-    let proratedPerUserAmount = perUserAmount;
-
-    if (hasActiveSubscription && currentSubscription) {
-      // This is an upgrade - calculate prorated amount
-      isUpgrade = true;
-      
-      // Get current subscription's price info
-      const currentPrice = currentSubscription.items.data[0]?.price;
-      if (currentPrice) {
-        const currentAmount = currentPrice.unit_amount || 0;
-        const periodEnd = currentSubscription.current_period_end;
-        const periodStart = currentSubscription.current_period_start;
-        const now = Math.floor(Date.now() / 1000);
-        
-        // Calculate unused portion of current subscription
-        const totalPeriod = periodEnd - periodStart;
-        const remainingPeriod = periodEnd - now;
-        const unusedCredit = Math.max(0, (currentAmount * remainingPeriod) / totalPeriod);
-        
-        // New amount minus unused credit
-        proratedPerUserAmount = Math.max(50, perUserAmount - Math.floor(unusedCredit));
-        
-        logStep("Upgrade calculation", {
-          currentAmount,
-          newPerUserAmount: perUserAmount,
-          unusedCredit: Math.floor(unusedCredit),
-          proratedPerUserAmount
-        });
-      }
-    }
+    // Simplified: no upgrade handling for now to avoid Stripe errors
+    const isUpgrade = false;
+    const finalPerUserAmount = perUserAmount;
 
     // Create checkout session
     const origin = req.headers.get("origin") || "http://localhost:5173";
@@ -186,7 +158,7 @@ serve(async (req) => {
               name: `${planData.name} - ${planData.seats} usuários`,
               description: `Plano ${is_annual ? 'anual' : 'mensal'} para ${planData.seats} usuários`,
             },
-            unit_amount: isUpgrade ? proratedPerUserAmount : perUserAmount,
+            unit_amount: finalPerUserAmount,
             recurring: is_annual 
               ? { interval: "year" } 
               : { interval: "month" }
@@ -201,35 +173,17 @@ serve(async (req) => {
         plan_id: plan_id,
         plan_name: planData.name,
         seats: planData.seats.toString(),
-        is_annual: is_annual.toString(),
-        is_upgrade: isUpgrade.toString(),
+        billing_cycle: billingCycle,
+        buyer_email: customerEmail,
         user_emails: user_emails.join(','),
-        monde_token: monde_token || '',
-        customer_email: customerEmail,
-      },
-      subscription_data: {
-        metadata: {
-          plan_id: plan_id,
-          plan_name: planData.name,
-          seats: planData.seats.toString(),
-          user_emails: user_emails.join(','),
-          customer_email: customerEmail,
-        }
+        monde_token: monde_token || ''
       }
     };
-
-    // Handle upgrades differently
-    if (isUpgrade && currentSubscription) {
-      // For upgrades, we'll handle this in the webhook/verification
-      // For now, create a regular checkout with proration info
-      sessionConfig.subscription_data.proration_behavior = 'create_prorations';
-    }
-
     const session = await stripe.checkout.sessions.create(sessionConfig);
 
     logStep("Checkout session created", { 
       sessionId: session.id, 
-      amount: isUpgrade ? proratedPerUserAmount : perUserAmount,
+      amount: finalPerUserAmount,
       isUpgrade 
     });
 
@@ -237,8 +191,7 @@ serve(async (req) => {
       url: session.url,
       session_id: session.id,
       is_upgrade: isUpgrade,
-      original_amount: perUserAmount,
-      prorated_amount: isUpgrade ? proratedPerUserAmount : perUserAmount
+      amount: finalPerUserAmount
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
