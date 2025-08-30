@@ -57,10 +57,9 @@ export default function DashboardSection() {
 
   useEffect(() => {
     const load = async () => {
-      // Métricas básicas do banco
+      // Métricas básicas do banco usando função segura
       const { data: adminData } = await supabase
-        .from("admin_metrics")
-        .select("*")
+        .rpc("get_admin_metrics")
         .maybeSingle();
 
       const [{ data: profiles }, { data: roles }, { data: accounts }, { data: subscribers }] = await Promise.all([

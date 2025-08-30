@@ -443,6 +443,19 @@ export type Database = {
       }
     }
     Functions: {
+      get_admin_metrics: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          active_subscriptions: number
+          active_trials: number
+          average_ticket_cents: number
+          revenue_growth_percentage: number
+          subscription_growth_percentage: number
+          total_admins: number
+          total_monthly_revenue_cents: number
+          total_users: number
+        }[]
+      }
       get_first_admin_user_id: {
         Args: Record<PropertyKey, never>
         Returns: string
