@@ -488,10 +488,7 @@ export default function SubscriptionPage() {
                 <ArrowUp className="w-4 h-4" />
                 <span>Alterar Plano</span>
               </Button>}
-            <Button variant="outline" onClick={() => setShowUsersModal(true)} className="flex items-center space-x-2 bg-white/20 text-white border-white/30 hover:bg-white/30">
-              <CreditCard className="w-4 h-4" />
-              <span>Gerenciar Usuários</span>
-            </Button>
+            
             {subscriptionData.subscribed && <Button variant="outline" onClick={handleCancelSubscription} className="flex items-center space-x-2 bg-red-500/20 text-white border-red-300/30 hover:bg-red-500/30">
                 <X className="w-4 h-4" />
                 <span>Cancelar Assinatura</span>
