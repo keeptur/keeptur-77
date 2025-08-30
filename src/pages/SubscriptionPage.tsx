@@ -142,7 +142,9 @@ export default function SubscriptionPage() {
           email,
           mondeToken
         }
-      }), supabase.functions.invoke('get-available-plans'), hasSession ? supabase.functions.invoke('get-payment-history') : Promise.resolve({
+      }), supabase.functions.invoke('get-available-plans'), email ? supabase.functions.invoke('get-payment-history', hasSession ? {} : {
+        body: { customer_email: email }
+      }) : Promise.resolve({
         value: {
           data: {
             payment_history: []
@@ -174,7 +176,7 @@ export default function SubscriptionPage() {
       }
       if (historyResponse.status === 'fulfilled' && historyResponse.value.data?.payment_history) {
         setPaymentHistory(historyResponse.value.data.payment_history);
-      } else if (!hasSession) {
+      } else {
         setPaymentHistory([]);
       }
       if (methodResponse.status === 'fulfilled' && methodResponse.value.data?.payment_method !== undefined) {
