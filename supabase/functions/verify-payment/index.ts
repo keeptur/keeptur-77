@@ -72,6 +72,20 @@ serve(async (req) => {
         subscriptionEnd.setMonth(now.getMonth() + 1);
       }
 
+      // Get plan details to determine seats
+      const planId = session.metadata?.plan_id;
+      let planSeats = 1;
+      if (planId) {
+        const { data: planData } = await supabaseService
+          .from('plan_kits')
+          .select('seats')
+          .eq('id', planId)
+          .single();
+        if (planData) {
+          planSeats = planData.seats;
+        }
+      }
+
       // Build activation list: prefer provided users; fallback to buyer
       const activationList: Array<{ email: string; name?: string }> =
         usersData && usersData.length > 0
@@ -220,6 +234,62 @@ serve(async (req) => {
         }
       } catch (e) {
         logStep('Consolidation error', { message: (e as any)?.message || String(e) });
+      }
+
+      // Update or create account record
+      if (buyerEmail) {
+        logStep("Updating account record", { buyerEmail, planSeats });
+        
+        const { data: existingAccount } = await supabaseService
+          .from('accounts')
+          .select('id')
+          .eq('email', buyerEmail)
+          .single();
+
+        if (existingAccount) {
+          // Update existing account
+          const { error: accountUpdateError } = await supabaseService
+            .from('accounts')
+            .update({
+              subscribed: true,
+              subscription_tier: planName || 'Premium',
+              seats_purchased: planSeats,
+              stripe_customer_id: session.customer as string,
+              plan_kit_id: planId,
+              trial_start: null,
+              trial_end: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingAccount.id);
+
+          if (accountUpdateError) {
+            logStep("Error updating account", { error: accountUpdateError.message });
+          } else {
+            logStep("Account updated successfully");
+          }
+        } else {
+          // Create new account
+          const { error: accountInsertError } = await supabaseService
+            .from('accounts')
+            .insert({
+              email: buyerEmail,
+              subscribed: true,
+              subscription_tier: planName || 'Premium',
+              seats_purchased: planSeats,
+              stripe_customer_id: session.customer as string,
+              plan_kit_id: planId,
+              trial_start: null,
+              trial_end: null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+
+          if (accountInsertError) {
+            logStep("Error creating account", { error: accountInsertError.message });
+          } else {
+            logStep("Account created successfully");
+          }
+        }
       }
 
       // Return early response data update
