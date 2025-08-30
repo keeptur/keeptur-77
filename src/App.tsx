@@ -23,7 +23,7 @@ import AdminPlansPage from "./pages/admin/AdminPlansPage";
 import AdminEmailsPage from "./pages/admin/AdminEmailsPage";
 import SubscriptionPage from "./pages/SubscriptionPage";
 import AdminLogsPage from "./pages/admin/AdminLogsPage";
-import PlansPage from "./pages/Plans";
+
 import { UserRoute } from "./components/auth/UserRoute";
 import { PaymentVerifier } from "./components/PaymentVerifier";
 
@@ -117,7 +117,7 @@ const AppWrapper = () => {
                 } />
                 <Route path="plans" element={
                   <UserRoute>
-                    <PlansPage />
+                    <SubscriptionPage />
                   </UserRoute>
                 } />
                 {/* Legacy single admin page (kept) */}

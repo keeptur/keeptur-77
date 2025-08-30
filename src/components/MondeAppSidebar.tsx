@@ -29,7 +29,7 @@ import { supabase } from "@/integrations/supabase/client";
 const navigationItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Pessoas", url: "/people", icon: Users },
-  { title: "Planos", url: "/plans", icon: CreditCard },
+  { title: "Assinaturas", url: "/subscription", icon: CreditCard },
 ];
 
   const adminNavigationItems = [
@@ -305,7 +305,7 @@ export function MondeAppSidebar() {
                 )}
                 {!subscribed && (
                   <NavLink
-                    to="/plans"
+                    to="/subscription"
                     className="px-2 py-1 text-xs rounded-button bg-primary text-primary-foreground hover:opacity-90 inline-block text-center no-underline"
                   >
                     Assinar agora

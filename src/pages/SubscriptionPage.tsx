@@ -91,6 +91,7 @@ export default function SubscriptionPage() {
   const [isAnnual, setIsAnnual] = useState(false);
   const [annualDiscount, setAnnualDiscount] = useState(20);
   const [planUsers, setPlanUsers] = useState<string[]>([]);
+  const [contractedUsers, setContractedUsers] = useState<string[]>([]); // Usuários contratados
   const [paymentStatus, setPaymentStatus] = useState<'checking' | 'success' | 'pending' | null>(null);
 
   useEffect(() => {
@@ -189,6 +190,13 @@ const loadSubscriptionData = async () => {
 
       if (data?.paid) {
         setPaymentStatus('success');
+        
+        // Carregar usuários contratados dos metadados do pagamento
+        if (data.users_activated && data.user_emails) {
+          setContractedUsers(data.user_emails);
+          setPlanUsers(data.user_emails);
+        }
+        
         toast({
           title: "Pagamento confirmado!",
           description: `Plano ${data.plan_name} ativado com sucesso para ${data.users_activated} usuário(s).`,
@@ -613,9 +621,9 @@ const loadSubscriptionData = async () => {
           <CardContent>
             {subscriptionData.subscribed && subscriptionData.current_plan ? (
               <div className="space-y-4">
-                {planUsers.length > 0 ? (
+                {contractedUsers.length > 0 ? (
                   <div className="space-y-2">
-                    {planUsers.map((email) => (
+                    {contractedUsers.map((email, index) => (
                       <div key={email} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
@@ -626,7 +634,9 @@ const loadSubscriptionData = async () => {
                             <p className="text-xs text-muted-foreground">{email}</p>
                           </div>
                         </div>
-                        <Badge variant="secondary">Ativo</Badge>
+                        <Badge variant="secondary">
+                          {index === 0 ? "Comprador" : "Ativo"}
+                        </Badge>
                       </div>
                     ))}
                   </div>
@@ -639,7 +649,7 @@ const loadSubscriptionData = async () => {
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground text-center">
-                  {Math.max(subscriptionData.current_plan.seats - planUsers.length, 0)} usuários restantes
+                  {Math.max(subscriptionData.current_plan.seats - contractedUsers.length, 0)} usuários restantes
                 </p>
               </div>
             ) : (
@@ -764,14 +774,7 @@ const loadSubscriptionData = async () => {
         </>
       )}
 
-      {/* Gestão de usuários - só exibir se tiver plano ativo */}
-      {subscriptionData.subscribed && subscriptionData.current_plan && (
-        <UserManagement
-          planSeats={subscriptionData.current_plan.seats}
-          currentUsers={planUsers}
-          onUsersUpdate={setPlanUsers}
-        />
-      )}
+      {/* Gestão de usuários removida - agora só existe uma seção acima */}
 
       {/* Payment History */}
       <Card>
@@ -846,7 +849,20 @@ const loadSubscriptionData = async () => {
             )}
           </CardContent>
       </Card>
-      {/* Plan Selection Modal */}
+      {/* Modals */}
+      {subscriptionData.subscribed && subscriptionData.current_plan && (
+        <ManageUsersModal
+          open={showUsersModal}
+          onOpenChange={setShowUsersModal}
+          planSeats={subscriptionData.current_plan.seats}
+          users={contractedUsers}
+          onUsersUpdate={(newUsers) => {
+            setContractedUsers(newUsers);
+            setPlanUsers(newUsers);
+          }}
+        />
+      )}
+      
       <PlanSelectionModal
         open={showPlanModal}
         onOpenChange={setShowPlanModal}
