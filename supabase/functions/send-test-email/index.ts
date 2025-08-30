@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { Resend } from "npm:resend@4.0.0";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
@@ -20,7 +21,16 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const { to_email, template_id, template_type }: SendTestEmailRequest = await req.json();
-    console.log('Sending test email to:', to_email, 'with template:', template_type);
+
+    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+    if (!RESEND_API_KEY) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Configure o RESEND_API_KEY nos secrets do Supabase.' }),
+        { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
+
+    const resend = new Resend(RESEND_API_KEY);
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -32,29 +42,30 @@ const handler = async (req: Request): Promise<Response> => {
       .from('email_templates')
       .select('*')
       .eq('id', template_id)
-      .single();
+      .maybeSingle();
 
     if (templateError || !template) {
-      throw new Error('Template não encontrado');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Template não encontrado' }),
+        { status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
     }
 
-    // Get SMTP settings with password from the request
-    const { data: smtpSettings, error: smtpError } = await supabase
+    // Get SMTP settings just for from_email
+    const { data: smtpSettings } = await supabase
       .from('smtp_settings')
-      .select('*')
+      .select('from_email')
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
-    if (smtpError || !smtpSettings) {
-      throw new Error('Configurações SMTP não encontradas');
-    }
+    const fromEmail = smtpSettings?.from_email || 'onboarding@resend.dev';
 
     // Replace variables in template with test data
-    let emailContent = template.html;
-    let emailSubject = template.subject;
+    let emailContent = (template as any).html as string;
+    let emailSubject = (template as any).subject as string;
 
-    const testVariables = {
+    const testVariables: Record<string, string> = {
       '{{nome_usuario}}': 'Usuário Teste',
       '{{email}}': to_email,
       '{{nome_sistema}}': 'Keeptur',
@@ -66,62 +77,33 @@ const handler = async (req: Request): Promise<Response> => {
       '{{link_acesso}}': 'https://exemplo.com/acesso'
     };
 
-    // Replace variables in content and subject
     Object.entries(testVariables).forEach(([variable, value]) => {
       emailContent = emailContent.replace(new RegExp(variable, 'g'), value);
       emailSubject = emailSubject.replace(new RegExp(variable, 'g'), value);
     });
 
-    // Here you would implement the actual email sending logic
-    // For now, we'll simulate a successful send
-    console.log('Email would be sent with:', {
-      to: to_email,
+    // Send email with Resend
+    const result = await resend.emails.send({
+      from: `Keeptur <${fromEmail}>`,
+      to: [to_email],
       subject: emailSubject,
-      content: emailContent,
-      smtp: {
-        host: smtpSettings.host,
-        port: smtpSettings.port,
-        from: smtpSettings.from_email
-      }
-    });
+      html: emailContent,
+    }) as any;
 
-    // Simulate email sending delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    if (result?.error) {
+      throw result.error;
+    }
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Email de teste enviado com sucesso!',
-        details: {
-          to: to_email,
-          subject: emailSubject,
-          template_type: template_type
-        }
-      }),
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders,
-        },
-      }
+      JSON.stringify({ success: true, message: 'Email de teste enviado com sucesso!', template_type }),
+      { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
 
   } catch (error: any) {
     console.error('Error in send-test-email function:', error);
-    
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error.message || 'Erro desconhecido ao enviar email de teste' 
-      }),
-      {
-        status: 400,
-        headers: { 
-          'Content-Type': 'application/json', 
-          ...corsHeaders 
-        },
-      }
+      JSON.stringify({ success: false, error: error.message || 'Erro desconhecido ao enviar email de teste' }),
+      { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
   }
 };

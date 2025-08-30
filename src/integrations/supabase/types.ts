@@ -283,6 +283,7 @@ export type Database = {
           from_email: string
           host: string
           id: string
+          password: string | null
           port: number
           secure: boolean
           updated_at: string
@@ -294,6 +295,7 @@ export type Database = {
           from_email: string
           host: string
           id?: string
+          password?: string | null
           port?: number
           secure?: boolean
           updated_at?: string
@@ -305,6 +307,7 @@ export type Database = {
           from_email?: string
           host?: string
           id?: string
+          password?: string | null
           port?: number
           secure?: boolean
           updated_at?: string
