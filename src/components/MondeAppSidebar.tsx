@@ -150,12 +150,17 @@ export function MondeAppSidebar() {
     // Initial load
     updateTrialData();
 
+    // Listen for explicit subscription updates
+    const subUpdatedHandler = () => { updateTrialData(); };
+    window.addEventListener('subscription-updated', subUpdatedHandler);
+
     // Poll every 30 seconds for trial updates
     pollInterval = setInterval(updateTrialData, 30000);
 
     return () => {
       mounted = false;
       if (pollInterval) clearInterval(pollInterval);
+      window.removeEventListener('subscription-updated', subUpdatedHandler);
     };
   }, [location.pathname, location.search]);
 

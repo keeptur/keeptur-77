@@ -22,6 +22,10 @@ export function PaymentVerifier() {
             title: "Pagamento confirmado!",
             description: `Plano ${(data as any)?.plan_name || ''} ativado.`,
           });
+          try {
+            await supabase.functions.invoke('check-subscription');
+          } catch {}
+          window.dispatchEvent(new Event('subscription-updated'));
         } else {
           toast({
             title: "Pagamento pendente",

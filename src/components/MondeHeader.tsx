@@ -19,7 +19,7 @@ function TrialStatus() {
   const [subscribed, setSubscribed] = useState(false);
   useEffect(() => {
     let mounted = true;
-    (async () => {
+    const fetchStatus = async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -62,9 +62,13 @@ function TrialStatus() {
           setDaysRemaining(null);
         }
       }
-    })();
+    };
+    fetchStatus();
+    const handler = () => { fetchStatus(); };
+    window.addEventListener('subscription-updated', handler);
     return () => {
       mounted = false;
+      window.removeEventListener('subscription-updated', handler);
     };
   }, []);
   if (daysRemaining === null) return null;
