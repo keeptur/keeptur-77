@@ -30,7 +30,7 @@ export default function PaymentHistorySection() {
   const loadPaymentHistory = async () => {
     setLoading(true);
     try {
-      // Buscar todos os subscribers para obter histórico de pagamentos
+      // Buscar apenas subscribers que têm stripe_customer_id e são únicos por customer_id
       const { data: subscribers } = await supabase
         .from('subscribers')
         .select('email, subscription_tier, stripe_customer_id')
@@ -42,9 +42,16 @@ export default function PaymentHistorySection() {
       }
 
       const allPayments: PaymentHistoryItem[] = [];
+      const processedCustomers = new Set<string>();
 
-      // Para cada subscriber, buscar histórico de pagamentos
+      // Para cada subscriber único por stripe_customer_id, buscar histórico de pagamentos
       for (const subscriber of subscribers) {
+        // Evitar duplicatas por stripe_customer_id
+        if (processedCustomers.has(subscriber.stripe_customer_id)) {
+          continue;
+        }
+        processedCustomers.add(subscriber.stripe_customer_id);
+
         try {
           const { data, error } = await supabase.functions.invoke('get-payment-history', {
             body: { customer_email: subscriber.email }
@@ -68,9 +75,12 @@ export default function PaymentHistorySection() {
         }
       }
 
-      // Ordenar por data mais recente
-      allPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      setPayments(allPayments);
+      // Remover duplicatas por ID de pagamento e ordenar por data mais recente
+      const uniquePayments = allPayments.filter((payment, index, array) => 
+        array.findIndex(p => p.id === payment.id) === index
+      );
+      uniquePayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setPayments(uniquePayments);
     } catch (error) {
       console.error('Error loading payment history:', error);
       toast({
@@ -211,8 +221,8 @@ export default function PaymentHistorySection() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredPayments.map((payment) => (
-                    <tr key={payment.id} className="border-b hover:bg-muted/50">
+                  {filteredPayments.map((payment, index) => (
+                    <tr key={`${payment.id}-${index}`} className="border-b hover:bg-muted/50">
                       <td className="py-3 px-2 text-sm">
                         {formatDate(payment.date)}
                       </td>
