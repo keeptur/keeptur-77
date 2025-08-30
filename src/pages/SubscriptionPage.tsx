@@ -3,12 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, Calendar, RefreshCw, ArrowUp, X, Download, Users, Star, Plus } from "lucide-react";
+import { CreditCard, Calendar, RefreshCw, ArrowUp, X, Download, Users, Star, Plus, Check, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { PlanSelectionModal } from "@/components/modals/PlanSelectionModal";
-// ReloginModal removed
+import { UserManagement } from "@/components/plans/UserManagement";
 
 interface CompleteSubscriptionData {
   subscribed: boolean;
@@ -85,10 +85,25 @@ export default function SubscriptionPage() {
   });
   const [hasSupabaseSession, setHasSupabaseSession] = useState(false);
   const [showPlanModal, setShowPlanModal] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<AvailablePlan | null>(null);
+  const [isAnnual, setIsAnnual] = useState(false);
+  const [annualDiscount, setAnnualDiscount] = useState(20);
+  const [planUsers, setPlanUsers] = useState<string[]>([]);
+  const [paymentStatus, setPaymentStatus] = useState<'checking' | 'success' | 'pending' | null>(null);
 
   useEffect(() => {
     document.title = "Assinaturas | Keeptur";
     loadSubscriptionData();
+    
+    // Verificar se voltou do checkout
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session_id');
+    
+    if (sessionId) {
+      verifyPayment(sessionId);
+      // Limpar URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
   }, []);
 
 // Automatically open plan selection when user has no subscription and plans are available
@@ -160,6 +175,57 @@ const loadSubscriptionData = async () => {
     setLoading(false);
   }
 };
+
+  const verifyPayment = async (sessionId: string) => {
+    setPaymentStatus('checking');
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-payment', {
+        body: { session_id: sessionId }
+      });
+
+      if (error) throw error;
+
+      if (data?.paid) {
+        setPaymentStatus('success');
+        toast({
+          title: "Pagamento confirmado!",
+          description: `Plano ${data.plan_name} ativado com sucesso para ${data.users_activated} usuário(s).`,
+        });
+        
+        // Recarregar dados imediatamente e também após delay
+        loadSubscriptionData();
+        setTimeout(() => {
+          loadSubscriptionData();
+          setPaymentStatus(null);
+        }, 2000);
+      } else {
+        setPaymentStatus('pending');
+        toast({
+          title: "Pagamento pendente",
+          description: "O pagamento ainda está sendo processado. Verifique novamente em alguns minutos.",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('Error verifying payment:', error);
+      setPaymentStatus('pending');
+      toast({
+        title: "Erro ao verificar pagamento",
+        description: "Não foi possível verificar o status do pagamento. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const formatPricePerUser = (cents: number, seats: number) => {
+    const pricePerUser = cents / seats;
+    return formatCurrency(pricePerUser);
+  };
+
+  const handleSelectPlan = (plan: AvailablePlan) => {
+    setSelectedPlan(plan);
+    setShowPlanModal(true);
+  };
 
   const formatCurrency = (cents: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -314,6 +380,28 @@ const loadSubscriptionData = async () => {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
+      {/* Status de pagamento */}
+      {paymentStatus && (
+        <Card className={`border-2 ${
+          paymentStatus === 'success' ? 'border-green-500 bg-green-50' : 
+          paymentStatus === 'checking' ? 'border-blue-500 bg-blue-50' : 
+          'border-yellow-500 bg-yellow-50'
+        }`}>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              {paymentStatus === 'checking' && (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+              )}
+              <span className="font-medium">
+                {paymentStatus === 'success' && "✅ Pagamento confirmado!"}
+                {paymentStatus === 'checking' && "🔄 Verificando pagamento..."}
+                {paymentStatus === 'pending' && "⏳ Pagamento pendente"}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -546,6 +634,125 @@ const loadSubscriptionData = async () => {
         </Card>
       </div>
 
+      {/* Seção de planos para usuários sem assinatura */}
+      {!subscriptionData.subscribed && !subscriptionData.trial_active && availablePlans.length > 0 && (
+        <>
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold tracking-tight mb-4">Escolha seu Plano</h2>
+            <p className="text-xl text-muted-foreground mb-6">
+              Selecione o plano ideal para sua equipe
+            </p>
+            
+            <div className="flex items-center justify-center space-x-4 mb-8">
+              <span className="text-sm font-medium">Mensal</span>
+              <Switch checked={isAnnual} onCheckedChange={setIsAnnual} />
+              <span className="text-sm font-medium">Anual</span>
+              <Badge variant="secondary" className="ml-2">
+                Economize {annualDiscount}%
+              </Badge>
+            </div>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {availablePlans.map((plan) => {
+              const monthlyPrice = isAnnual ? plan.yearly_price_cents / 12 : plan.price_cents;
+              const yearlyTotal = plan.yearly_price_cents;
+              const monthlySavings = isAnnual ? (plan.price_cents * 12) - yearlyTotal : 0;
+              
+              return (
+                <Card 
+                  key={plan.id}
+                  className={`relative transition-all duration-200 hover:shadow-lg ${
+                    plan.is_current ? 'ring-2 ring-primary shadow-lg' : ''
+                  }`}
+                >
+                  {plan.is_current && (
+                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                      <Badge className="bg-primary text-primary-foreground">
+                        <Star className="w-3 h-3 mr-1" />
+                        Plano Atual
+                      </Badge>
+                    </div>
+                  )}
+                  
+                  <CardHeader className="text-center pb-4">
+                    <CardTitle className="text-2xl font-bold">{plan.name}</CardTitle>
+                    {plan.description && (
+                      <p className="text-base text-muted-foreground">{plan.description}</p>
+                    )}
+                    
+                    <div className="mt-4">
+                      <div className="flex items-baseline justify-center">
+                        <span className="text-4xl font-bold">
+                          {formatCurrency(monthlyPrice)}
+                        </span>
+                        <span className="text-muted-foreground ml-1">/mês</span>
+                      </div>
+                      <div className="text-sm text-muted-foreground mt-1">
+                        {formatPricePerUser(monthlyPrice, plan.seats)} por usuário
+                      </div>
+                      
+                      {isAnnual && monthlySavings > 0 && (
+                        <p className="text-sm text-green-600 mt-2">
+                          Economize {formatCurrency(monthlySavings)} por ano
+                        </p>
+                      )}
+                    </div>
+                  </CardHeader>
+                  
+                  <CardContent className="space-y-6">
+                    <div className="flex items-center justify-center text-muted-foreground">
+                      <Users className="w-4 h-4 mr-2" />
+                      <span>Até {plan.seats} usuários</span>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      {plan.features.map((feature, index) => (
+                        <div key={index} className="flex items-start space-x-3">
+                          <Check className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                          <span className="text-sm">{feature}</span>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <Button 
+                      className="w-full mt-6" 
+                      size="lg"
+                      variant={plan.is_current ? "outline" : "default"}
+                      onClick={() => handleSelectPlan(plan)}
+                      disabled={plan.is_current}
+                    >
+                      {plan.is_current ? (
+                        "Plano Atual"
+                      ) : plan.is_upgrade ? (
+                        <>
+                          <Zap className="w-4 h-4 mr-2" />
+                          Fazer Upgrade
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-4 h-4 mr-2" />
+                          Selecionar Plano
+                        </>
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* Gestão de usuários - só exibir se tiver plano ativo */}
+      {subscriptionData.subscribed && subscriptionData.current_plan && (
+        <UserManagement
+          planSeats={subscriptionData.current_plan.seats}
+          currentUsers={planUsers}
+          onUsersUpdate={setPlanUsers}
+        />
+      )}
+
       {/* Payment History */}
       <Card>
         <CardHeader>
@@ -620,14 +827,12 @@ const loadSubscriptionData = async () => {
           </CardContent>
       </Card>
       {/* Plan Selection Modal */}
-<PlanSelectionModal
-  open={showPlanModal}
-  onOpenChange={setShowPlanModal}
-  plans={availablePlans}
-  onSuccess={loadSubscriptionData}
-/>
-
-{/* Relogin modal removed: page now works sem sessão Supabase (modo leitura) */}
+      <PlanSelectionModal
+        open={showPlanModal}
+        onOpenChange={setShowPlanModal}
+        plans={selectedPlan ? [selectedPlan] : availablePlans}
+        onSuccess={loadSubscriptionData}
+      />
     </div>
   );
 }
