@@ -71,9 +71,9 @@ export default function UsersSection() {
     const [ { data: p }, { data: r }, { data: s } ] = await Promise.all([
       supabase.from("profiles").select("id, email, full_name, created_at"),
       supabase.from("user_roles").select("user_id, role"),
-      supabase
-        .from("subscribers")
-        .select("id, user_id, email, display_name, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at, updated_at"),
+       supabase
+         .from("subscribers")
+         .select("id, user_id, email, display_name, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at, updated_at, username"),
     ]);
     setProfiles((p || []) as any);
     setRoles((r || []) as any);
@@ -129,7 +129,7 @@ export default function UsersSection() {
           supabase.from("user_roles").select("user_id, role"),
           supabase
             .from("subscribers")
-            .select("id, user_id, email, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at, updated_at"),
+            .select("id, user_id, email, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at, updated_at, username"),
         ]);
         setProfiles((p || []) as any);
         setRoles((r || []) as any);
@@ -268,15 +268,14 @@ export default function UsersSection() {
   }, [profiles, subscribers]);
 
   
-  // Helper to generate Monde email format
-  const getMondeEmail = (email: string) => {
-    if (email.endsWith('.monde.com.br')) {
-      return email;
-    }
-    
-    const localPart = email.split('@')[0];
-    const domain = email.split('@')[1]?.replace(/\.(com|com\.br|net|org)$/, '');
-    return `${localPart}@${domain}.monde.com.br`;
+  // Prefer stored Monde username; never fabricate
+  const getDisplayMondeEmail = (u: CombinedUser) => {
+    const username = u.subscriber?.username?.trim();
+    const email = u.email || '';
+    if (username && username.endsWith('.monde.com.br')) return username;
+    if (email.endsWith('.monde.com.br')) return email;
+    // fallback to original email (do not invent a Monde address)
+    return email;
   };
 
   const filtered = useMemo(() => {
@@ -503,11 +502,11 @@ export default function UsersSection() {
                             {initials}
                           </div>
                           <div>
-                            <p className="text-sm font-medium">{u.full_name || getMondeEmail(u.email)}</p>
+                            <p className="text-sm font-medium">{u.full_name || getDisplayMondeEmail(u)}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="py-3 px-2 text-sm break-words whitespace-normal max-w-[260px]">{getMondeEmail(u.email)}</td>
+                      <td className="py-3 px-2 text-sm break-words whitespace-normal max-w-[260px]">{getDisplayMondeEmail(u)}</td>
                       <td className="py-3 px-2">
                         <span
                           className="px-2 py-1 rounded-full text-xs font-medium"
