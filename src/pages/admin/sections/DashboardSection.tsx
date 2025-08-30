@@ -57,51 +57,25 @@ export default function DashboardSection() {
 
   useEffect(() => {
     const load = async () => {
-      // Load real admin metrics from the view
+      // Métricas básicas do banco
       const { data: adminData } = await supabase
         .from("admin_metrics")
         .select("*")
         .maybeSingle();
-      
-      // Perfis (para métricas e lista recente)
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, email, full_name, created_at");
-      // Admins
-      const { data: roles } = await supabase
-        .from("user_roles")
-        .select("user_id, role");
-      // Contas (mantém compatibilidade atual)
-      const { data: accounts } = await supabase
-        .from("accounts")
-        .select("id, subscribed, trial_start, trial_end");
-      // Subscribers: ainda é carregado abaixo, mas as métricas de assinatura e trial
-      // serão calculadas a partir da tabela `accounts` para evitar duplicidades de registros
-      const { data: subscribers } = await supabase
-        .from('subscribers')
-        .select('id, subscribed, trial_start, trial_end, subscription_end');
-        
-      // Set real metrics from admin_metrics view
-      if (adminData) {
-        setRealMetrics({
-          totalRevenue: adminData.total_monthly_revenue_cents || 0,
-          revenueGrowth: adminData.revenue_growth_percentage || 0,
-          userGrowth: 0, // Will calculate separately for users
-          subsGrowth: adminData.subscription_growth_percentage || 0,
-          averageTicket: adminData.average_ticket_cents || 0,
-        });
-      }
-        
-      // Calcular KPI básicos
+
+      const [{ data: profiles }, { data: roles }, { data: accounts }, { data: subscribers }] = await Promise.all([
+        supabase.from("profiles").select("id, email, full_name, created_at"),
+        supabase.from("user_roles").select("user_id, role"),
+        supabase.from("accounts").select("id, subscribed, trial_start, trial_end"),
+        supabase
+          .from('subscribers')
+          .select('id, email, subscribed, trial_start, trial_end, subscription_end, updated_at, stripe_customer_id')
+      ]);
+
+      // KPIs
       const users = profiles?.length || 0;
       const admins = (roles || []).filter((r) => r.role === 'admin').length;
       const accs = accounts?.length || 0;
-
-      // Para assinaturas ativas e trials, priorize a tabela `subscribers`. Cada linha
-      // em `subscribers` representa um e‑mail/usuário único, então calculamos as
-      // contagens de forma mais fidedigna. Consideramos assinatura ativa quando
-      // `subscribed` está true ou quando existe `subscription_end` futura. Consideramos
-      // em trial quando não há assinatura ativa e `trial_end` é futura.
       const now = new Date();
       const activeSubs = (subscribers || []).filter((s: any) => {
         const subscribed = !!s.subscribed;
@@ -112,49 +86,100 @@ export default function DashboardSection() {
         const subscribed = !!s.subscribed;
         const subEnd = s.subscription_end ? new Date(s.subscription_end as any) : null;
         const trialEnd = s.trial_end ? new Date(s.trial_end as any) : null;
-        // Trial se não está ativo e trial_end existe no futuro
         return !subscribed && (!subEnd || subEnd <= now) && trialEnd && trialEnd > now;
       }).length;
       setKpis({ users, admins, accounts: accs, activeSubs, inTrial });
-      // Usuários mais recentes (5 últimos)
+
+      // Últimos usuários
       const rec = (profiles || [])
         .slice()
-        .sort(
-          (a: any, b: any) =>
-            new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
-        )
+        .sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
         .slice(0, 5) as ProfileLite[];
       setRecent(rec);
-      // Construir séries temporais para os últimos 7 dias
+
+      // Série temporal dos últimos 7 dias
       const days: string[] = [];
       const userCountByDay: Record<string, number> = {};
-      const subCountByDay: Record<string, number> = {};
+      const accountCountByDay: Record<string, number> = {};
       for (let i = 6; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
         const key = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
         days.push(key);
         userCountByDay[key] = 0;
-        subCountByDay[key] = 0;
+        accountCountByDay[key] = 0;
       }
-      // Contar novos perfis por dia
+      // Contar perfis por dia
       (profiles || []).forEach((p) => {
         if (!p.created_at) return;
         const date = new Date(p.created_at);
         const key = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`;
         if (key in userCountByDay) userCountByDay[key]++;
       });
-      // Contar novas contas/assinaturas ativas por dia (como proxy de faturamento)
-      (accounts || []).forEach((a) => {
-        // Usa trial_start como proxy de criação
-        const dateStr: any = a.trial_start || a.trial_end;
-        if (!dateStr) return;
-        const date = new Date(dateStr);
+      // Contar novas contas/assinaturas confirmadas por dia usando subscribers.updated_at
+      (subscribers || []).forEach((s: any) => {
+        if (!s.updated_at || !s.subscribed) return;
+        const date = new Date(s.updated_at);
         const key = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`;
-        if (key in subCountByDay) subCountByDay[key]++;
+        if (key in accountCountByDay) accountCountByDay[key]++;
       });
       setUsersData(days.map((d) => ({ d, v: userCountByDay[d] })));
-      setRevenueData(days.map((d) => ({ d, v: subCountByDay[d] })));
+      setRevenueData(days.map((d) => ({ d, v: accountCountByDay[d] })));
+
+      // ========= Receita real via Stripe (mesma lógica da página de Usuários) =========
+      const processedCustomers = new Set<string>();
+      const allPayments: { id: string; amount: number; status: string; date: string }[] = [];
+      for (const sub of subscribers || []) {
+        if (!sub?.stripe_customer_id || processedCustomers.has(sub.stripe_customer_id)) continue;
+        processedCustomers.add(sub.stripe_customer_id);
+        const { data, error } = await supabase.functions.invoke('get-payment-history', {
+          body: { customer_email: sub.email }
+        });
+        if (error) continue;
+        const list = data?.payment_history || [];
+        for (const p of list) {
+          allPayments.push({ id: p.id, amount: p.amount, status: p.status, date: p.date });
+        }
+      }
+      // Unificar por id e manter apenas pagos
+      const uniquePaid = allPayments
+        .filter((p, i, arr) => arr.findIndex((x) => x.id === p.id) === i)
+        .filter((p) => p.status === 'paid');
+
+      const totalRevenueCents = uniquePaid.reduce((sum, p) => sum + (p.amount || 0), 0);
+      // Ticket médio por fatura paga
+      const averageTicketCents = uniquePaid.length > 0 ? Math.round(totalRevenueCents / uniquePaid.length) : 0;
+
+      // Crescimento: últimos 7 dias vs 7 anteriores
+      const byDay: Record<string, number> = {};
+      uniquePaid.forEach((p) => {
+        const d = new Date(p.date);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        byDay[key] = (byDay[key] || 0) + (p.amount || 0);
+      });
+      const today = new Date();
+      const sumRange = (startOffset: number, endOffset: number) => {
+        let sum = 0;
+        for (let i = startOffset; i <= endOffset; i++) {
+          const d = new Date(today);
+          d.setDate(d.getDate() - i);
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          sum += byDay[key] || 0;
+        }
+        return sum;
+      };
+      const last7 = sumRange(0, 6);
+      const prev7 = sumRange(7, 13);
+      const revenueGrowth = prev7 > 0 ? Number((((last7 - prev7) / prev7) * 100).toFixed(1)) : 0;
+
+      // Ajustar métricas reais (prioriza Stripe ao invés da view)
+      setRealMetrics({
+        totalRevenue: totalRevenueCents,
+        revenueGrowth,
+        userGrowth: adminData?.subscription_growth_percentage || 0,
+        subsGrowth: adminData?.subscription_growth_percentage || 0,
+        averageTicket: averageTicketCents,
+      });
     };
     load().catch(() => {});
   }, []);
