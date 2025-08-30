@@ -106,6 +106,7 @@ export default function AdminEmailsPage() {
     host: '',
     port: 587,
     username: '',
+    password: '',
     from_email: '',
     secure: false
   });
@@ -131,6 +132,7 @@ export default function AdminEmailsPage() {
           host: smtpRes.data[0].host,
           port: smtpRes.data[0].port,
           username: smtpRes.data[0].username || '',
+          password: '', // Não carregar senha por segurança
           from_email: smtpRes.data[0].from_email,
           secure: smtpRes.data[0].secure
         });
@@ -739,6 +741,17 @@ export default function AdminEmailsPage() {
                     value={smtpForm.username}
                     onChange={(e) => setSMTPForm(prev => ({ ...prev, username: e.target.value }))}
                     placeholder="seu@email.com"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="password">Senha SMTP</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={smtpForm.password}
+                    onChange={(e) => setSMTPForm(prev => ({ ...prev, password: e.target.value }))}
+                    placeholder="Digite a senha SMTP"
                   />
                 </div>
                 

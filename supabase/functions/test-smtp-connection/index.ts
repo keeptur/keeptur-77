@@ -9,6 +9,7 @@ interface SMTPSettings {
   host: string;
   port: number;
   username: string;
+  password: string;
   from_email: string;
   secure: boolean;
 }
@@ -32,10 +33,8 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Host, porta e email de envio são obrigatórios');
     }
 
-    // Get SMTP password from secrets
-    const smtpPassword = Deno.env.get('SMTP_PASSWORD');
-    if (!smtpPassword) {
-      throw new Error('Senha SMTP não configurada. Configure a variável SMTP_PASSWORD nos secrets.');
+    if (!smtp_settings.password) {
+      throw new Error('Senha SMTP é obrigatória');
     }
 
     // Create a simple test connection using Deno's native TCP

@@ -37,7 +37,7 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error(`Template '${template_type}' não encontrado`);
     }
 
-    // Get SMTP settings
+    // Get SMTP settings 
     const { data: smtpSettings, error: smtpError } = await supabase
       .from('smtp_settings')
       .select('*')
@@ -47,12 +47,6 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (smtpError || !smtpSettings) {
       throw new Error('Configurações SMTP não encontradas');
-    }
-
-    // Get SMTP password from secrets
-    const smtpPassword = Deno.env.get('SMTP_PASSWORD');
-    if (!smtpPassword) {
-      throw new Error('Senha SMTP não configurada');
     }
 
     const results = [];
