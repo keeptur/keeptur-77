@@ -751,6 +751,12 @@ export default function SubscriptionPage() {
       setPlanUsers(newUsers);
     }} />}
       
-      <PlanSelectionModal open={showPlanModal} onOpenChange={setShowPlanModal} plans={selectedPlan ? [selectedPlan] : availablePlans} onSuccess={loadSubscriptionData} />
+      <PlanSelectionModal 
+        open={showPlanModal} 
+        onOpenChange={setShowPlanModal} 
+        plans={selectedPlan ? [selectedPlan] : availablePlans} 
+        onSuccess={loadSubscriptionData}
+        currentPlan={subscriptionData.current_plan}
+      />
     </div>;
 }

@@ -32,6 +32,11 @@ interface PlanSelectionModalProps {
   onOpenChange: (open: boolean) => void;
   plans: AvailablePlan[];
   onSuccess?: () => void;
+  currentPlan?: {
+    name: string;
+    price_cents: number;
+    seats: number;
+  };
 }
 
 interface UserInfo {
@@ -39,7 +44,7 @@ interface UserInfo {
   email: string;
 }
 
-export function PlanSelectionModal({ open, onOpenChange, plans, onSuccess }: PlanSelectionModalProps) {
+export function PlanSelectionModal({ open, onOpenChange, plans, onSuccess, currentPlan }: PlanSelectionModalProps) {
   const { toast } = useToast();
   const [selectedPlan, setSelectedPlan] = useState<AvailablePlan | null>(null);
   const [isAnnual, setIsAnnual] = useState(false);
@@ -92,8 +97,17 @@ const [loading, setLoading] = useState(false);
 
   const calculateTotal = () => {
     if (!selectedPlan) return 0;
-    // Retorna o valor total do plano, não por usuário
-    return isAnnual ? selectedPlan.yearly_price_cents / 12 : selectedPlan.price_cents;
+    
+    const newPlanPrice = isAnnual ? selectedPlan.yearly_price_cents / 12 : selectedPlan.price_cents;
+    
+    // If upgrading and there's a current plan, calculate prorated upgrade
+    if (currentPlan && selectedPlan.price_cents > currentPlan.price_cents) {
+      const currentPlanPrice = currentPlan.price_cents;
+      return newPlanPrice - currentPlanPrice; // Show only the difference
+    }
+    
+    // Otherwise show full price (new subscription or downgrade)
+    return newPlanPrice;
   };
 
   const calculateAnnualSavings = () => {
@@ -391,9 +405,19 @@ const [loading, setLoading] = useState(false);
                 </div>
                 <Separator />
                 <div className="flex justify-between text-lg font-semibold">
-                  <span>Total</span>
+                  <span>
+                    {currentPlan && selectedPlan && selectedPlan.price_cents > currentPlan.price_cents 
+                      ? 'Valor do Upgrade' 
+                      : 'Total'
+                    }
+                  </span>
                   <span>{formatCurrency(calculateTotal())}/{isAnnual ? 'ano' : 'mês'}</span>
                 </div>
+                {currentPlan && selectedPlan && selectedPlan.price_cents > currentPlan.price_cents && (
+                  <p className="text-xs text-muted-foreground">
+                    Você pagará apenas a diferença entre os planos
+                  </p>
+                )}
                 {isAnnual && (
                   <p className="text-sm text-green-600">
                     Economia anual: {formatCurrency(calculateAnnualSavings())}

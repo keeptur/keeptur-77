@@ -47,9 +47,22 @@ export default function DashboardSection() {
   const [recent, setRecent] = useState<ProfileLite[]>([]);
   const [revenueData, setRevenueData] = useState<{ d: string; v: number }[]>([]);
   const [usersData, setUsersData] = useState<{ d: string; v: number }[]>([]);
+  const [realMetrics, setRealMetrics] = useState({
+    totalRevenue: 0,
+    revenueGrowth: 0,
+    userGrowth: 0,
+    subsGrowth: 0,
+    averageTicket: 0,
+  });
 
   useEffect(() => {
     const load = async () => {
+      // Load real admin metrics from the view
+      const { data: adminData } = await supabase
+        .from("admin_metrics")
+        .select("*")
+        .maybeSingle();
+      
       // Perfis (para métricas e lista recente)
       const { data: profiles } = await supabase
         .from("profiles")
@@ -67,6 +80,18 @@ export default function DashboardSection() {
       const { data: subscribers } = await supabase
         .from('subscribers')
         .select('id, subscribed, trial_start, trial_end, subscription_end');
+        
+      // Set real metrics from admin_metrics view
+      if (adminData) {
+        setRealMetrics({
+          totalRevenue: adminData.total_monthly_revenue_cents || 0,
+          revenueGrowth: adminData.revenue_growth_percentage || 0,
+          userGrowth: 0, // Will calculate separately for users
+          subsGrowth: adminData.subscription_growth_percentage || 0,
+          averageTicket: adminData.average_ticket_cents || 0,
+        });
+      }
+        
       // Calcular KPI básicos
       const users = profiles?.length || 0;
       const admins = (roles || []).filter((r) => r.role === 'admin').length;
@@ -162,15 +187,18 @@ export default function DashboardSection() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-white/80 text-sm font-medium">Faturamento Total</p>
-                {/* Como não temos dados de faturamento, exibir 0 */}
-                <p className="text-white text-2xl font-bold">R$ 0</p>
+                <p className="text-white text-2xl font-bold">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((realMetrics.totalRevenue || 0) / 100)}
+                </p>
               </div>
               <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
                 <span className="text-white text-xl">R$</span>
               </div>
             </div>
             <div className="mt-4 flex items-center">
-              <span className="text-white/80 text-sm">+0% este período</span>
+              <span className="text-white/80 text-sm">
+                {realMetrics.revenueGrowth > 0 ? '+' : ''}{realMetrics.revenueGrowth}% este período
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -186,7 +214,9 @@ export default function DashboardSection() {
               </div>
             </div>
             <div className="mt-4 flex items-center">
-              <span className="text-white/80 text-sm">+0% este período</span>
+              <span className="text-white/80 text-sm">
+                {realMetrics.userGrowth > 0 ? '+' : ''}{realMetrics.userGrowth}% este período
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -202,7 +232,9 @@ export default function DashboardSection() {
               </div>
             </div>
             <div className="mt-4 flex items-center">
-              <span className="text-white/80 text-sm">+0% este período</span>
+              <span className="text-white/80 text-sm">
+                {realMetrics.subsGrowth > 0 ? '+' : ''}{realMetrics.subsGrowth}% este período
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -218,7 +250,9 @@ export default function DashboardSection() {
               </div>
             </div>
             <div className="mt-4 flex items-center">
-              <span className="text-white/80 text-sm">-0% este período</span>
+              <span className="text-white/80 text-sm">
+                {kpis.inTrial === 0 ? 'Nenhum trial ativo' : `${kpis.inTrial} trial(s) ativo(s)`}
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -358,10 +392,13 @@ export default function DashboardSection() {
             <CardTitle className="text-lg">Ticket Médio</CardTitle>
           </CardHeader>
           <CardContent className="text-center space-y-2">
-            <p className="text-3xl font-bold text-primary">R$ {ticketAverage}</p>
+            <p className="text-3xl font-bold text-primary">
+              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((realMetrics.averageTicket || 0) / 100)}
+            </p>
             <p className="text-sm text-muted-foreground">Por usuário/mês</p>
-            {/* Sem comparação com período anterior, deixar vazio */}
-            <div className="text-green-600 text-sm">&nbsp;</div>
+            <div className="text-green-600 text-sm">
+              {kpis.activeSubs > 0 ? `${kpis.activeSubs} assinatura(s) ativa(s)` : 'Nenhuma assinatura ativa'}
+            </div>
           </CardContent>
         </Card>
       </div>
