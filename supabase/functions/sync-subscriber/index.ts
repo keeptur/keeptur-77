@@ -297,6 +297,7 @@ if (allRecords && allRecords.length > 1) {
     if (existing?.id) {
       const update: any = {
         email: finalEmail,
+        user_email: supabaseUser?.email || email, // Store the login email separately
         last_login_at: now.toISOString(),
         display_name: display_name || existing.display_name || null,
         username: username || (existing as any).username || null,
@@ -317,6 +318,7 @@ if (allRecords && allRecords.length > 1) {
       trial_end = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000).toISOString();
       const { data: inserted } = await admin.from("subscribers").insert({
         email: finalEmail,
+        user_email: supabaseUser?.email || email, // Store the login email separately
         user_id,
         display_name: display_name || null,
         username: username || null,

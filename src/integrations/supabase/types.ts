@@ -328,6 +328,7 @@ export type Database = {
           trial_end: string | null
           trial_start: string | null
           updated_at: string
+          user_email: string | null
           user_id: string | null
           username: string | null
         }
@@ -345,6 +346,7 @@ export type Database = {
           trial_end?: string | null
           trial_start?: string | null
           updated_at?: string
+          user_email?: string | null
           user_id?: string | null
           username?: string | null
         }
@@ -362,6 +364,7 @@ export type Database = {
           trial_end?: string | null
           trial_start?: string | null
           updated_at?: string
+          user_email?: string | null
           user_id?: string | null
           username?: string | null
         }

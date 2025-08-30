@@ -62,7 +62,7 @@ serve(async (req) => {
 
     const stripe = new Stripe(stripeSecret, { apiVersion: "2023-10-16" });
 
-    // Find Stripe customer by email
+    // Find Stripe customer by email - try both email and user_email
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     if (customers.data.length === 0) {
       log("No customer found; marking unsubscribed");
@@ -70,7 +70,7 @@ serve(async (req) => {
       const { data: existing } = await supabaseService
         .from("subscribers")
         .select("id")
-        .eq("email", user.email)
+        .or(`email.eq.${user.email},user_email.eq.${user.email}`)
         .maybeSingle();
 
       if (existing?.id) {
@@ -128,11 +128,12 @@ serve(async (req) => {
     const { data: existing } = await supabaseService
       .from("subscribers")
       .select("id")
-      .eq("email", user.email)
+      .or(`email.eq.${user.email},user_email.eq.${user.email}`)
       .maybeSingle();
 
     const payload = {
       email: user.email,
+      user_email: user.email, // Store login email
       user_id: user.id,
       stripe_customer_id: customer.id,
       stripe_subscription_id: subId,

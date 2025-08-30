@@ -123,6 +123,7 @@ serve(async (req) => {
           .from('subscribers')
           .upsert({
             email: finalEmail,
+            user_email: isMondeEmail ? email : undefined, // Store Monde email as user_email if different
             display_name: name,
             subscribed: true,
             subscription_tier: planName || 'Premium',
