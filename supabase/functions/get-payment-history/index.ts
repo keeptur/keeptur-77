@@ -76,13 +76,13 @@ serve(async (req) => {
       });
     }
 
-    // Get invoices from Stripe
-    const invoices = await stripe.invoices.list({
+    // Get all invoices from Stripe (histórico completo)
+    const allInvoices = await stripe.invoices.list({
       customer: subscriber.stripe_customer_id,
-      limit: 50,
+      limit: 100,  // Pegar histórico completo
     });
 
-    const paymentHistory = invoices.data.map(invoice => ({
+    const paymentHistory = allInvoices.data.map(invoice => ({
       id: invoice.id,
       date: new Date(invoice.created * 1000).toISOString(),
       description: invoice.lines.data[0]?.description || `Fatura ${invoice.number}`,

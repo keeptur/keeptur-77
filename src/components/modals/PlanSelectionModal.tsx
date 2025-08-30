@@ -268,7 +268,7 @@ const [loading, setLoading] = useState(false);
                   className={`cursor-pointer transition-all hover:shadow-lg ${
                     plan.is_current ? 'ring-2 ring-primary' : ''
                   }`}
-                  onClick={() => { setSelectedPlan(plan); setUserCount(plan.seats); }}
+                  onClick={() => !plan.is_current && setSelectedPlan(plan)}
                 >
                   <CardHeader className="pb-4">
                     <div className="flex items-center justify-between">
@@ -283,11 +283,13 @@ const [loading, setLoading] = useState(false);
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
-                      <div className="flex items-baseline space-x-1">
-                        <span className="text-2xl font-bold">
-                          {formatCurrency((isAnnual ? plan.yearly_price_cents / 12 : plan.price_cents) / Math.max(1, plan.seats))}
+                      <div className="flex flex-col space-y-1">
+                        <span className="text-3xl font-bold text-primary">
+                          {formatCurrency(isAnnual ? plan.yearly_price_cents / 12 : plan.price_cents)}
                         </span>
-                        <span className="text-sm text-muted-foreground">/usuário/mês</span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatCurrency((isAnnual ? plan.yearly_price_cents / 12 : plan.price_cents) / Math.max(1, plan.seats))} /usuário/mês
+                        </span>
                       </div>
                         {isAnnual && (
                           <p className="text-xs text-green-600">
@@ -315,7 +317,12 @@ const [loading, setLoading] = useState(false);
                       )}
                     </div>
 
-                    <Button className="w-full" variant={plan.is_current ? "outline" : "default"}>
+                    <Button 
+                      className="w-full" 
+                      variant={plan.is_current ? "outline" : "default"}
+                      disabled={plan.is_current}
+                      onClick={() => !plan.is_current && setSelectedPlan(plan)}
+                    >
                       {plan.is_current ? "Plano Atual" : "Selecionar"}
                     </Button>
                   </CardContent>
