@@ -239,20 +239,11 @@ const loadSubscriptionData = async () => {
       const plan = availablePlans.find(p => p.id === planId);
       if (!plan) return;
 
-      const priceId = isAnnual ? plan.stripe_price_id_yearly : plan.stripe_price_id_monthly;
-      if (!priceId) {
-        toast({
-          title: "Erro",
-          description: "Preço não configurado para este plano",
-          variant: "destructive",
-        });
-        return;
-      }
-
       // Resolver e-mail do comprador
       const { data: sessionData } = await supabase.auth.getSession();
       let buyerEmail: string | undefined = sessionData.session?.user?.email || undefined;
       const mondeToken = localStorage.getItem('monde_token') || undefined;
+      
       if (!buyerEmail && mondeToken) {
         try {
           const payload = JSON.parse(atob((mondeToken.split('.')[1] || '')));
@@ -261,13 +252,18 @@ const loadSubscriptionData = async () => {
       }
 
       const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { price_id: priceId, monde_token: mondeToken, buyer_email: buyerEmail }
+        body: { 
+          plan_id: planId, 
+          is_annual: isAnnual, 
+          user_emails: ["fabio@allanacaires.monde.com.br"],
+          monde_token: mondeToken
+        }
       });
       
       if (error) throw error;
       
       if (data?.url) {
-        window.location.href = data.url;
+        window.open(data.url, '_blank');
       }
     } catch (error) {
       console.error('Error changing subscription:', error);
@@ -606,28 +602,42 @@ const loadSubscriptionData = async () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-              Método de Pagamento
+              Usuários do Plano
               <Button variant="ghost" size="sm" onClick={handleManagePayment}>
-                Alterar
+                Gerenciar
               </Button>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {paymentMethod ? (
-              <div className="flex items-center space-x-4 p-4 bg-muted rounded-lg">
-                <div className="w-12 h-8 bg-blue-600 rounded flex items-center justify-center text-white text-xs font-semibold">
-                  {paymentMethod.brand.toUpperCase()}
+            {subscriptionData.subscribed && subscriptionData.current_plan ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                      <Users className="w-4 h-4 text-primary-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">FABIO RODRIGUES</p>
+                      <p className="text-xs text-muted-foreground">fabio@allanacaires.monde.com.br</p>
+                    </div>
+                  </div>
+                  <Badge variant="secondary">Admin</Badge>
                 </div>
-                <div>
-                  <p className="text-sm font-medium">•••• •••• •••• {paymentMethod.last4}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Expira em {paymentMethod.exp_month.toString().padStart(2, '0')}/{paymentMethod.exp_year}
+                <div className="text-center py-4">
+                  <p className="text-sm text-muted-foreground">
+                    {subscriptionData.current_plan.seats - 1} usuários restantes
                   </p>
+                  <Button variant="outline" size="sm" className="mt-2">
+                    + Adicionar Usuário
+                  </Button>
                 </div>
               </div>
             ) : (
               <div className="flex items-center justify-center p-8 text-muted-foreground">
-                <p>Nenhum método de pagamento cadastrado</p>
+                <div className="text-center">
+                  <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>Assine um plano para adicionar usuários</p>
+                </div>
               </div>
             )}
           </CardContent>
