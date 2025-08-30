@@ -191,11 +191,12 @@ export default function Plans() {
           description: `Plano ${data.plan_name} ativado com sucesso para ${data.users_activated} usuário(s).`,
         });
         
-        // Recarregar planos para atualizar status
+        // Recarregar dados imediatamente e também após delay
+        Promise.all([loadUserStatus(), fetchPlans()]);
         setTimeout(() => {
           Promise.all([loadUserStatus(), fetchPlans()]);
           setPaymentStatus(null);
-        }, 3000);
+        }, 2000);
       } else {
         setPaymentStatus('pending');
         toast({

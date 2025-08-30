@@ -296,12 +296,12 @@ export function MondeAppSidebar() {
                   </div>
                 )}
                 {!subscribed && (
-                  <button
-                    onClick={handleSubscribe}
-                    className="px-2 py-1 text-xs rounded-button bg-primary text-primary-foreground hover:opacity-90"
+                  <NavLink
+                    to="/plans"
+                    className="px-2 py-1 text-xs rounded-button bg-primary text-primary-foreground hover:opacity-90 inline-block text-center no-underline"
                   >
                     Assinar agora
-                  </button>
+                  </NavLink>
                 )}
               </div>
             </div>
