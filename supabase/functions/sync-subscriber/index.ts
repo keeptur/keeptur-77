@@ -34,12 +34,13 @@ serve(async (req) => {
     const admin = createClient(supabaseUrl, serviceKey || anonKey, { auth: { persistSession: false } });
 
     const body = await req.json().catch(() => ({}));
-    const { mondeToken, email: emailRaw, name: nameRaw, userId: userIdRaw, source = "monde" } = body as {
+    const { mondeToken, email: emailRaw, name: nameRaw, userId: userIdRaw, source = "monde", loginEmail: originalLoginEmail } = body as {
       mondeToken?: string;
       email?: string;
       name?: string;
       userId?: string;
       source?: string;
+      loginEmail?: string;
     };
 
 let email = (emailRaw || "").trim();
@@ -80,7 +81,7 @@ if (!email && mondeToken) {
 // Get authenticated user info from Supabase
 const authHeader = req.headers.get("Authorization");
 let supabaseUser = null;
-let originalLoginEmail = email; // Preserve original login email for user_email field
+let finalLoginEmail = originalLoginEmail; // Use the login email passed from frontend
 if (authHeader) {
   try {
     const token = authHeader.replace("Bearer ", "");
@@ -88,9 +89,9 @@ if (authHeader) {
     supabaseUser = userData.user;
     console.log("Authenticated Supabase user:", supabaseUser?.email);
     
-    // Preserve the original login email before overwriting
-    if (supabaseUser?.email && !originalLoginEmail) {
-      originalLoginEmail = supabaseUser.email;
+    // If no login email was passed from frontend, use Supabase user email as fallback
+    if (!finalLoginEmail && supabaseUser?.email) {
+      finalLoginEmail = supabaseUser.email;
     }
   } catch (error) {
     console.warn("Could not authenticate Supabase user:", error);
@@ -103,7 +104,7 @@ if (supabaseUser) {
   if (!display_name && supabaseUser.user_metadata?.full_name) {
     display_name = supabaseUser.user_metadata.full_name;
   }
-  console.log(`Using authenticated Supabase user ID: ${user_id}, login email: ${originalLoginEmail}`);
+  console.log(`Using authenticated Supabase user ID: ${user_id}, login email: ${finalLoginEmail}`);
 }
 
 // Determine Monde alias and username - prioritize real emails
@@ -302,7 +303,7 @@ if (allRecords && allRecords.length > 1) {
     if (existing?.id) {
       const update: any = {
         email: finalEmail,
-        user_email: originalLoginEmail, // Store the original login email
+        user_email: finalLoginEmail, // Store the original login email
         last_login_at: now.toISOString(),
         display_name: display_name || existing.display_name || null,
         username: username || (existing as any).username || null,
@@ -323,7 +324,7 @@ if (allRecords && allRecords.length > 1) {
       trial_end = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000).toISOString();
       const { data: inserted } = await admin.from("subscribers").insert({
         email: finalEmail,
-        user_email: originalLoginEmail, // Store the original login email
+        user_email: finalLoginEmail, // Store the original login email
         user_id,
         display_name: display_name || null,
         username: username || null,

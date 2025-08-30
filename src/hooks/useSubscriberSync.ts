@@ -29,6 +29,7 @@ export function useSubscriberSync() {
       // 1) If we have a Supabase user, sync via direct table access (respecting RLS)
       if (user) {
         const email = monde?.email || user.email;
+        const loginEmail = localStorage.getItem("keeptur_login_email") || user.email;
         if (!email) return;
 
         // Try to fetch existing subscriber (allowed by RLS for the current user)
@@ -46,6 +47,7 @@ export function useSubscriberSync() {
         const payload: any = {
           email,
           user_id: user.id,
+          user_email: loginEmail, // Store the original login email
           display_name: monde?.name || user.user_metadata?.name || null,
           last_login_at: now.toISOString(),
           trial_start: trialStart,
@@ -62,8 +64,15 @@ export function useSubscriberSync() {
 
       // 2) If there's no Supabase session but we have a Monde token, sync via Edge Function (service role)
       if (mondeToken || monde?.email) {
+        const loginEmail = localStorage.getItem("keeptur_login_email");
         await supabase.functions.invoke("sync-subscriber", {
-          body: { mondeToken, email: monde?.email, name: monde?.name, source: "monde" },
+          body: { 
+            mondeToken, 
+            email: monde?.email, 
+            name: monde?.name, 
+            source: "monde",
+            loginEmail: loginEmail // Pass the original login email
+          },
         }).catch(() => {/* silent */});
       }
     };

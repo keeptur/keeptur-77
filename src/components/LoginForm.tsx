@@ -38,6 +38,9 @@ export default function LoginForm() {
       // 1) First try Monde API authentication
       await api.authenticate(credentials.login, credentials.password);
       
+      // Store the login email for sync purposes
+      localStorage.setItem("keeptur_login_email", credentials.login);
+      
       // 2) Also authenticate with Supabase for subscription features
       try {
         const { error: supaError } = await supabase.auth.signInWithPassword({
@@ -65,6 +68,9 @@ export default function LoginForm() {
           password: credentials.password
         });
         if (supaError) throw supaError;
+        
+        // Store the login email for sync purposes
+        localStorage.setItem("keeptur_login_email", credentials.login);
         
         // Check user role and redirect
         const { data: sessionData } = await supabase.auth.getSession();
