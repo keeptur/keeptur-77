@@ -92,14 +92,14 @@ const [loading, setLoading] = useState(false);
 
   const calculateTotal = () => {
     if (!selectedPlan) return 0;
-    const pricePerUser = isAnnual ? selectedPlan.yearly_price_cents / 12 : selectedPlan.price_cents;
-    return pricePerUser * userCount;
+    const perUser = (isAnnual ? selectedPlan.yearly_price_cents / 12 : selectedPlan.price_cents) / Math.max(1, selectedPlan.seats);
+    return perUser * userCount;
   };
 
   const calculateAnnualSavings = () => {
     if (!selectedPlan) return 0;
-    const monthlyTotal = selectedPlan.price_cents * userCount * 12;
-    const annualTotal = selectedPlan.yearly_price_cents * userCount;
+    const monthlyTotal = selectedPlan.price_cents * 12;
+    const annualTotal = selectedPlan.yearly_price_cents;
     return monthlyTotal - annualTotal;
   };
 
@@ -285,15 +285,15 @@ const [loading, setLoading] = useState(false);
                     <div>
                       <div className="flex items-baseline space-x-1">
                         <span className="text-2xl font-bold">
-                          {formatCurrency(isAnnual ? plan.yearly_price_cents / 12 : plan.price_cents)}
+                          {formatCurrency((isAnnual ? plan.yearly_price_cents / 12 : plan.price_cents) / Math.max(1, plan.seats))}
                         </span>
                         <span className="text-sm text-muted-foreground">/usuário/mês</span>
                       </div>
-                      {isAnnual && (
-                        <p className="text-xs text-green-600">
-                          Economize {formatCurrency((plan.price_cents * 12) - plan.yearly_price_cents)} por usuário/ano
-                        </p>
-                      )}
+                        {isAnnual && (
+                          <p className="text-xs text-green-600">
+                            Economize {formatCurrency((plan.price_cents * 12) - plan.yearly_price_cents)} por ano
+                          </p>
+                        )}
                     </div>
 
                     <div className="flex items-center space-x-2 text-sm text-muted-foreground">
@@ -374,7 +374,7 @@ const [loading, setLoading] = useState(false);
                 </div>
                 <div className="flex justify-between">
                   <span>Preço por usuário</span>
-                  <span>{formatCurrency(isAnnual ? selectedPlan.yearly_price_cents / 12 : selectedPlan.price_cents)}/mês</span>
+                  <span>{formatCurrency((isAnnual ? selectedPlan.yearly_price_cents / 12 : selectedPlan.price_cents) / Math.max(1, selectedPlan.seats))}/mês</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Período de cobrança</span>

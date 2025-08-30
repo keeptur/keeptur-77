@@ -134,14 +134,15 @@ serve(async (req) => {
       currentSubscriptionId: currentSubscription?.id 
     });
 
-    // Determine pricing
-    const unitAmount = is_annual 
+    // Determine pricing (per user)
+    const totalAmount = is_annual 
       ? (planData.yearly_price_cents || planData.price_cents * 12)
       : planData.price_cents;
+    const perUserAmount = Math.max(50, Math.round(totalAmount / Math.max(1, planData.seats)));
 
-    // Check if it's an upgrade (has current subscription with different plan)
+    // Upgrade handling helpers
     let isUpgrade = false;
-    let proratedAmount = unitAmount;
+    let proratedPerUserAmount = perUserAmount;
 
     if (hasActiveSubscription && currentSubscription) {
       // This is an upgrade - calculate prorated amount
@@ -161,13 +162,13 @@ serve(async (req) => {
         const unusedCredit = Math.max(0, (currentAmount * remainingPeriod) / totalPeriod);
         
         // New amount minus unused credit
-        proratedAmount = Math.max(100, unitAmount - Math.floor(unusedCredit)); // Minimum 1.00
+        proratedPerUserAmount = Math.max(50, perUserAmount - Math.floor(unusedCredit));
         
         logStep("Upgrade calculation", {
           currentAmount,
-          newAmount: unitAmount,
+          newPerUserAmount: perUserAmount,
           unusedCredit: Math.floor(unusedCredit),
-          proratedAmount
+          proratedPerUserAmount
         });
       }
     }
@@ -184,12 +185,12 @@ serve(async (req) => {
               name: `${planData.name} - ${planData.seats} usuários`,
               description: `Plano ${is_annual ? 'anual' : 'mensal'} para ${planData.seats} usuários`,
             },
-            unit_amount: isUpgrade ? proratedAmount : unitAmount,
+            unit_amount: isUpgrade ? proratedPerUserAmount : perUserAmount,
             recurring: is_annual 
               ? { interval: "year" } 
               : { interval: "month" }
           },
-          quantity: 1,
+          quantity: planData.seats,
         },
       ],
       mode: "subscription",
@@ -227,7 +228,7 @@ serve(async (req) => {
 
     logStep("Checkout session created", { 
       sessionId: session.id, 
-      amount: isUpgrade ? proratedAmount : unitAmount,
+      amount: isUpgrade ? proratedPerUserAmount : perUserAmount,
       isUpgrade 
     });
 
@@ -235,8 +236,8 @@ serve(async (req) => {
       url: session.url,
       session_id: session.id,
       is_upgrade: isUpgrade,
-      original_amount: unitAmount,
-      prorated_amount: isUpgrade ? proratedAmount : unitAmount
+      original_amount: perUserAmount,
+      prorated_amount: isUpgrade ? proratedPerUserAmount : perUserAmount
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
