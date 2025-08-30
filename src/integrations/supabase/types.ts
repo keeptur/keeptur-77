@@ -478,7 +478,20 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
-      email_template_type: "welcome" | "trial_expired" | "payment_confirmed"
+      email_template_type:
+        | "welcome"
+        | "trial_expired"
+        | "payment_confirmed"
+        | "email_confirmation"
+        | "password_reset"
+        | "trial_start"
+        | "trial_ending"
+        | "trial_ended"
+        | "subscription_welcome"
+        | "subscription_renewal"
+        | "subscription_cancelled"
+        | "payment_failed"
+        | "tutorial_inicial"
       membership_status: "active" | "inactive"
     }
     CompositeTypes: {
@@ -608,7 +621,21 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user"],
-      email_template_type: ["welcome", "trial_expired", "payment_confirmed"],
+      email_template_type: [
+        "welcome",
+        "trial_expired",
+        "payment_confirmed",
+        "email_confirmation",
+        "password_reset",
+        "trial_start",
+        "trial_ending",
+        "trial_ended",
+        "subscription_welcome",
+        "subscription_renewal",
+        "subscription_cancelled",
+        "payment_failed",
+        "tutorial_inicial",
+      ],
       membership_status: ["active", "inactive"],
     },
   },

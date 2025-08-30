@@ -210,9 +210,14 @@ export default function AdminEmailsPage() {
           })
           .eq('id', selectedTemplate.id);
       } else {
+        // Cast type to satisfy TypeScript while allowing flexibility
         await supabase
           .from('email_templates')
-          .insert([newTemplate]);
+          .insert([{
+            type: newTemplate.type as any,
+            subject: newTemplate.subject,
+            html: newTemplate.html
+          }]);
       }
 
       setNewTemplate({ type: '', subject: '', html: '' });
