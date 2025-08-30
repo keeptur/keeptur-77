@@ -31,6 +31,7 @@ interface SubscriberRow {
   subscription_end: string | null;
   created_at: string;
   updated_at: string;
+  user_email?: string | null;
   username?: string | null;
 }
 type CombinedUser = {
@@ -73,7 +74,7 @@ export default function UsersSection() {
       supabase.from("user_roles").select("user_id, role"),
        supabase
          .from("subscribers")
-         .select("id, user_id, email, display_name, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at, updated_at, username"),
+         .select("id, user_id, email, display_name, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at, updated_at, username, user_email"),
     ]);
     setProfiles((p || []) as any);
     setRoles((r || []) as any);
@@ -129,7 +130,7 @@ export default function UsersSection() {
           supabase.from("user_roles").select("user_id, role"),
           supabase
             .from("subscribers")
-            .select("id, user_id, email, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at, updated_at, username"),
+            .select("id, user_id, email, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at, updated_at, username, user_email"),
         ]);
         setProfiles((p || []) as any);
         setRoles((r || []) as any);
@@ -267,15 +268,15 @@ export default function UsersSection() {
     return Array.from(byEmail.values());
   }, [profiles, subscribers]);
 
-  
-  // Prefer stored Monde username; never fabricate
+  // Emails de exibição
+  const getBillingEmail = (u: CombinedUser) => u.email || '';
+  const getLoginEmail = (u: CombinedUser) => u.subscriber?.user_email || '';
+
+  // Prefer stored Monde username for fallback display name
   const getDisplayMondeEmail = (u: CombinedUser) => {
-    const username = u.subscriber?.username?.trim();
-    const email = u.email || '';
-    if (username && username.endsWith('.monde.com.br')) return username;
-    if (email.endsWith('.monde.com.br')) return email;
-    // fallback to original email (do not invent a Monde address)
-    return email;
+    const loginEmail = getLoginEmail(u);
+    if (loginEmail) return loginEmail;
+    return getBillingEmail(u);
   };
 
   const filtered = useMemo(() => {
@@ -412,7 +413,8 @@ export default function UsersSection() {
             <thead>
               <tr className="border-b">
                 <th className="text-left py-3 px-2 font-medium text-xs text-muted-foreground">Usuário</th>
-                <th className="text-left py-3 px-2 font-medium text-xs text-muted-foreground">E-mail</th>
+                <th className="text-left py-3 px-2 font-medium text-xs text-muted-foreground">E-mail (Cadastro)</th>
+                <th className="text-left py-3 px-2 font-medium text-xs text-muted-foreground">E-mail de Usuário</th>
                 <th className="text-left py-3 px-2 font-medium text-xs text-muted-foreground">Plano</th>
                 <th className="text-left py-3 px-2 font-medium text-xs text-muted-foreground">Status</th>
                 <th className="text-left py-3 px-2 font-medium text-xs text-muted-foreground">Trial +Dias</th>
@@ -424,14 +426,14 @@ export default function UsersSection() {
             <tbody>
               {loading && (
                 <tr>
-                  <td className="py-6 px-2 text-sm text-muted-foreground" colSpan={8}>
-                    Carregando...
-                  </td>
+          <td className="py-6 px-2 text-sm text-muted-foreground" colSpan={9}>
+            Carregando...
+          </td>
                 </tr>
               )}
               {!loading && filtered.length === 0 && (
                 <tr>
-                  <td className="py-6 px-2 text-sm text-muted-foreground" colSpan={8}>
+                  <td className="py-6 px-2 text-sm text-muted-foreground" colSpan={9}>
                     Nenhum usuário encontrado.
                   </td>
                 </tr>
@@ -506,7 +508,8 @@ export default function UsersSection() {
                           </div>
                         </div>
                       </td>
-                      <td className="py-3 px-2 text-sm break-words whitespace-normal max-w-[260px]">{getDisplayMondeEmail(u)}</td>
+                      <td className="py-3 px-2 text-sm break-words whitespace-normal max-w-[260px]">{getBillingEmail(u)}</td>
+                      <td className="py-3 px-2 text-sm break-words whitespace-normal max-w-[260px]">{getLoginEmail(u) || '-'}</td>
                       <td className="py-3 px-2">
                         <span
                           className="px-2 py-1 rounded-full text-xs font-medium"
