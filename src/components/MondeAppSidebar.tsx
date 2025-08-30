@@ -95,12 +95,15 @@ export function MondeAppSidebar() {
             setPlanName((data as any)?.subscription_tier || null);
 
             if (data?.subscribed && subEnd && subEnd > now) {
+              // Plano ativo: calcular dias restantes baseado na subscription_end
               setSubscriptionDays(Math.ceil((subEnd - now) / (1000 * 60 * 60 * 24)));
               setTrialDays(null);
-            } else if (trialEnd && (!data?.subscribed || !subEnd || subEnd <= now)) {
+            } else if (trialEnd && trialEnd > now && !data?.subscribed) {
+              // Trial ativo: calcular dias restantes do trial
               setTrialDays(Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24)));
               setSubscriptionDays(null);
             } else {
+              // Nem trial nem plano ativo
               setTrialDays(null);
               setSubscriptionDays(null);
             }

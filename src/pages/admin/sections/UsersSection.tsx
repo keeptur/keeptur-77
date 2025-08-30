@@ -267,6 +267,18 @@ export default function UsersSection() {
     return Array.from(byEmail.values());
   }, [profiles, subscribers]);
 
+  
+  // Helper to generate Monde email format
+  const getMondeEmail = (email: string) => {
+    if (email.endsWith('.monde.com.br')) {
+      return email;
+    }
+    
+    const localPart = email.split('@')[0];
+    const domain = email.split('@')[1]?.replace(/\.(com|com\.br|net|org)$/, '');
+    return `${localPart}@${domain}.monde.com.br`;
+  };
+
   const filtered = useMemo(() => {
     let list = combinedUsers;
     if (q) {
@@ -491,11 +503,11 @@ export default function UsersSection() {
                             {initials}
                           </div>
                           <div>
-                            <p className="text-sm font-medium">{u.full_name || u.email}</p>
+                            <p className="text-sm font-medium">{u.full_name || getMondeEmail(u.email)}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="py-3 px-2 text-sm break-words whitespace-normal max-w-[260px]">{u.email}</td>
+                      <td className="py-3 px-2 text-sm break-words whitespace-normal max-w-[260px]">{getMondeEmail(u.email)}</td>
                       <td className="py-3 px-2">
                         <span
                           className="px-2 py-1 rounded-full text-xs font-medium"

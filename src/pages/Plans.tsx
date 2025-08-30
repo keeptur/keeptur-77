@@ -7,6 +7,7 @@ import { Check, Star, Users, Zap, Clock, Crown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { PlanSelectionModal } from "@/components/modals/PlanSelectionModal";
+import { UserManagement } from "@/components/plans/UserManagement";
 
 interface Plan {
   id: string;
@@ -48,12 +49,18 @@ export default function Plans() {
     daysRemaining: 0
   });
   const [paymentStatus, setPaymentStatus] = useState<'checking' | 'success' | 'pending' | null>(null);
+  const [planUsers, setPlanUsers] = useState<string[]>([]);
 
   const formatCurrency = (cents: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
     }).format(cents / 100);
+  };
+
+  const formatPricePerUser = (cents: number, seats: number) => {
+    const pricePerUser = cents / seats;
+    return formatCurrency(pricePerUser);
   };
 
   const loadUserStatus = async () => {
@@ -93,8 +100,10 @@ export default function Plans() {
           let isInTrial = false;
 
           if (isSubscribed && subEnd && subEnd > now) {
+            // Plano ativo: usar subscription_end
             daysRemaining = Math.ceil((subEnd - now) / (1000 * 60 * 60 * 24));
           } else if (trialEnd && trialEnd > now && !isSubscribed) {
+            // Trial ativo
             isInTrial = true;
             daysRemaining = Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24));
           }
@@ -356,6 +365,7 @@ export default function Plans() {
             const monthlyPrice = isAnnual ? plan.yearly_price_cents / 12 : plan.price_cents;
             const yearlyTotal = plan.yearly_price_cents;
             const monthlySavings = isAnnual ? (plan.price_cents * 12) - yearlyTotal : 0;
+            const pricePerUser = monthlyPrice / plan.seats;
             
             return (
               <Card 
@@ -384,12 +394,15 @@ export default function Plans() {
                       <span className="text-4xl font-bold">
                         {formatCurrency(monthlyPrice)}
                       </span>
-                      <span className="text-muted-foreground ml-1">/usuário/mês</span>
+                      <span className="text-muted-foreground ml-1">/mês</span>
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      {formatPricePerUser(monthlyPrice, plan.seats)} por usuário
                     </div>
                     
                     {isAnnual && monthlySavings > 0 && (
                       <p className="text-sm text-green-600 mt-2">
-                        Economize {formatCurrency(monthlySavings)} por usuário/ano
+                        Economize {formatCurrency(monthlySavings)} por ano
                       </p>
                     )}
                   </div>
@@ -419,6 +432,11 @@ export default function Plans() {
                   >
                     {plan.is_current ? (
                       "Plano Atual"
+                    ) : plan.is_upgrade ? (
+                      <>
+                        <Zap className="w-4 h-4 mr-2" />
+                        Fazer Upgrade
+                      </>
                     ) : (
                       <>
                         <Zap className="w-4 h-4 mr-2" />
@@ -431,6 +449,17 @@ export default function Plans() {
             );
           })}
         </div>
+
+        {/* Gestão de usuários - só exibir se tiver plano ativo */}
+        {userStatus.isSubscribed && !userStatus.isAdmin && (
+          <div className="max-w-4xl mx-auto mt-8">
+            <UserManagement
+              planSeats={plans.find(p => p.is_current)?.seats || 1}
+              currentUsers={planUsers}
+              onUsersUpdate={setPlanUsers}
+            />
+          </div>
+        )}
 
         {selectedPlan && (
           <PlanSelectionModal
