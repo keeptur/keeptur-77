@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { api } from "@/lib/api";
 import {
   LineChart,
   Line,
@@ -58,9 +59,7 @@ export default function DashboardSection() {
   useEffect(() => {
     const load = async () => {
       // Métricas básicas do banco usando função segura
-      const { data: adminData } = await supabase
-        .rpc("get_admin_metrics")
-        .maybeSingle();
+      const adminData = await api.getAdminMetrics();
 
       const [{ data: profiles }, { data: roles }, { data: accounts }, { data: subscribers }] = await Promise.all([
         supabase.from("profiles").select("id, email, full_name, created_at"),

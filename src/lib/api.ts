@@ -14,6 +14,7 @@ import {
   CreateTaskHistoricData,
   UpdateTaskHistoricData
 } from "@/types/api";
+import { supabase } from "@/integrations/supabase/client";
 
 const API_BASE_URL = "https://web.monde.com.br/api/v2";
 
@@ -702,6 +703,21 @@ class MondeAPI {
       return await this.request<ApiResponse<any[]>>(`/people?${params.toString()}`);
     } catch (error) {
       console.warn('Error fetching company users:', error);
+      throw error;
+    }
+  }
+
+  // Secure admin metrics access - only accessible to admin users
+  async getAdminMetrics() {
+    try {
+      const { data, error } = await supabase
+        .rpc('get_admin_metrics')
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Erro ao buscar métricas administrativas:', error);
       throw error;
     }
   }
