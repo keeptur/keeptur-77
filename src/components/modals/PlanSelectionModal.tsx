@@ -137,7 +137,7 @@ const [loading, setLoading] = useState(false);
   };
 
   const handleCheckout = async () => {
-    if (!selectedPlan || !validateUsers()) return;
+    if (!selectedPlan) return;
 
     const { data: sessionData } = await supabase.auth.getSession();
     const mondeToken = localStorage.getItem('monde_token');
@@ -185,10 +185,6 @@ const [loading, setLoading] = useState(false);
         body: { 
           plan_id: selectedPlan.id,
           is_annual: isAnnual,
-          quantity: userCount,
-          users: users.slice(0, userCount),
-          user_emails: users.slice(0, userCount).map((u) => u.email),
-          billing_cycle: isAnnual ? 'yearly' : 'monthly',
           monde_token: mondeTokenToSend,
           buyer_email: buyerEmail,
         }
@@ -272,7 +268,7 @@ const [loading, setLoading] = useState(false);
                   className={`cursor-pointer transition-all hover:shadow-lg ${
                     plan.is_current ? 'ring-2 ring-primary' : ''
                   }`}
-                  onClick={() => setSelectedPlan(plan)}
+                  onClick={() => { setSelectedPlan(plan); setUserCount(plan.seats); }}
                 >
                   <CardHeader className="pb-4">
                     <div className="flex items-center justify-between">
@@ -332,9 +328,9 @@ const [loading, setLoading] = useState(false);
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold">Configurar Usuários - {selectedPlan.name}</h3>
+                <h3 className="text-lg font-semibold">Confirmar Plano - {selectedPlan.name}</h3>
                 <p className="text-sm text-muted-foreground">
-                  Defina quantos usuários terão acesso e seus dados
+                  Revise os detalhes e prossiga para o pagamento
                 </p>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setSelectedPlan(null)}>
@@ -342,83 +338,9 @@ const [loading, setLoading] = useState(false);
               </Button>
             </div>
 
-            {/* Quantity Selector */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Quantidade de Usuários</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center space-x-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleUserCountChange(userCount - 1)}
-                    disabled={userCount <= 1}
-                  >
-                    <Minus className="w-4 h-4" />
-                  </Button>
-                  <span className="text-xl font-semibold min-w-[3ch] text-center">{userCount}</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleUserCountChange(userCount + 1)}
-                    disabled={userCount >= selectedPlan.seats}
-                  >
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                  <span className="text-sm text-muted-foreground">
-                    (máximo {selectedPlan.seats} usuários)
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Seleção de quantidade removida temporariamente - será o máximo do plano */}
 
-            {/* User Details */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Dados dos Usuários</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {users.slice(0, userCount).map((user, index) => (
-                  <div key={index} className="p-4 border rounded-lg space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium">Usuário {index + 1}</h4>
-                      {userCount > 1 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeUser(index)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <Label htmlFor={`name-${index}`}>Nome completo</Label>
-                        <Input
-                          id={`name-${index}`}
-                          placeholder="Ex: João Silva"
-                          value={user.name}
-                          onChange={(e) => updateUser(index, 'name', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor={`email-${index}`}>E-mail</Label>
-                        <Input
-                          id={`email-${index}`}
-                          type="email"
-                          placeholder="joao@empresa.com"
-                          value={user.email}
-                          onChange={(e) => updateUser(index, 'email', e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+            {/* Dados dos usuários removidos temporariamente - serão adicionados após a contratação */}
 
             {/* Billing Toggle */}
             <Card>

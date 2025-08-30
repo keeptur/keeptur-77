@@ -274,8 +274,8 @@ export default function SubscriptionPage() {
         body: {
           plan_id: planId,
           is_annual: isAnnual,
-          user_emails: ["fabio@allanacaires.monde.com.br"],
-          monde_token: mondeToken
+          monde_token: mondeToken,
+          buyer_email: buyerEmail
         }
       });
       if (error) throw error;

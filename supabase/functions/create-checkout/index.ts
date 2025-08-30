@@ -193,8 +193,8 @@ serve(async (req) => {
         },
       ],
       mode: "subscription",
-      success_url: `${req.headers.get("origin")}/plans?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.get("origin")}/plans`,
+      success_url: `${req.headers.get("origin")}/subscription?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${req.headers.get("origin")}/subscription`,
       metadata: {
         plan_id: plan_id,
         plan_name: planData.name,
@@ -220,7 +220,7 @@ serve(async (req) => {
     if (isUpgrade && currentSubscription) {
       // For upgrades, we'll handle this in the webhook/verification
       // For now, create a regular checkout with proration info
-      sessionConfig.subscription_data.proration_behavior = 'always_invoice';
+      sessionConfig.subscription_data.proration_behavior = 'create_prorations';
     }
 
     const session = await stripe.checkout.sessions.create(sessionConfig);
