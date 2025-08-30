@@ -184,8 +184,10 @@ const [loading, setLoading] = useState(false);
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: { 
           plan_id: selectedPlan.id,
+          is_annual: isAnnual,
           quantity: userCount,
           users: users.slice(0, userCount),
+          user_emails: users.slice(0, userCount).map((u) => u.email),
           billing_cycle: isAnnual ? 'yearly' : 'monthly',
           monde_token: mondeTokenToSend,
           buyer_email: buyerEmail,

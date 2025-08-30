@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { PlanSelectionModal } from "@/components/modals/PlanSelectionModal";
+import { ManageUsersModal } from "@/components/modals/ManageUsersModal";
 import { UserManagement } from "@/components/plans/UserManagement";
 
 interface CompleteSubscriptionData {
@@ -85,6 +86,7 @@ export default function SubscriptionPage() {
   });
   const [hasSupabaseSession, setHasSupabaseSession] = useState(false);
   const [showPlanModal, setShowPlanModal] = useState(false);
+  const [showUsersModal, setShowUsersModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<AvailablePlan | null>(null);
   const [isAnnual, setIsAnnual] = useState(false);
   const [annualDiscount, setAnnualDiscount] = useState(20);
@@ -531,11 +533,11 @@ const loadSubscriptionData = async () => {
             )}
             <Button
               variant="outline"
-              onClick={handleManagePayment}
+              onClick={() => setShowUsersModal(true)}
               className="flex items-center space-x-2 bg-white/20 text-white border-white/30 hover:bg-white/30"
             >
               <CreditCard className="w-4 h-4" />
-              <span>Método de Pagamento</span>
+              <span>Gerenciar Usuários</span>
             </Button>
             {subscriptionData.subscribed && (
               <Button
@@ -603,7 +605,7 @@ const loadSubscriptionData = async () => {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               Usuários do Plano
-              <Button variant="ghost" size="sm" onClick={handleManagePayment}>
+              <Button variant="ghost" size="sm" onClick={() => setShowUsersModal(true)}>
                 Gerenciar
               </Button>
             </CardTitle>
@@ -611,26 +613,34 @@ const loadSubscriptionData = async () => {
           <CardContent>
             {subscriptionData.subscribed && subscriptionData.current_plan ? (
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                      <Users className="w-4 h-4 text-primary-foreground" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">FABIO RODRIGUES</p>
-                      <p className="text-xs text-muted-foreground">fabio@allanacaires.monde.com.br</p>
-                    </div>
+                {planUsers.length > 0 ? (
+                  <div className="space-y-2">
+                    {planUsers.map((email) => (
+                      <div key={email} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                            <Users className="w-4 h-4 text-primary-foreground" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{email.split('@')[0].toUpperCase()}</p>
+                            <p className="text-xs text-muted-foreground">{email}</p>
+                          </div>
+                        </div>
+                        <Badge variant="secondary">Ativo</Badge>
+                      </div>
+                    ))}
                   </div>
-                  <Badge variant="secondary">Admin</Badge>
-                </div>
-                <div className="text-center py-4">
-                  <p className="text-sm text-muted-foreground">
-                    {subscriptionData.current_plan.seats - 1} usuários restantes
-                  </p>
-                  <Button variant="outline" size="sm" className="mt-2">
-                    + Adicionar Usuário
-                  </Button>
-                </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-muted-foreground">Nenhum usuário adicionado ao plano</p>
+                    <Button variant="outline" size="sm" className="mt-2" onClick={() => setShowUsersModal(true)}>
+                      + Adicionar Usuário
+                    </Button>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground text-center">
+                  {Math.max(subscriptionData.current_plan.seats - planUsers.length, 0)} usuários restantes
+                </p>
               </div>
             ) : (
               <div className="flex items-center justify-center p-8 text-muted-foreground">
