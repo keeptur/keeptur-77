@@ -60,11 +60,10 @@ serve(async (req) => {
       billingCycle 
     });
 
-    if (isPaid && usersData.length > 0) {
-      // Ativar plano para todos os usuários especificados
-      logStep("Activating plans for users", { userEmails: usersData.map((u: any) => u.email) });
+    if (isPaid) {
+      logStep("Payment paid, proceeding with activation");
 
-      // Calcular data de expiração baseada no ciclo de cobrança
+      // Calculate subscription end date based on billing cycle
       const now = new Date();
       const subscriptionEnd = new Date(now);
       if (billingCycle === 'yearly') {
@@ -73,18 +72,24 @@ serve(async (req) => {
         subscriptionEnd.setMonth(now.getMonth() + 1);
       }
 
-      // Ativar para cada usuário
-      for (const userData of usersData) {
+      // Build activation list: prefer provided users; fallback to buyer
+      const activationList: Array<{ email: string; name?: string }> =
+        usersData && usersData.length > 0
+          ? usersData
+          : (buyerEmail ? [{ email: buyerEmail, name: buyerEmail.split('@')[0] }] : []);
+
+      let activatedCount = 0;
+
+      for (const userData of activationList) {
         const { email, name } = userData;
-        
         logStep("Activating plan for user", { email, name });
 
         // Determine if this is a Monde email or real email
         const isMondeEmail = /@([a-z0-9-]+\.)*monde\.com\.br$/i.test(email);
         let finalEmail = email;
         let username = isMondeEmail ? email.split('@')[0] : undefined;
-        
-        // If this is a Monde email, try to find corresponding real email
+
+        // If Monde email, try to find corresponding real email by username
         if (isMondeEmail && username) {
           const { data: realEmailUser } = await supabaseService
             .from('subscribers')
@@ -92,9 +97,8 @@ serve(async (req) => {
             .eq('username', username)
             .not('email', 'like', '%monde.com.br%')
             .maybeSingle();
-            
+
           if (realEmailUser) {
-            // Update existing real email record instead of creating new
             finalEmail = realEmailUser.email;
             logStep("Found existing real email for Monde user", { mondeEmail: email, realEmail: finalEmail });
           }
@@ -120,43 +124,24 @@ serve(async (req) => {
         if (upsertError) {
           logStep("Error activating plan for user", { email, error: upsertError.message });
         } else {
+          activatedCount += 1;
           logStep("Plan activated successfully for user", { email });
         }
       }
 
-      // Atualizar também o comprador se não estiver na lista
-      if (buyerEmail && !usersData.some((u: any) => u.email === buyerEmail)) {
-        logStep("Activating plan for buyer", { buyerEmail });
-        
-        // Se já existir um assinante com o mesmo stripe_customer_id,
-        // atualize esse registro em vez de criar um novo para evitar duplicidade.
-        const userEmails = usersData.map((u: any) => u.email);
-        const { data: existingPreferred, error: findPreferredErr } = await supabaseService
-          .from('subscribers')
-          .select('id,email')
-          .eq('stripe_customer_id', session.customer as string)
-          .in('email', userEmails)
-          .limit(1);
+      // If buyer is not in the provided list, ensure buyer is also activated
+      if (buyerEmail && !(usersData || []).some((u: any) => u.email === buyerEmail)) {
+        logStep("Ensuring buyer subscription", { buyerEmail });
 
-        if (findPreferredErr) {
-          logStep('Error searching preferred buyer by customer id', { error: findPreferredErr.message });
-        }
-
-        const { data: existingByCustomer, error: findByCustomerErr } = await supabaseService
+        const { data: existingPreferred } = await supabaseService
           .from('subscribers')
           .select('id,email')
           .eq('stripe_customer_id', session.customer as string)
           .limit(1);
 
-        if (findByCustomerErr) {
-          logStep('Error searching buyer by customer id', { error: findByCustomerErr.message });
-        }
+        const existingBuyer = existingPreferred && existingPreferred.length > 0 ? existingPreferred[0] : null;
 
-        const existing = (existingPreferred && existingPreferred.length > 0)
-          ? existingPreferred[0]
-          : (existingByCustomer && existingByCustomer.length > 0 ? existingByCustomer[0] : null);
-
-        if (existing) {
+        if (existingBuyer) {
           const { error: updateBuyerErr } = await supabaseService
             .from('subscribers')
             .update({
@@ -168,12 +153,12 @@ serve(async (req) => {
               trial_end: null,
               updated_at: new Date().toISOString(),
             })
-            .eq('id', existing.id);
+            .eq('id', existingBuyer.id);
 
           if (updateBuyerErr) {
-            logStep('Error updating existing buyer subscriber', { error: updateBuyerErr.message, existingEmail: existing.email });
+            logStep('Error updating existing buyer subscriber', { error: updateBuyerErr.message, existingEmail: existingBuyer.email });
           } else {
-            logStep('Updated existing buyer subscriber', { existingEmail: existing.email });
+            logStep('Updated existing buyer subscriber', { existingEmail: existingBuyer.email });
           }
         } else {
           const { error: buyerError } = await supabaseService
@@ -192,6 +177,8 @@ serve(async (req) => {
 
           if (buyerError) {
             logStep('Error activating plan for buyer', { buyerEmail, error: buyerError.message });
+          } else {
+            activatedCount += 1;
           }
         }
       }
@@ -234,6 +221,19 @@ serve(async (req) => {
       } catch (e) {
         logStep('Consolidation error', { message: (e as any)?.message || String(e) });
       }
+
+      // Return early response data update
+      return new Response(JSON.stringify({
+        paid: isPaid,
+        status: session.status,
+        payment_status: session.payment_status,
+        users_activated: activatedCount,
+        plan_name: planName,
+        billing_cycle: billingCycle,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
     }
 
     return new Response(JSON.stringify({

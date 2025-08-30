@@ -25,6 +25,7 @@ import SubscriptionPage from "./pages/SubscriptionPage";
 import AdminLogsPage from "./pages/admin/AdminLogsPage";
 import PlansPage from "./pages/Plans";
 import { UserRoute } from "./components/auth/UserRoute";
+import { PaymentVerifier } from "./components/PaymentVerifier";
 
 const queryClient = new QueryClient();
 
@@ -79,6 +80,7 @@ const AppWrapper = () => {
           <BrowserRouter>
             <TokenManagerInside />
             <SubscriberSync />
+            <PaymentVerifier />
             <Routes>
               {/* Public routes */}
               <Route path="/login" element={
