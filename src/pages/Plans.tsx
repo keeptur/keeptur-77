@@ -37,6 +37,15 @@ interface UserSubscriptionStatus {
   userEmail?: string;
 }
 
+interface PaymentItem {
+  date?: string;
+  description?: string;
+  amount_cents?: number;
+  currency?: string;
+  status?: string;
+  invoice_url?: string;
+}
+
 export default function Plans() {
   const { toast } = useToast();
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -53,7 +62,7 @@ export default function Plans() {
   });
   const [paymentStatus, setPaymentStatus] = useState<'checking' | 'success' | 'pending' | null>(null);
   const [planUsers, setPlanUsers] = useState<string[]>([]);
-
+  const [paymentHistory, setPaymentHistory] = useState<PaymentItem[]>([]);
   const formatCurrency = (cents: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -174,7 +183,7 @@ export default function Plans() {
   };
 
   useEffect(() => {
-    Promise.all([loadUserStatus(), fetchPlans()]);
+    Promise.all([loadUserStatus(), fetchPlans(), loadPaymentHistory()]);
     
     // Verificar se voltou do checkout
     const urlParams = new URLSearchParams(window.location.search);
@@ -225,6 +234,20 @@ export default function Plans() {
         description: "Não foi possível verificar o status do pagamento. Tente novamente.",
         variant: "destructive",
       });
+    }
+  };
+
+  const loadPaymentHistory = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('get-payment-history');
+      if (error) throw error;
+      if (Array.isArray((data as any)?.paymentHistory)) {
+        setPaymentHistory((data as any).paymentHistory as PaymentItem[]);
+      } else if (Array.isArray(data)) {
+        setPaymentHistory(data as PaymentItem[]);
+      }
+    } catch (e) {
+      console.warn('Não foi possível carregar o histórico de pagamentos:', e);
     }
   };
 
@@ -309,94 +332,103 @@ export default function Plans() {
           </Card>
         )}
 
-        {/* Card do plano atual */}
-        {userStatus.isSubscribed && !userStatus.isAdmin && (
-          <Card className="rounded-xl p-6 bg-gradient-to-r from-primary to-blue-600 text-white">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-semibold">Plano {userStatus.subscriptionTier || 'Pro'}</h2>
-                <p className="text-blue-100 text-sm">
-                  Assinatura ativa desde {new Date().toLocaleDateString('pt-BR')}
-                </p>
+        {/* Card de plano/estado atual */}
+        <Card className="rounded-xl p-6 bg-gradient-to-r from-primary to-blue-600 text-white">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-semibold">{userStatus.isSubscribed ? `Plano ${userStatus.subscriptionTier || 'Pro'}` : 'Sem Plano Ativo'}</h2>
+              <p className="text-blue-100 text-sm">
+                {userStatus.isSubscribed ? `Assinatura ativa` : 'Escolha um plano para começar'}
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="flex items-baseline">
+                <span className="text-2xl font-bold">{formatCurrency(currentPlanPrice)}</span>
+                <span className="text-sm ml-1 text-blue-100">/mês</span>
               </div>
-              <div className="text-right">
-                <div className="flex items-baseline">
-                  <span className="text-2xl font-bold">{formatCurrency(currentPlanPrice)}</span>
-                  <span className="text-sm ml-1 text-blue-100">/mês</span>
-                </div>
+              {userStatus.isSubscribed && (
                 <p className="text-xs text-blue-100 mt-1">
                   Próxima cobrança: {new Date(Date.now() + userStatus.daysRemaining * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR')}
                 </p>
-              </div>
+              )}
             </div>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-              <div className="bg-white/10 rounded-lg p-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                    <User className="w-4 h-4 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-blue-100">Usuários</p>
-                    <p className="font-semibold">{planUsers.length} de {currentPlan?.seats || 1}</p>
-                  </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div className="bg-white/10 rounded-lg p-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                  <User className="w-4 h-4 text-white" />
                 </div>
-              </div>
-              <div className="bg-white/10 rounded-lg p-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                    <Calendar className="w-4 h-4 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-blue-100">Dias restantes</p>
-                    <p className="font-semibold">{userStatus.daysRemaining} dias</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white/10 rounded-lg p-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                    <RefreshCw className="w-4 h-4 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-blue-100">Renovação</p>
-                    <p className="font-semibold">Automática</p>
-                  </div>
+                <div>
+                  <p className="text-sm text-blue-100">Usuários</p>
+                  <p className="font-semibold">{planUsers.length} de {currentPlan?.seats || 0}</p>
                 </div>
               </div>
             </div>
+            <div className="bg-white/10 rounded-lg p-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                  <Calendar className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-blue-100">Dias restantes</p>
+                  <p className="font-semibold">{userStatus.daysRemaining} dias</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white/10 rounded-lg p-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                  <RefreshCw className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-blue-100">Renovação</p>
+                  <p className="font-semibold">Automática</p>
+                </div>
+              </div>
+            </div>
+          </div>
 
-            <div className="flex flex-wrap gap-3">
-              <Button
-                onClick={() => {
-                  const upgradePlan = plans.find(p => !p.is_current && p.is_upgrade);
-                  if (upgradePlan) {
-                    setSelectedPlan(upgradePlan);
-                    setPlanModalOpen(true);
-                  }
-                }}
-                className="bg-white text-primary hover:bg-gray-50 flex items-center space-x-2"
-              >
+          <div className="flex flex-wrap gap-3">
+            {userStatus.isSubscribed ? (
+              <>
+                <Button
+                  onClick={() => {
+                    const upgradePlan = plans.find(p => !p.is_current && p.is_upgrade);
+                    if (upgradePlan) {
+                      setSelectedPlan(upgradePlan);
+                      setPlanModalOpen(true);
+                    }
+                  }}
+                  className="bg-white text-primary hover:bg-gray-50 flex items-center space-x-2"
+                >
+                  <ArrowUp className="w-4 h-4" />
+                  <span>Alterar Plano</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="bg-white/20 text-white border-white/30 hover:bg-white/30 flex items-center space-x-2"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  <span>Método de Pagamento</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="bg-red-500/20 text-white border-red-300/30 hover:bg-red-500/30 flex items-center space-x-2"
+                >
+                  <X className="w-4 h-4" />
+                  <span>Cancelar Assinatura</span>
+                </Button>
+              </>
+            ) : (
+              <Button onClick={handleSubscribe} className="bg-white text-primary hover:bg-gray-50 flex items-center space-x-2">
                 <ArrowUp className="w-4 h-4" />
-                <span>Alterar Plano</span>
+                <span>Escolher Plano</span>
               </Button>
-              <Button
-                variant="outline"
-                className="bg-white/20 text-white border-white/30 hover:bg-white/30 flex items-center space-x-2"
-              >
-                <CreditCard className="w-4 h-4" />
-                <span>Método de Pagamento</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="bg-red-500/20 text-white border-red-300/30 hover:bg-red-500/30 flex items-center space-x-2"
-              >
-                <X className="w-4 h-4" />
-                <span>Cancelar Assinatura</span>
-              </Button>
-            </div>
-          </Card>
-        )}
+            )}
+          </div>
+        </Card>
 
         {/* Seção de planos para usuários sem assinatura */}
         {!userStatus.isSubscribed && !userStatus.isAdmin && (
@@ -608,7 +640,7 @@ export default function Plans() {
         )}
 
         {/* Histórico de Pagamentos */}
-        {userStatus.isSubscribed && !userStatus.isAdmin && (
+        {(paymentHistory.length > 0 || (userStatus.isSubscribed && !userStatus.isAdmin)) && (
           <Card className="rounded-xl">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg font-semibold">Histórico de Pagamentos</CardTitle>
@@ -630,45 +662,37 @@ export default function Plans() {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr className="border-b">
-                      <td className="py-4 text-muted-foreground">15 Dez 2024</td>
-                      <td className="py-4 text-muted-foreground">Plano {userStatus.subscriptionTier} - Mensal</td>
-                      <td className="py-4 font-medium">{formatCurrency(currentPlanPrice)}</td>
-                      <td className="py-4">
-                        <Badge variant="secondary" className="bg-green-100 text-green-800">Pago</Badge>
-                      </td>
-                      <td className="py-4">
-                        <Button size="sm" variant="ghost" className="text-primary text-xs">
-                          Baixar
-                        </Button>
-                      </td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="py-4 text-muted-foreground">15 Nov 2024</td>
-                      <td className="py-4 text-muted-foreground">Plano {userStatus.subscriptionTier} - Mensal</td>
-                      <td className="py-4 font-medium">{formatCurrency(currentPlanPrice)}</td>
-                      <td className="py-4">
-                        <Badge variant="secondary" className="bg-green-100 text-green-800">Pago</Badge>
-                      </td>
-                      <td className="py-4">
-                        <Button size="sm" variant="ghost" className="text-primary text-xs">
-                          Baixar
-                        </Button>
-                      </td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="py-4 text-muted-foreground">15 Out 2024</td>
-                      <td className="py-4 text-muted-foreground">Plano {userStatus.subscriptionTier} - Mensal</td>
-                      <td className="py-4 font-medium">{formatCurrency(currentPlanPrice)}</td>
-                      <td className="py-4">
-                        <Badge variant="secondary" className="bg-green-100 text-green-800">Pago</Badge>
-                      </td>
-                      <td className="py-4">
-                        <Button size="sm" variant="ghost" className="text-primary text-xs">
-                          Baixar
-                        </Button>
-                      </td>
-                    </tr>
+                    {paymentHistory.length === 0 ? (
+                      <tr>
+                        <td className="py-6 text-muted-foreground" colSpan={5}>
+                          Nenhum pagamento encontrado.
+                        </td>
+                      </tr>
+                    ) : (
+                      paymentHistory.map((p, idx) => (
+                        <tr key={idx} className="border-b">
+                          <td className="py-4 text-muted-foreground">{p.date ? new Date(p.date).toLocaleDateString('pt-BR') : '-'}</td>
+                          <td className="py-4 text-muted-foreground">{p.description || 'Assinatura'}</td>
+                          <td className="py-4 font-medium">{formatCurrency(p.amount_cents || 0)}</td>
+                          <td className="py-4">
+                            <Badge variant="secondary" className={
+                              ((p.status || '').toLowerCase() === 'paid' ? 'bg-green-100 text-green-800' :
+                              (p.status || '').toLowerCase() === 'pending' ? 'bg-amber-100 text-amber-800' :
+                              'bg-gray-100 text-gray-800'))
+                            }>
+                              {(p.status || '').toLowerCase() === 'paid' ? 'Pago' : (p.status || '—')}
+                            </Badge>
+                          </td>
+                          <td className="py-4">
+                            {p.invoice_url ? (
+                              <a href={p.invoice_url} target="_blank" rel="noreferrer" className="text-primary text-xs">Baixar</a>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">Indisponível</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
