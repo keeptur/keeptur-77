@@ -172,7 +172,21 @@ export default function SubscriptionPage() {
         }
       }
       if (plansResponse.status === 'fulfilled' && plansResponse.value.data?.available_plans) {
-        setAvailablePlans(plansResponse.value.data.available_plans);
+        let plans = plansResponse.value.data.available_plans as AvailablePlan[];
+        const current = (subResponse.status === 'fulfilled' && subResponse.value.data?.current_plan)
+          ? subResponse.value.data.current_plan
+          : undefined;
+        if (current) {
+          plans = plans.map((p) => ({
+            ...p,
+            is_current:
+              p.name === current.name ||
+              (typeof current.seats === 'number' && p.seats === current.seats && p.price_cents === current.price_cents),
+            // Fallback for upgrade/downgrade by seats
+            is_upgrade: typeof current.seats === 'number' ? p.seats > current.seats : p.is_upgrade,
+          }));
+        }
+        setAvailablePlans(plans);
       }
       if (historyResponse.status === 'fulfilled' && historyResponse.value.data?.payment_history) {
         setPaymentHistory(historyResponse.value.data.payment_history);
