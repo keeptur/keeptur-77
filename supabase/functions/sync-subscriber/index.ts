@@ -80,25 +80,30 @@ if (!email && mondeToken) {
 // Get authenticated user info from Supabase
 const authHeader = req.headers.get("Authorization");
 let supabaseUser = null;
+let originalLoginEmail = email; // Preserve original login email for user_email field
 if (authHeader) {
   try {
     const token = authHeader.replace("Bearer ", "");
     const { data: userData } = await supabase.auth.getUser(token);
     supabaseUser = userData.user;
     console.log("Authenticated Supabase user:", supabaseUser?.email);
+    
+    // Preserve the original login email before overwriting
+    if (supabaseUser?.email && !originalLoginEmail) {
+      originalLoginEmail = supabaseUser.email;
+    }
   } catch (error) {
     console.warn("Could not authenticate Supabase user:", error);
   }
 }
 
-// Prioritize authenticated Supabase user data
-if (supabaseUser?.email) {
-  email = supabaseUser.email;
+// Set user_id from authenticated user, but don't overwrite login email
+if (supabaseUser) {
   user_id = supabaseUser.id;
   if (!display_name && supabaseUser.user_metadata?.full_name) {
     display_name = supabaseUser.user_metadata.full_name;
   }
-  console.log(`Using authenticated Supabase user: ${email}`);
+  console.log(`Using authenticated Supabase user ID: ${user_id}, login email: ${originalLoginEmail}`);
 }
 
 // Determine Monde alias and username - prioritize real emails
@@ -297,7 +302,7 @@ if (allRecords && allRecords.length > 1) {
     if (existing?.id) {
       const update: any = {
         email: finalEmail,
-        user_email: supabaseUser?.email || email, // Store the login email separately
+        user_email: originalLoginEmail, // Store the original login email
         last_login_at: now.toISOString(),
         display_name: display_name || existing.display_name || null,
         username: username || (existing as any).username || null,
@@ -318,7 +323,7 @@ if (allRecords && allRecords.length > 1) {
       trial_end = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000).toISOString();
       const { data: inserted } = await admin.from("subscribers").insert({
         email: finalEmail,
-        user_email: supabaseUser?.email || email, // Store the login email separately
+        user_email: originalLoginEmail, // Store the original login email
         user_id,
         display_name: display_name || null,
         username: username || null,
