@@ -43,11 +43,11 @@ serve(async (req) => {
     
     const user = userData.user;
 
-    // Get customer ID from subscriber
+    // Get customer ID from subscriber (check both email and user_email)
     const { data: subscriber } = await supabase
       .from("subscribers")
       .select("stripe_customer_id")
-      .eq("email", user.email)
+      .or(`email.eq.${user.email},user_email.eq.${user.email}`)
       .maybeSingle();
 
     if (!subscriber?.stripe_customer_id) {

@@ -48,7 +48,26 @@ serve(async (req) => {
 
     const isPaid = session.payment_status === 'paid' || session.status === 'complete';
     const buyerEmail = session.metadata?.buyer_email || session.metadata?.customer_email || (session as any)?.customer_details?.email || undefined;
-    const usersData = session.metadata?.users ? JSON.parse(session.metadata.users) : [];
+    
+    // Handle user_emails from metadata (can be JSON array or comma-separated string)
+    let usersData: Array<{ email: string; name?: string }> = [];
+    if (session.metadata?.user_emails) {
+      try {
+        // Try parsing as JSON first
+        usersData = JSON.parse(session.metadata.user_emails);
+      } catch {
+        // Fallback to comma-separated string
+        const emails = session.metadata.user_emails.split(',').map(e => e.trim()).filter(Boolean);
+        usersData = emails.map(email => ({ email, name: email.split('@')[0] }));
+      }
+    } else if (session.metadata?.users) {
+      try {
+        usersData = JSON.parse(session.metadata.users);
+      } catch {
+        usersData = [];
+      }
+    }
+    
     const planName = session.metadata?.plan_name;
     const billingCycle = session.metadata?.billing_cycle || (session.metadata?.is_annual === 'true' ? 'yearly' : 'monthly');
 
@@ -176,7 +195,7 @@ serve(async (req) => {
             logStep('Updated existing buyer subscriber', { existingEmail: existingBuyer.email });
           }
         } else {
-          const { error: buyerError } = await supabaseService
+        const { error: buyerError } = await supabaseService
             .from('subscribers')
             .upsert({
               email: buyerEmail,

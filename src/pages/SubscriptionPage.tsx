@@ -162,6 +162,12 @@ export default function SubscriptionPage() {
           ...prev,
           autoRenewal: !!subResponse.value.data.auto_renewal
         }));
+        
+        // Set contracted users from plan_users
+        if (subResponse.value.data.plan_users) {
+          setContractedUsers(subResponse.value.data.plan_users);
+          setPlanUsers(subResponse.value.data.plan_users);
+        }
       }
       if (plansResponse.status === 'fulfilled' && plansResponse.value.data?.available_plans) {
         setAvailablePlans(plansResponse.value.data.available_plans);
@@ -646,11 +652,18 @@ export default function SubscriptionPage() {
                         </div>)}
                     </div>
                     
-                    <Button className="w-full mt-6" size="lg" variant={plan.is_current ? "outline" : "default"} onClick={() => handleSelectPlan(plan)} disabled={plan.is_current}>
-                      {plan.is_current ? "Plano Atual" : plan.is_upgrade ? <>
+                    <Button 
+                      className="w-full mt-6" 
+                      size="lg" 
+                      variant={plan.is_current ? "outline" : "default"} 
+                      onClick={() => handleSelectPlan(plan)} 
+                      disabled={plan.is_current || (!plan.is_upgrade && subscriptionData.subscribed)}
+                    >
+                      {plan.is_current ? "Plano Atual" : 
+                       plan.is_upgrade ? <>
                           <Zap className="w-4 h-4 mr-2" />
                           Fazer Upgrade
-                        </> : <>
+                        </> : subscriptionData.subscribed ? "Downgrade não permitido" : <>
                           <Zap className="w-4 h-4 mr-2" />
                           Selecionar Plano
                         </>}

@@ -80,11 +80,11 @@ if (!email) {
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
 }
 
-// Get subscriber data by email
+// Get subscriber data by email or user_email
     const { data: subscriber } = await supabase
       .from("subscribers")
       .select("*")
-      .eq("email", email)
+      .or(`email.eq.${email},user_email.eq.${email}`)
       .maybeSingle();
 
     if (!subscriber) {
@@ -164,6 +164,20 @@ if (!email) {
       }
     }
 
+    // Get plan users (subscribers with same stripe_customer_id)
+    let planUsers: string[] = [];
+    if (subscriber.stripe_customer_id) {
+      const { data: planSubscribers } = await supabase
+        .from("subscribers")
+        .select("user_email, email")
+        .eq("stripe_customer_id", subscriber.stripe_customer_id)
+        .eq("subscribed", true);
+      
+      if (planSubscribers) {
+        planUsers = planSubscribers.map(s => s.user_email || s.email).filter(Boolean);
+      }
+    }
+
     return new Response(JSON.stringify({
       subscribed: subscriber.subscribed,
       subscription_tier: subscriber.subscription_tier,
@@ -174,7 +188,8 @@ if (!email) {
       current_plan: currentPlan,
       next_billing_date: subscriptionEnd?.toISOString(),
       auto_renewal: autoRenewal,
-stripe_customer_id: subscriber.stripe_customer_id || null
+      stripe_customer_id: subscriber.stripe_customer_id || null,
+      plan_users: planUsers
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,

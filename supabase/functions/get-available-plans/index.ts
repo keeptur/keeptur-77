@@ -34,7 +34,7 @@ if (userEmail) {
   const { data } = await supabase
     .from("subscribers")
     .select("subscription_tier")
-    .eq("email", userEmail)
+    .or(`email.eq.${userEmail},user_email.eq.${userEmail}`)
     .maybeSingle();
   subscriber = data as any;
 }
@@ -60,6 +60,19 @@ if (userEmail) {
 const availablePlans = (plans || []).map((plan) => {
   const yearlyPriceCents = Math.round(plan.price_cents * 12 * (1 - annualDiscount / 100));
   const isCurrent = subscriber?.subscription_tier === plan.name;
+  
+  // Determine if this is an upgrade (higher price than current plan)
+  let isUpgrade = false;
+  if (subscriber?.subscription_tier && !isCurrent) {
+    const currentPlan = plans?.find(p => p.name === subscriber.subscription_tier);
+    if (currentPlan) {
+      isUpgrade = plan.price_cents > currentPlan.price_cents;
+    }
+  } else if (!subscriber?.subscription_tier) {
+    // If no subscription, all plans are upgrades
+    isUpgrade = true;
+  }
+  
   return {
     id: plan.id,
     name: plan.name,
@@ -72,7 +85,7 @@ const availablePlans = (plans || []).map((plan) => {
     stripe_price_id_monthly: plan.stripe_price_id_monthly,
     stripe_price_id_yearly: plan.stripe_price_id_yearly,
     is_current: !!isCurrent,
-    is_upgrade: false,
+    is_upgrade: isUpgrade,
     sort_order: plan.sort_order,
   };
 });
