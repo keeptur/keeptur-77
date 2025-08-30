@@ -46,13 +46,13 @@ serve(async (req) => {
       }
     }
 
-    const { plan_id, is_annual = false, user_emails = [], monde_token } = await req.json();
+    const { plan_id, is_annual = false, user_emails = [], monde_token, buyer_email } = await req.json();
     
     if (!plan_id) {
       throw new Error("plan_id is required");
     }
 
-    logStep("Request data", { plan_id, is_annual, user_emails_count: user_emails.length });
+    logStep("Request data", { plan_id, is_annual, user_emails_count: user_emails.length, has_monde_token: !!monde_token, buyer_email_present: !!buyer_email });
 
     // Validate Monde emails
     const mondeEmailRegex = /^[^@]+@([a-z0-9-]+\.)*monde\.com\.br$/i;
@@ -83,8 +83,8 @@ serve(async (req) => {
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
 
-    // Determine customer email (priority: user.email > monde token > user_emails[0])
-    let customerEmail = user?.email;
+    // Determine customer email (priority: buyer_email > user.email > monde token > user_emails[0])
+    let customerEmail = (typeof buyer_email === 'string' && buyer_email.trim().length > 0) ? buyer_email : user?.email;
     if (!customerEmail && monde_token) {
       try {
         const payload = JSON.parse(atob(monde_token.split('.')[1]));
@@ -174,6 +174,7 @@ serve(async (req) => {
     }
 
     // Create checkout session
+    const origin = req.headers.get("origin") || "http://localhost:5173";
     const sessionConfig: any = {
       customer: customerId || undefined,
       customer_email: customerId ? undefined : customerEmail,
@@ -194,8 +195,8 @@ serve(async (req) => {
         },
       ],
       mode: "subscription",
-      success_url: `${req.headers.get("origin")}/subscription?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.get("origin")}/subscription`,
+      success_url: `${origin}/subscription?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/subscription`,
       metadata: {
         plan_id: plan_id,
         plan_name: planData.name,
