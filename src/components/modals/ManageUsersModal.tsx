@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -59,7 +59,9 @@ export function ManageUsersModal({ open, onOpenChange, planSeats, users, onUsers
     try {
       const { data, error } = await supabase.functions.invoke('add-plan-users', {
         body: {
-          user_emails: [newUserEmail]
+          user_emails: [newUserEmail],
+          buyer_email: users[0],
+          mondeToken: typeof window !== 'undefined' ? localStorage.getItem('monde_token') : undefined,
         }
       });
 
@@ -102,6 +104,7 @@ export function ManageUsersModal({ open, onOpenChange, planSeats, users, onUsers
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Gerenciar usuários do plano</DialogTitle>
+          <DialogDescription className="sr-only">Gerencie os usuários vinculados ao seu plano</DialogDescription>
         </DialogHeader>
         
         <Card>

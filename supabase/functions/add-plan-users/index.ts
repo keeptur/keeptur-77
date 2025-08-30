@@ -28,29 +28,47 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      throw new Error("No Authorization header provided");
-    }
+    // Parse body early and try to resolve buyer's email from provided data
+    let body: any = {};
+    try { body = await req.json(); } catch (_) {}
+    const { user_emails, buyer_email, mondeToken } = body || {};
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !userData.user?.email) {
-      throw new Error("Authentication failed");
-    }
-
-    const { user_emails } = await req.json();
     if (!Array.isArray(user_emails)) {
       throw new Error("user_emails must be an array");
     }
 
-    logStep("Adding plan users", { user_emails, buyer: userData.user.email });
+    // Try multiple strategies to identify the buyer email
+    let buyerEmail: string | undefined = buyer_email;
+
+    // 1) Try Supabase Auth token if available (may be absent in our flow)
+    const authHeader = req.headers.get("Authorization");
+    if (!buyerEmail && authHeader?.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.replace("Bearer ", "");
+        const { data: userData } = await supabase.auth.getUser(token);
+        buyerEmail = userData.user?.email ?? buyerEmail;
+      } catch { /* ignore */ }
+    }
+
+    // 2) Try Monde token payload (if it contains email)
+    if (!buyerEmail && typeof mondeToken === 'string') {
+      try {
+        const payload = JSON.parse(atob(mondeToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        buyerEmail = payload?.email || payload?.user_email || payload?.sub;
+      } catch { /* ignore */ }
+    }
+
+    if (!buyerEmail) {
+      throw new Error("Could not determine buyer email. Pass buyer_email in body.");
+    }
+
+    logStep("Adding plan users", { user_emails, buyer: buyerEmail });
 
     // Get buyer's subscription info
     const { data: buyerSubscriber } = await supabase
       .from("subscribers")
       .select("stripe_customer_id, subscription_tier, subscription_end")
-      .or(`email.eq.${userData.user.email},user_email.eq.${userData.user.email}`)
+      .or(`email.eq.${buyerEmail},user_email.eq.${buyerEmail}`)
       .eq("subscribed", true)
       .maybeSingle();
 
