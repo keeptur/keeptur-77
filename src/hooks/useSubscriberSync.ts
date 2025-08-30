@@ -54,10 +54,25 @@ export function useSubscriberSync() {
           trial_end: trialEnd,
         };
 
+        let result;
         if (existing?.id) {
-          await supabase.from("subscribers").update(payload).eq("id", existing.id);
+          result = await supabase.from("subscribers").update(payload).eq("id", existing.id);
         } else {
-          await supabase.from("subscribers").insert(payload);
+          result = await supabase.from("subscribers").insert(payload);
+        }
+        
+        // Fallback via Edge Function if RLS prevents update/insert
+        if ((result as any)?.error) {
+          await supabase.functions.invoke("sync-subscriber", {
+            body: {
+              mondeToken,
+              email,
+              name: payload.display_name,
+              source: "monde",
+              userId: user.id,
+              loginEmail: loginEmail,
+            },
+          }).catch(() => {/* silent */});
         }
         return;
       }
