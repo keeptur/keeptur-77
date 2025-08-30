@@ -3,7 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Check, Star, Users, Zap, Clock, Crown } from "lucide-react";
+import { 
+  Check, Star, Users, Zap, Clock, Crown, User, Calendar, RefreshCw, 
+  ArrowUp, CreditCard, X, Download, UserPlus, Edit, Trash2
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { PlanSelectionModal } from "@/components/modals/PlanSelectionModal";
@@ -268,63 +271,25 @@ export default function Plans() {
     );
   }
 
+  const currentPlan = plans.find(p => p.is_current);
+  const currentPlanPrice = currentPlan ? (isAnnual ? currentPlan.yearly_price_cents / 12 : currentPlan.price_cents) : 0;
+
   return (
-    <div className="min-h-screen bg-muted/30">
-      {/* Header com informações do usuário */}
-      {!userStatus.isAdmin && (
-        <div className={`${
-          userStatus.isSubscribed 
-            ? 'bg-gradient-to-r from-green-600 to-emerald-600' 
-            : 'bg-gradient-to-r from-primary to-blue-600'
-        } text-white`}>
-          <div className="container max-w-7xl mx-auto px-4 py-8">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
-                  userStatus.isSubscribed ? 'bg-green-500/20' : 'bg-white/20'
-                }`}>
-                  {userStatus.isSubscribed ? (
-                    <Crown className={`w-8 h-8 ${userStatus.isSubscribed ? 'text-green-300' : 'text-white'}`} />
-                  ) : (
-                    <Clock className="w-8 h-8" />
-                  )}
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold">
-                    {userStatus.isSubscribed 
-                      ? `Plano ${userStatus.subscriptionTier || 'Ativo'}` 
-                      : userStatus.isInTrial 
-                        ? "Período de Trial" 
-                        : "Sem Plano Ativo"}
-                  </h2>
-                  <p className={userStatus.isSubscribed ? "text-green-100" : "text-blue-100"}>
-                    {userStatus.isSubscribed
-                      ? `${userStatus.daysRemaining} dias de plano ativo`
-                      : userStatus.isInTrial
-                        ? `${userStatus.daysRemaining} dias restantes`
-                        : "Escolha um plano para continuar"}
-                  </p>
-                </div>
-              </div>
-              
-              {(!userStatus.isSubscribed || userStatus.isInTrial) && (
-                <Button
-                  onClick={handleSubscribe}
-                  size="lg"
-                  className="bg-white text-primary hover:bg-blue-50"
-                >
-                  {userStatus.isInTrial ? "Assinar agora" : "Escolher Plano"}
-                </Button>
-              )}
-            </div>
+    <div className="min-h-screen bg-background">
+      <div className="max-w-6xl mx-auto space-y-8 p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Minhas Assinaturas</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Gerencie suas assinaturas ativas e histórico de pagamentos
+            </p>
           </div>
         </div>
-      )}
 
-      {/* Conteúdo principal */}
-      <div className="container max-w-7xl mx-auto px-4 py-8">
+        {/* Status de pagamento */}
         {paymentStatus && (
-          <Card className={`mb-6 border-2 ${
+          <Card className={`border-2 ${
             paymentStatus === 'success' ? 'border-green-500 bg-green-50' : 
             paymentStatus === 'checking' ? 'border-blue-500 bg-blue-50' : 
             'border-yellow-500 bg-yellow-50'
@@ -343,124 +308,375 @@ export default function Plans() {
             </CardContent>
           </Card>
         )}
-        
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold tracking-tight mb-4">Escolha seu Plano</h1>
-          <p className="text-xl text-muted-foreground mb-6">
-            Selecione o plano ideal para sua equipe
-          </p>
-          
-          <div className="flex items-center justify-center space-x-4 mb-8">
-            <span className="text-sm font-medium">Mensal</span>
-            <Switch checked={isAnnual} onCheckedChange={setIsAnnual} />
-            <span className="text-sm font-medium">Anual</span>
-            <Badge variant="secondary" className="ml-2">
-              Economize {annualDiscount}%
-            </Badge>
-          </div>
-        </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
-          {plans.map((plan) => {
-            const monthlyPrice = isAnnual ? plan.yearly_price_cents / 12 : plan.price_cents;
-            const yearlyTotal = plan.yearly_price_cents;
-            const monthlySavings = isAnnual ? (plan.price_cents * 12) - yearlyTotal : 0;
-            const pricePerUser = monthlyPrice / plan.seats;
-            
-            return (
-              <Card 
-                key={plan.id}
-                className={`relative transition-all duration-200 hover:shadow-lg ${
-                  plan.is_current ? 'ring-2 ring-primary shadow-lg' : ''
-                }`}
+        {/* Card do plano atual */}
+        {userStatus.isSubscribed && !userStatus.isAdmin && (
+          <Card className="rounded-xl p-6 bg-gradient-to-r from-primary to-blue-600 text-white">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-semibold">Plano {userStatus.subscriptionTier || 'Pro'}</h2>
+                <p className="text-blue-100 text-sm">
+                  Assinatura ativa desde {new Date().toLocaleDateString('pt-BR')}
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="flex items-baseline">
+                  <span className="text-2xl font-bold">{formatCurrency(currentPlanPrice)}</span>
+                  <span className="text-sm ml-1 text-blue-100">/mês</span>
+                </div>
+                <p className="text-xs text-blue-100 mt-1">
+                  Próxima cobrança: {new Date(Date.now() + userStatus.daysRemaining * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR')}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div className="bg-white/10 rounded-lg p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                    <User className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-blue-100">Usuários</p>
+                    <p className="font-semibold">{planUsers.length} de {currentPlan?.seats || 1}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white/10 rounded-lg p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                    <Calendar className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-blue-100">Dias restantes</p>
+                    <p className="font-semibold">{userStatus.daysRemaining} dias</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white/10 rounded-lg p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                    <RefreshCw className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-blue-100">Renovação</p>
+                    <p className="font-semibold">Automática</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Button
+                onClick={() => {
+                  const upgradePlan = plans.find(p => !p.is_current && p.is_upgrade);
+                  if (upgradePlan) {
+                    setSelectedPlan(upgradePlan);
+                    setPlanModalOpen(true);
+                  }
+                }}
+                className="bg-white text-primary hover:bg-gray-50 flex items-center space-x-2"
               >
-                {plan.is_current && (
-                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                    <Badge className="bg-primary text-primary-foreground">
-                      <Star className="w-3 h-3 mr-1" />
-                      Plano Atual
-                    </Badge>
-                  </div>
-                )}
+                <ArrowUp className="w-4 h-4" />
+                <span>Alterar Plano</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="bg-white/20 text-white border-white/30 hover:bg-white/30 flex items-center space-x-2"
+              >
+                <CreditCard className="w-4 h-4" />
+                <span>Método de Pagamento</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="bg-red-500/20 text-white border-red-300/30 hover:bg-red-500/30 flex items-center space-x-2"
+              >
+                <X className="w-4 h-4" />
+                <span>Cancelar Assinatura</span>
+              </Button>
+            </div>
+          </Card>
+        )}
+
+        {/* Seção de planos para usuários sem assinatura */}
+        {!userStatus.isSubscribed && !userStatus.isAdmin && (
+          <>
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold tracking-tight mb-4">Escolha seu Plano</h2>
+              <p className="text-xl text-muted-foreground mb-6">
+                Selecione o plano ideal para sua equipe
+              </p>
+              
+              <div className="flex items-center justify-center space-x-4 mb-8">
+                <span className="text-sm font-medium">Mensal</span>
+                <Switch checked={isAnnual} onCheckedChange={setIsAnnual} />
+                <span className="text-sm font-medium">Anual</span>
+                <Badge variant="secondary" className="ml-2">
+                  Economize {annualDiscount}%
+                </Badge>
+              </div>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {plans.map((plan) => {
+                const monthlyPrice = isAnnual ? plan.yearly_price_cents / 12 : plan.price_cents;
+                const yearlyTotal = plan.yearly_price_cents;
+                const monthlySavings = isAnnual ? (plan.price_cents * 12) - yearlyTotal : 0;
                 
-                <CardHeader className="text-center pb-4">
-                  <CardTitle className="text-2xl font-bold">{plan.name}</CardTitle>
-                  {plan.description && (
-                    <CardDescription className="text-base">{plan.description}</CardDescription>
-                  )}
-                  
-                  <div className="mt-4">
-                    <div className="flex items-baseline justify-center">
-                      <span className="text-4xl font-bold">
-                        {formatCurrency(monthlyPrice)}
-                      </span>
-                      <span className="text-muted-foreground ml-1">/mês</span>
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      {formatPricePerUser(monthlyPrice, plan.seats)} por usuário
-                    </div>
-                    
-                    {isAnnual && monthlySavings > 0 && (
-                      <p className="text-sm text-green-600 mt-2">
-                        Economize {formatCurrency(monthlySavings)} por ano
-                      </p>
+                return (
+                  <Card 
+                    key={plan.id}
+                    className={`relative transition-all duration-200 hover:shadow-lg ${
+                      plan.is_current ? 'ring-2 ring-primary shadow-lg' : ''
+                    }`}
+                  >
+                    {plan.is_current && (
+                      <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                        <Badge className="bg-primary text-primary-foreground">
+                          <Star className="w-3 h-3 mr-1" />
+                          Plano Atual
+                        </Badge>
+                      </div>
                     )}
+                    
+                    <CardHeader className="text-center pb-4">
+                      <CardTitle className="text-2xl font-bold">{plan.name}</CardTitle>
+                      {plan.description && (
+                        <CardDescription className="text-base">{plan.description}</CardDescription>
+                      )}
+                      
+                      <div className="mt-4">
+                        <div className="flex items-baseline justify-center">
+                          <span className="text-4xl font-bold">
+                            {formatCurrency(monthlyPrice)}
+                          </span>
+                          <span className="text-muted-foreground ml-1">/mês</span>
+                        </div>
+                        <div className="text-sm text-muted-foreground mt-1">
+                          {formatPricePerUser(monthlyPrice, plan.seats)} por usuário
+                        </div>
+                        
+                        {isAnnual && monthlySavings > 0 && (
+                          <p className="text-sm text-green-600 mt-2">
+                            Economize {formatCurrency(monthlySavings)} por ano
+                          </p>
+                        )}
+                      </div>
+                    </CardHeader>
+                    
+                    <CardContent className="space-y-6">
+                      <div className="flex items-center justify-center text-muted-foreground">
+                        <Users className="w-4 h-4 mr-2" />
+                        <span>Até {plan.seats} usuários</span>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        {plan.features.map((feature, index) => (
+                          <div key={index} className="flex items-start space-x-3">
+                            <Check className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                            <span className="text-sm">{feature}</span>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <Button 
+                        className="w-full mt-6" 
+                        size="lg"
+                        variant={plan.is_current ? "outline" : "default"}
+                        onClick={() => handleSelectPlan(plan)}
+                        disabled={plan.is_current}
+                      >
+                        {plan.is_current ? (
+                          "Plano Atual"
+                        ) : plan.is_upgrade ? (
+                          <>
+                            <Zap className="w-4 h-4 mr-2" />
+                            Fazer Upgrade
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="w-4 h-4 mr-2" />
+                            Selecionar Plano
+                          </>
+                        )}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {/* Seções para usuários com assinatura */}
+        {userStatus.isSubscribed && !userStatus.isAdmin && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Configurações da Assinatura */}
+            <Card className="rounded-xl">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold">Configurações da Assinatura</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Renovação Automática</p>
+                    <p className="text-xs text-muted-foreground">Renovar automaticamente na data de vencimento</p>
                   </div>
-                </CardHeader>
-                
-                <CardContent className="space-y-6">
-                  <div className="flex items-center justify-center text-muted-foreground">
-                    <Users className="w-4 h-4 mr-2" />
-                    <span>Até {plan.seats} usuários</span>
+                  <Switch defaultChecked />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Notificações de Cobrança</p>
+                    <p className="text-xs text-muted-foreground">Receber lembretes antes da cobrança</p>
                   </div>
-                  
-                  <div className="space-y-3">
-                    {plan.features.map((feature, index) => (
-                      <div key={index} className="flex items-start space-x-3">
-                        <Check className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                        <span className="text-sm">{feature}</span>
+                  <Switch defaultChecked />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">E-mails Promocionais</p>
+                    <p className="text-xs text-muted-foreground">Receber ofertas e promoções especiais</p>
+                  </div>
+                  <Switch />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Usuários da Conta */}
+            <Card className="rounded-xl">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-lg font-semibold">Usuários da Conta</CardTitle>
+                <Button size="sm" variant="ghost" className="text-primary">
+                  <UserPlus className="w-4 h-4 mr-1" />
+                  Adicionar Usuário
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="text-xs text-muted-foreground">
+                    {planUsers.length} de {currentPlan?.seats || 1} usuários utilizados
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm">
+                          JD
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">João Dias</p>
+                          <p className="text-xs text-muted-foreground">
+                            {userStatus.userEmail || 'joao@empresa.monde.com.br'}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant="secondary">Admin</Badge>
+                    </div>
+                    {planUsers.map((user, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-white text-sm">
+                            {user.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{user}</p>
+                            <p className="text-xs text-muted-foreground">{user}@empresa.monde.com.br</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button size="sm" variant="ghost">
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost">
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
-                  
-                  <Button 
-                    className="w-full mt-6" 
-                    size="lg"
-                    variant={plan.is_current ? "outline" : "default"}
-                    onClick={() => handleSelectPlan(plan)}
-                    disabled={plan.is_current}
-                  >
-                    {plan.is_current ? (
-                      "Plano Atual"
-                    ) : plan.is_upgrade ? (
-                      <>
-                        <Zap className="w-4 h-4 mr-2" />
-                        Fazer Upgrade
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="w-4 h-4 mr-2" />
-                        Selecionar Plano
-                      </>
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-
-        {/* Gestão de usuários - só exibir se tiver plano ativo */}
-        {userStatus.isSubscribed && !userStatus.isAdmin && (
-          <div className="max-w-4xl mx-auto mt-8">
-            <UserManagement
-              planSeats={plans.find(p => p.is_current)?.seats || 1}
-              currentUsers={planUsers}
-              onUsersUpdate={setPlanUsers}
-            />
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 
+        {/* Gestão de usuários detalhada */}
+        {userStatus.isSubscribed && !userStatus.isAdmin && (
+          <UserManagement
+            planSeats={currentPlan?.seats || 1}
+            currentUsers={planUsers}
+            onUsersUpdate={setPlanUsers}
+          />
+        )}
+
+        {/* Histórico de Pagamentos */}
+        {userStatus.isSubscribed && !userStatus.isAdmin && (
+          <Card className="rounded-xl">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg font-semibold">Histórico de Pagamentos</CardTitle>
+              <Button size="sm" variant="ghost" className="text-primary">
+                <Download className="w-4 h-4 mr-1" />
+                Baixar Fatura
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-3 font-medium">Data</th>
+                      <th className="text-left py-3 font-medium">Descrição</th>
+                      <th className="text-left py-3 font-medium">Valor</th>
+                      <th className="text-left py-3 font-medium">Status</th>
+                      <th className="text-left py-3 font-medium">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b">
+                      <td className="py-4 text-muted-foreground">15 Dez 2024</td>
+                      <td className="py-4 text-muted-foreground">Plano {userStatus.subscriptionTier} - Mensal</td>
+                      <td className="py-4 font-medium">{formatCurrency(currentPlanPrice)}</td>
+                      <td className="py-4">
+                        <Badge variant="secondary" className="bg-green-100 text-green-800">Pago</Badge>
+                      </td>
+                      <td className="py-4">
+                        <Button size="sm" variant="ghost" className="text-primary text-xs">
+                          Baixar
+                        </Button>
+                      </td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="py-4 text-muted-foreground">15 Nov 2024</td>
+                      <td className="py-4 text-muted-foreground">Plano {userStatus.subscriptionTier} - Mensal</td>
+                      <td className="py-4 font-medium">{formatCurrency(currentPlanPrice)}</td>
+                      <td className="py-4">
+                        <Badge variant="secondary" className="bg-green-100 text-green-800">Pago</Badge>
+                      </td>
+                      <td className="py-4">
+                        <Button size="sm" variant="ghost" className="text-primary text-xs">
+                          Baixar
+                        </Button>
+                      </td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="py-4 text-muted-foreground">15 Out 2024</td>
+                      <td className="py-4 text-muted-foreground">Plano {userStatus.subscriptionTier} - Mensal</td>
+                      <td className="py-4 font-medium">{formatCurrency(currentPlanPrice)}</td>
+                      <td className="py-4">
+                        <Badge variant="secondary" className="bg-green-100 text-green-800">Pago</Badge>
+                      </td>
+                      <td className="py-4">
+                        <Button size="sm" variant="ghost" className="text-primary text-xs">
+                          Baixar
+                        </Button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Modal de seleção de planos */}
         {selectedPlan && (
           <PlanSelectionModal
             open={planModalOpen}
