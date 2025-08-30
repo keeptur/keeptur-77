@@ -36,7 +36,7 @@ const navigationItems = [
     { title: "Dashboard", url: "/admin?t=dashboard", icon: LayoutDashboard },
     { title: "Usuários", url: "/admin?t=users", icon: Users },
     { title: "Planos", url: "/admin?t=plans", icon: Package },
-    { title: "E-mails", url: "/admin?t=emails", icon: Mail },
+    { title: "E-mails", url: "/admin/emails", icon: Mail },
     { title: "Logs", url: "/admin?t=logs", icon: FileText },
   ];
 

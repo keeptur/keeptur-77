@@ -131,7 +131,7 @@ const AppWrapper = () => {
                 <Route path="admin/users" element={<Navigate to="/admin?t=users" replace />} />
                 <Route path="admin/plans" element={<Navigate to="/admin?t=plans" replace />} />
                 <Route path="admin/billing" element={<Navigate to="/admin?t=billing" replace />} />
-                <Route path="admin/emails" element={<Navigate to="/admin?t=emails" replace />} />
+                <Route path="admin/emails" element={<AdminRoute><AdminEmailsPage /></AdminRoute>} />
                 <Route path="admin/logs" element={<Navigate to="/admin?t=logs" replace />} />
               </Route>
             </Routes>
