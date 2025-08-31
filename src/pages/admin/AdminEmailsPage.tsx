@@ -302,13 +302,26 @@ export default function AdminEmailsPage() {
       });
 
       if (error) throw error;
-      if (data && data.success === false) throw new Error(data.error || 'Falha no envio');
 
-      toast({
-        title: "Sucesso",
-        description: "Email de teste enviado com sucesso!"
-      });
+      if (data?.success) {
+        toast({
+          title: "Sucesso",
+          description: data?.message || "Email de teste enviado com sucesso!"
+        });
+        if (data?.warning) {
+          toast({
+            title: "Aviso",
+            description: data.warning,
+          });
+        }
+        return;
+      }
+
+      // Se veio resposta com erro estruturado
+      const errMsg = data?.error || data?.message || 'Falha no envio (veja logs da função)';
+      throw new Error(errMsg);
     } catch (error: any) {
+      console.error('send-test-email error:', error);
       toast({
         title: "Erro",
         description: error?.message || "Erro ao enviar email de teste",

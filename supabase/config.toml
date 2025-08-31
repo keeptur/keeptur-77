@@ -32,3 +32,9 @@ verify_jwt = true
 
 [functions.merge-subscribers]
 verify_jwt = true
+
+[functions.send-test-email]
+verify_jwt = true
+
+[functions.send-bulk-emails]
+verify_jwt = true
