@@ -30,13 +30,14 @@ const handler = async (req: Request): Promise<Response> => {
 
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
     if (!RESEND_API_KEY) {
+      // 200 + success:false para não quebrar o frontend com non-2xx
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Falta configurar o RESEND_API_KEY nos secrets do Supabase.',
+          error: 'RESEND_API_KEY não configurado.',
           hint: 'Crie uma API key em https://resend.com/api-keys e adicione em Settings > Functions > Secrets.'
         }),
-        { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
 
@@ -49,7 +50,7 @@ const handler = async (req: Request): Promise<Response> => {
           success: false, 
           error: "Informe o campo 'Email de Envio' (from_email).",
         }),
-        { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
 
@@ -58,11 +59,11 @@ const handler = async (req: Request): Promise<Response> => {
     if (!domain) {
       return new Response(
         JSON.stringify({ success: false, error: 'E-mail de envio inválido.' }),
-        { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
 
-    // If using Resend default sender
+    // Caso especial: remetente padrão da Resend
     if (domain === 'resend.dev') {
       return new Response(
         JSON.stringify({
@@ -76,23 +77,32 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Check domain verification status in Resend
+    // Verifica status do domínio na Resend (tenta subdomínio e depois domínio raiz)
     let verified = false;
     let status: string | undefined;
+    let checkedDomain = domain;
     try {
       const listResp: any = await resend.domains.list();
       const domains: any[] = (listResp?.data) || [];
-      const match = domains.find((d) => (d?.name || '').toLowerCase() === domain);
+      const findByName = (name: string) => domains.find((d) => (d?.name || '').toLowerCase() === name);
+
+      let match = findByName(domain);
+      if (!match && domain.split('.').length > 2) {
+        const apex = domain.split('.').slice(-2).join('.');
+        match = findByName(apex);
+        if (match) checkedDomain = apex;
+      }
+
       status = match?.status;
       verified = status === 'verified';
-    } catch (e) {
-      // If listing fails, return a useful error instead of a false OK
+    } catch (e: any) {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Não foi possível consultar os domínios na Resend. Verifique a API key e tente novamente.',
+          error: 'Falha ao consultar domínios na Resend.',
+          details: { message: e?.message || String(e) }
         }),
-        { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
 
@@ -100,22 +110,22 @@ const handler = async (req: Request): Promise<Response> => {
       return new Response(
         JSON.stringify({
           success: false,
-          error: `Domínio '${domain}' não verificado na Resend.`,
+          error: `Domínio não verificado na Resend: '${checkedDomain}'.`,
           hint: 'Acesse https://resend.com/domains, adicione/verifique o domínio e use um remetente desse domínio (ex.: noreply@seu-dominio.com).',
-          details: { from_email: fromEmail, domain, domain_status: status || 'not_found' }
+          details: { from_email: fromEmail, domain: checkedDomain, domain_status: status || 'not_found' }
         }),
         { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
 
-    // Domain is verified => consider connection OK
+    // Domínio verificado => OK
     return new Response(
       JSON.stringify({
         success: true,
         provider: 'resend',
         fallback: false,
-        message: `Conexão OK. Domínio '${domain}' verificado na Resend.`,
-        details: { from_email: fromEmail, domain, domain_status: 'verified' }
+        message: `Conexão OK. Domínio '${checkedDomain}' verificado na Resend.`,
+        details: { from_email: fromEmail, domain: checkedDomain, domain_status: 'verified' }
       }),
       { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
@@ -123,7 +133,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.error('Error in test-smtp-connection function:', error);
     return new Response(
       JSON.stringify({ success: false, error: error.message || 'Erro desconhecido' }),
-      { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
   }
 };
