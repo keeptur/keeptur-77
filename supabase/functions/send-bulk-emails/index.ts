@@ -79,6 +79,13 @@ const handler = async (req: Request): Promise<Response> => {
           let emailContent = (template as any).html as string;
           let emailSubject = (template as any).subject as string;
 
+          // Adicionar cabeçalho com logo Keeptur
+          const logoHeader = `
+            <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid #e5e5e5; margin-bottom: 30px;">
+              <img src="https://lquuoriatdcspbcvgsbg.supabase.co/storage/v1/object/public/avatars/keeptur-logo.png" alt="Keeptur" style="max-height: 60px; height: auto;" />
+            </div>
+          `;
+
           const variables: Record<string, string> = {
             '{{nome_usuario}}': profile?.full_name || 'Usuário',
             '{{email}}': email,
@@ -95,6 +102,11 @@ const handler = async (req: Request): Promise<Response> => {
             emailContent = emailContent.replace(new RegExp(variable, 'g'), value);
             emailSubject = emailSubject.replace(new RegExp(variable, 'g'), value);
           });
+
+          // Adicionar logo no início do conteúdo se não estiver presente
+          if (!emailContent.includes('img')) {
+            emailContent = logoHeader + emailContent;
+          }
 
           const sendResult = await resend.emails.send({
             from: `Keeptur <${fromEmail}>`,

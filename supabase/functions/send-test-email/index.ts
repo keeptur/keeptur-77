@@ -11,6 +11,8 @@ interface SendTestEmailRequest {
   to_email: string;
   template_id: string;
   template_type: string;
+  logo_url?: string;
+  base_url?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -20,7 +22,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { to_email, template_id, template_type }: SendTestEmailRequest = await req.json();
+    const { to_email, template_id, template_type, logo_url, base_url }: SendTestEmailRequest = await req.json();
 
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
     if (!RESEND_API_KEY) {
@@ -65,6 +67,13 @@ const handler = async (req: Request): Promise<Response> => {
     let emailContent = (template as any).html as string;
     let emailSubject = (template as any).subject as string;
 
+    // Adicionar cabeçalho com logo se fornecido
+    const logoHeader = logo_url ? `
+      <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid #e5e5e5; margin-bottom: 30px;">
+        <img src="${logo_url}" alt="Keeptur" style="max-height: 60px; height: auto;" />
+      </div>
+    ` : '';
+
     const testVariables: Record<string, string> = {
       '{{nome_usuario}}': 'Usuário Teste',
       '{{email}}': to_email,
@@ -74,13 +83,18 @@ const handler = async (req: Request): Promise<Response> => {
       '{{valor_plano}}': 'R$ 39,90',
       '{{nome_plano}}': 'Plano Premium',
       '{{link_pagamento}}': 'https://exemplo.com/pagamento',
-      '{{link_acesso}}': 'https://exemplo.com/acesso'
+      '{{link_acesso}}': base_url || 'https://exemplo.com/acesso'
     };
 
     Object.entries(testVariables).forEach(([variable, value]) => {
       emailContent = emailContent.replace(new RegExp(variable, 'g'), value);
       emailSubject = emailSubject.replace(new RegExp(variable, 'g'), value);
     });
+
+    // Adicionar logo no início do conteúdo se não estiver presente
+    if (logoHeader && !emailContent.includes('img')) {
+      emailContent = logoHeader + emailContent;
+    }
 
     // Send email with Resend
     const result = await resend.emails.send({
