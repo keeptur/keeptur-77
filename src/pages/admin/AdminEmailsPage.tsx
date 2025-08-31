@@ -31,6 +31,7 @@ import {
   Upload
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import EmailPreview from "@/components/emails/EmailPreview";
 
 interface EmailTemplate {
   id: string;
@@ -499,8 +500,8 @@ export default function AdminEmailsPage() {
                                     <DialogHeader>
                                       <DialogTitle>Preview: {template.subject}</DialogTitle>
                                     </DialogHeader>
-                                    <div className="border rounded p-3 bg-background">
-                                      <div dangerouslySetInnerHTML={{ __html: template.html }} />
+                                    <div className="rounded bg-background">
+                                      <EmailPreview html={template.html} height={700} />
                                     </div>
                                   </DialogContent>
                                 </Dialog>
@@ -571,10 +572,9 @@ export default function AdminEmailsPage() {
                       <div className="text-sm text-muted-foreground">{selectedTemplate.subject}</div>
                       <Separator />
                       <div className="font-medium">Conteúdo:</div>
-                      <div 
-                        className="text-sm border rounded p-2 max-h-40 overflow-y-auto"
-                        dangerouslySetInnerHTML={{ __html: selectedTemplate.html }}
-                      />
+                      <div className="text-sm border rounded p-2">
+                        <EmailPreview html={selectedTemplate.html} height={320} />
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
