@@ -38,3 +38,6 @@ verify_jwt = true
 
 [functions.send-bulk-emails]
 verify_jwt = true
+
+[functions.send-automated-email]
+verify_jwt = false

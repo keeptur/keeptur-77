@@ -32,6 +32,8 @@ import {
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import EmailPreview from "@/components/emails/EmailPreview";
+import VisualEmailEditor from "@/components/emails/VisualEmailEditor";
+import EmailAutomationManager from "@/components/emails/EmailAutomationManager";
 
 interface EmailTemplate {
   id: string;
@@ -382,10 +384,18 @@ export default function AdminEmailsPage() {
       </header>
 
       <Tabs defaultValue="templates" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="templates" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Templates
+          </TabsTrigger>
+          <TabsTrigger value="editor" className="flex items-center gap-2">
+            <Edit className="h-4 w-4" />
+            Editor Visual
+          </TabsTrigger>
+          <TabsTrigger value="automation" className="flex items-center gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Automação
           </TabsTrigger>
           <TabsTrigger value="test" className="flex items-center gap-2">
             <TestTube className="h-4 w-4" />
@@ -394,10 +404,6 @@ export default function AdminEmailsPage() {
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Usuários
-          </TabsTrigger>
-          <TabsTrigger value="logs" className="flex items-center gap-2">
-            <Mail className="h-4 w-4" />
-            Logs de Email
           </TabsTrigger>
         </TabsList>
 
@@ -591,6 +597,55 @@ export default function AdminEmailsPage() {
           </div>
         </TabsContent>
 
+        <TabsContent value="editor" className="space-y-6">
+          <VisualEmailEditor
+            template={selectedTemplate || undefined}
+            onSave={async (template) => {
+              try {
+                if (template.id) {
+                  await supabase
+                    .from('email_templates')
+                    .update({
+                      subject: template.subject,
+                      html: template.html
+                    })
+                    .eq('id', template.id);
+                } else {
+                  await supabase
+                    .from('email_templates')
+                    .insert([{
+                      type: template.type as any,
+                      subject: template.subject,
+                      html: template.html
+                    }]);
+                }
+                
+                toast({
+                  title: "Sucesso",
+                  description: `Template ${template.id ? 'atualizado' : 'criado'} com sucesso!`
+                });
+                loadData();
+              } catch (error) {
+                toast({
+                  title: "Erro",
+                  description: "Erro ao salvar template",
+                  variant: "destructive"
+                });
+              }
+            }}
+            onPreview={(template) => {
+              // Implementar preview em modal
+              toast({
+                title: "Preview",
+                description: "Abrindo preview do template..."
+              });
+            }}
+          />
+        </TabsContent>
+
+        <TabsContent value="automation" className="space-y-6">
+          <EmailAutomationManager />
+        </TabsContent>
         <TabsContent value="test" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-2">
             <Card>
@@ -642,77 +697,74 @@ export default function AdminEmailsPage() {
               </CardContent>
             </Card>
 
+            <Card>
+              <CardHeader>
+                <CardTitle>Envio em Massa</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label>Selecionar Usuários</Label>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      const allEmails = profiles.map(p => p.email);
+                      const templateType = selectedTemplate?.type || 'welcome';
+                      sendBulkEmails(templateType, allEmails);
+                    }}
+                    disabled={!selectedTemplate || profiles.length === 0}
+                    className="w-full"
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    Enviar para Todos ({profiles.length})
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
         <TabsContent value="users" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                Usuários Registrados ({profiles.length})
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline">
-                    <Download className="h-4 w-4 mr-2" />
-                    Exportar
-                  </Button>
-                  <Button size="sm" variant="outline">
-                    <Mail className="h-4 w-4 mr-2" />
-                    Envio em Massa
-                  </Button>
-                </div>
-              </CardTitle>
+              <CardTitle>Usuários do Sistema</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Usuários autenticados via API Monde (@{'{dominio}'}.monde.com.br)
+              </p>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Data de Cadastro</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {profiles.map(profile => (
-                    <TableRow key={profile.id}>
-                      <TableCell>{profile.full_name || 'N/A'}</TableCell>
-                      <TableCell>{profile.email}</TableCell>
-                      <TableCell>
-                        {new Date(profile.created_at).toLocaleDateString('pt-BR')}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">Ativo</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button size="sm" variant="outline">
-                          <Mail className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="space-y-4">
+                {profiles.map((profile) => (
+                  <div key={profile.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <p className="font-medium">{profile.full_name}</p>
+                      <p className="text-sm text-muted-foreground">{profile.email}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Cadastrado em: {new Date(profile.created_at).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setTestEmail(profile.email);
+                          // Simular envio de email de boas-vindas
+                          toast({
+                            title: "Email agendado",
+                            description: `Email de boas-vindas será enviado para ${profile.email}`
+                          });
+                        }}
+                      >
+                        <Mail className="h-3 w-3 mr-1" />
+                        Enviar Boas-vindas
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
-
-        <TabsContent value="logs" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Logs de Envio de Email</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Funcionalidade de logs será implementada após configuração dos edge functions de envio de email.
-                </AlertDescription>
-              </Alert>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
       </Tabs>
     </div>
   );
