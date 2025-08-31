@@ -96,13 +96,48 @@ const handler = async (req: Request): Promise<Response> => {
       emailContent = logoHeader + emailContent;
     }
 
-    // Send email with Resend
-    const result = await resend.emails.send({
-      from: `Keeptur <${fromEmail}>`,
-      to: [to_email],
-      subject: emailSubject,
-      html: emailContent,
-    }) as any;
+    // Send email with Resend (com fallback de remetente não verificado)
+    let result: any = null;
+    try {
+      result = await resend.emails.send({
+        from: `Keeptur <${fromEmail}>`,
+        to: [to_email],
+        subject: emailSubject,
+        html: emailContent,
+      }) as any;
+    } catch (primaryError: any) {
+      console.error('Primary send error:', primaryError);
+      // Fallback: usar remetente padrão do Resend quando domínio não verificado ou erro 400
+      try {
+        const fallback = await resend.emails.send({
+          from: 'Keeptur <onboarding@resend.dev>',
+          to: [to_email],
+          subject: emailSubject + ' [teste] ',
+          html: emailContent,
+        }) as any;
+
+        if (fallback?.error) throw fallback.error;
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: 'Email de teste enviado com remetente padrão (domínio não verificado).',
+            template_type,
+            warning: 'Verifique o domínio/remetente configurado na Resend. Use um endereço @dominio_verificado.'
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        );
+      } catch (fallbackError: any) {
+        console.error('Fallback send error:', fallbackError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: fallbackError?.message || primaryError?.message || 'Falha ao enviar (remetente não verificado ou chave inválida)'
+          }),
+          { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        );
+      }
+    }
 
     if (result?.error) {
       throw result.error;
