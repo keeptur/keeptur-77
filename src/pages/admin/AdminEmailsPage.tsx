@@ -176,26 +176,40 @@ export default function AdminEmailsPage() {
 
   const saveSMTPSettings = async () => {
     try {
+      const basePayload = {
+        host: smtpForm.host,
+        port: smtpForm.port,
+        username: smtpForm.username || null,
+        from_email: smtpForm.from_email,
+        secure: smtpForm.secure,
+      } as any;
+
+      // Só envia a senha se o usuário realmente digitou algo
+      const payload = smtpForm.password ? { ...basePayload, password: smtpForm.password } : basePayload;
+
       if (smtpSettings) {
         await supabase
           .from('smtp_settings')
-          .update(smtpForm)
+          .update(payload)
           .eq('id', smtpSettings.id);
       } else {
         await supabase
           .from('smtp_settings')
-          .insert([smtpForm]);
+          .insert([payload]);
       }
+
+      // Limpa o campo de senha local para evitar sobrescrever com vazio no próximo save
+      setSMTPForm(prev => ({ ...prev, password: '' }));
 
       toast({
         title: "Sucesso",
         description: "Configurações SMTP salvas com sucesso!"
       });
       loadData();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Erro",
-        description: "Erro ao salvar configurações SMTP",
+        description: error?.message || "Erro ao salvar configurações SMTP",
         variant: "destructive"
       });
     }
@@ -261,24 +275,30 @@ export default function AdminEmailsPage() {
     if (!testEmail || !selectedTemplate) return;
 
     try {
-      const { error } = await supabase.functions.invoke('send-test-email', {
+      const baseUrl = window.location.origin;
+      const logoUrl = `${baseUrl}/lovable-uploads/3c1f2e1d-5094-4926-b204-fc12b2a5d877.png`;
+
+      const { data, error } = await supabase.functions.invoke('send-test-email', {
         body: {
           to_email: testEmail,
           template_id: selectedTemplate.id,
-          template_type: selectedTemplate.type
+          template_type: selectedTemplate.type,
+          logo_url: logoUrl,
+          base_url: baseUrl,
         }
       });
 
       if (error) throw error;
+      if (data && data.success === false) throw new Error(data.error || 'Falha no envio');
 
       toast({
         title: "Sucesso",
         description: "Email de teste enviado com sucesso!"
       });
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Erro",
-        description: "Erro ao enviar email de teste",
+        description: error?.message || "Erro ao enviar email de teste",
         variant: "destructive"
       });
     }
