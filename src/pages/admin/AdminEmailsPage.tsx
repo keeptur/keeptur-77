@@ -145,13 +145,8 @@ export default function AdminEmailsPage() {
       }
       if (profilesRes.data) setProfiles(profilesRes.data);
 
-      // Testa conexão automaticamente (silencioso)
-      try {
-        const { data } = await supabase.functions.invoke('test-smtp-connection', { body: {} });
-        setConnectionStatus(data?.success ? 'success' : 'error');
-      } catch {
-        setConnectionStatus('error');
-      }
+      // Não testar automaticamente para evitar execuções excessivas e falso positivo
+      setConnectionStatus('idle');
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast({
