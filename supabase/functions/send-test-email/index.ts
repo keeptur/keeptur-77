@@ -61,7 +61,7 @@ const handler = async (req: Request): Promise<Response> => {
       .limit(1)
       .maybeSingle();
 
-    const fromEmail = smtpSettings?.from_email || 'onboarding@resend.dev';
+    const fromEmail = smtpSettings?.from_email || 'contato@keeptur.com';
 
     // Replace variables in template with test data
     let emailContent = (template as any).html as string;
@@ -100,7 +100,7 @@ const handler = async (req: Request): Promise<Response> => {
     let result: any = null;
     try {
       result = await resend.emails.send({
-        from: `Keeptur <${fromEmail}>`,
+        from: `Keeptur <contato@keeptur.com>`,
         to: [to_email],
         subject: emailSubject,
         html: emailContent,
@@ -110,9 +110,9 @@ const handler = async (req: Request): Promise<Response> => {
       // Fallback: usar remetente padrão do Resend quando domínio não verificado ou erro 400
       try {
         const fallback = await resend.emails.send({
-          from: 'Keeptur <onboarding@resend.dev>',
+          from: 'Keeptur <contato@keeptur.com>',
           to: [to_email],
-          subject: emailSubject + ' [teste] ',
+          subject: emailSubject,
           html: emailContent,
         }) as any;
 
@@ -143,9 +143,9 @@ const handler = async (req: Request): Promise<Response> => {
       console.error('Primary send result with error:', result.error);
       try {
         const fallback = await resend.emails.send({
-          from: 'Keeptur <onboarding@resend.dev>',
+          from: 'Keeptur <contato@keeptur.com>',
           to: [to_email],
-          subject: emailSubject + ' [teste] ',
+          subject: emailSubject,
           html: emailContent,
         }) as any;
         if (fallback?.error) throw fallback.error;

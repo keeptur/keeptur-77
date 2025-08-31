@@ -57,7 +57,7 @@ const handler = async (req: Request): Promise<Response> => {
       .limit(1)
       .maybeSingle();
 
-    const fromEmail = smtpSettings?.from_email || 'onboarding@resend.dev';
+    const fromEmail = smtpSettings?.from_email || 'contato@keeptur.com';
 
     const results: any[] = [];
     let successCount = 0;
@@ -112,7 +112,7 @@ const handler = async (req: Request): Promise<Response> => {
           let sendResult: any;
           try {
             sendResult = await resend.emails.send({
-              from: `Keeptur <${fromEmail}>`,
+              from: `Keeptur <contato@keeptur.com>`,
               to: [email],
               subject: emailSubject,
               html: emailContent,
@@ -120,9 +120,9 @@ const handler = async (req: Request): Promise<Response> => {
           } catch (primaryErr: any) {
             try {
               sendResult = await resend.emails.send({
-                from: 'Keeptur <onboarding@resend.dev>',
+                from: 'Keeptur <contato@keeptur.com>',
                 to: [email],
-                subject: emailSubject + ' [teste] ',
+                subject: emailSubject,
                 html: emailContent,
               }) as any;
             } catch (fallbackErr: any) {
