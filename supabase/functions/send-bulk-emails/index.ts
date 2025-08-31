@@ -108,12 +108,27 @@ const handler = async (req: Request): Promise<Response> => {
             emailContent = logoHeader + emailContent;
           }
 
-          const sendResult = await resend.emails.send({
-            from: `Keeptur <${fromEmail}>`,
-            to: [email],
-            subject: emailSubject,
-            html: emailContent,
-          }) as any;
+          // Envio com Resend com fallback
+          let sendResult: any;
+          try {
+            sendResult = await resend.emails.send({
+              from: `Keeptur <${fromEmail}>`,
+              to: [email],
+              subject: emailSubject,
+              html: emailContent,
+            }) as any;
+          } catch (primaryErr: any) {
+            try {
+              sendResult = await resend.emails.send({
+                from: 'Keeptur <onboarding@resend.dev>',
+                to: [email],
+                subject: emailSubject + ' [teste] ',
+                html: emailContent,
+              }) as any;
+            } catch (fallbackErr: any) {
+              throw fallbackErr;
+            }
+          }
 
           if (sendResult?.error) {
             throw sendResult.error;
