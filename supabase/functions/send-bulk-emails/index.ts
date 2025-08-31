@@ -112,7 +112,7 @@ const handler = async (req: Request): Promise<Response> => {
           let sendResult: any;
           try {
             sendResult = await resend.emails.send({
-              from: `Keeptur <contato@keeptur.com>`,
+              from: `Keeptur <${fromEmail}>`,
               to: [email],
               subject: emailSubject,
               html: emailContent,
@@ -120,9 +120,9 @@ const handler = async (req: Request): Promise<Response> => {
           } catch (primaryErr: any) {
             try {
               sendResult = await resend.emails.send({
-                from: 'Keeptur <contato@keeptur.com>',
+                from: 'Keeptur <onboarding@resend.dev>',
                 to: [email],
-                subject: emailSubject,
+                subject: emailSubject + ' [teste] ',
                 html: emailContent,
               }) as any;
             } catch (fallbackErr: any) {
