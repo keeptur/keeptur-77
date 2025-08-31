@@ -95,6 +95,7 @@ export default function AdminEmailsPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [connectionInfo, setConnectionInfo] = useState<{ message?: string; details?: any; fallback?: boolean; success?: boolean } | null>(null);
 
   // Form states
   const [newTemplate, setNewTemplate] = useState({
@@ -168,17 +169,20 @@ export default function AdminEmailsPage() {
 
       if (error) throw error;
 
-      setConnectionStatus('success');
+      setConnectionInfo(data || null);
+      setConnectionStatus(data?.success ? 'success' : 'error');
+
       toast({
-        title: "Sucesso",
-        description: "Conexão SMTP testada com sucesso!"
+        title: data?.success ? 'Conexão válida' : 'Conexão inválida',
+        description: (data?.message || data?.error || 'Resultado do teste').toString()
       });
-    } catch (error) {
+    } catch (error: any) {
       setConnectionStatus('error');
+      setConnectionInfo(null);
       toast({
-        title: "Erro",
-        description: "Falha ao testar conexão SMTP",
-        variant: "destructive"
+        title: 'Erro',
+        description: error?.message || 'Falha ao testar conexão SMTP',
+        variant: 'destructive'
       });
     }
   };
@@ -667,10 +671,28 @@ export default function AdminEmailsPage() {
                 </Button>
 
                 {smtpSettings && (
-                  <div className="text-sm space-y-1">
+                  <div className="text-sm space-y-2">
                     <div><strong>Host:</strong> {smtpSettings.host}</div>
                     <div><strong>Porta:</strong> {smtpSettings.port}</div>
                     <div><strong>From:</strong> {smtpSettings.from_email}</div>
+                    {connectionInfo && (
+                      <>
+                        <Separator />
+                        <div><strong>Resultado:</strong> {connectionInfo.message || (connectionInfo.success ? 'OK' : 'Falha')}</div>
+                        {connectionInfo.details?.domain && (
+                          <div>
+                            <div><strong>Domínio:</strong> {connectionInfo.details.domain}</div>
+                            {connectionInfo.details.domain_status && (
+                              <div><strong>Status do domínio:</strong> {connectionInfo.details.domain_status}</div>
+                            )}
+                          </div>
+                        )}
+                        {connectionInfo.fallback && (
+                          <div className="text-orange-600">Usando remetente padrão da Resend (onboarding@resend.dev).</div>
+                        )}
+                        <p className="text-xs text-muted-foreground">Obs.: este teste valida provedor/domínio. A existência da caixa postal não é verificada.</p>
+                      </>
+                    )}
                   </div>
                 )}
               </CardContent>
