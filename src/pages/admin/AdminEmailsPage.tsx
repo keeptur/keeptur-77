@@ -110,6 +110,7 @@ export default function AdminEmailsPage() {
     from_email: '',
     secure: false
   });
+  const [smtpHasPassword, setSmtpHasPassword] = useState(false);
 
   useEffect(() => {
     document.title = "Gestão de Emails | Admin";
@@ -127,17 +128,29 @@ export default function AdminEmailsPage() {
 
       if (templatesRes.data) setTemplates(templatesRes.data);
       if (smtpRes.data && smtpRes.data.length > 0) {
-        setSMTPSettings(smtpRes.data[0]);
+        const row: any = smtpRes.data[0];
+        setSMTPSettings(row);
         setSMTPForm({
-          host: smtpRes.data[0].host,
-          port: smtpRes.data[0].port,
-          username: smtpRes.data[0].username || '',
-          password: '', // Não carregar senha por segurança
-          from_email: smtpRes.data[0].from_email,
-          secure: smtpRes.data[0].secure
+          host: row.host,
+          port: row.port,
+          username: row.username || '',
+          password: '', // não exibir senha salva
+          from_email: row.from_email,
+          secure: row.secure
         });
+        setSmtpHasPassword(Boolean(row.password));
+      } else {
+        setSmtpHasPassword(false);
       }
       if (profilesRes.data) setProfiles(profilesRes.data);
+
+      // Testa conexão automaticamente (silencioso)
+      try {
+        const { data } = await supabase.functions.invoke('test-smtp-connection', { body: {} });
+        setConnectionStatus(data?.success ? 'success' : 'error');
+      } catch {
+        setConnectionStatus('error');
+      }
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast({
@@ -472,13 +485,25 @@ export default function AdminEmailsPage() {
                           <div className="flex items-center gap-2">
                             {template && (
                               <>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setSelectedTemplate(template)}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
+                                <Dialog>
+                                  <DialogTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => setSelectedTemplate(template)}
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+                                    <DialogHeader>
+                                      <DialogTitle>Preview: {template.subject}</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="border rounded p-3 bg-background">
+                                      <div dangerouslySetInnerHTML={{ __html: template.html }} />
+                                    </div>
+                                  </DialogContent>
+                                </Dialog>
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -773,6 +798,9 @@ export default function AdminEmailsPage() {
                     onChange={(e) => setSMTPForm(prev => ({ ...prev, password: e.target.value }))}
                     placeholder="Digite a senha SMTP"
                   />
+                  {smtpHasPassword && smtpForm.password === '' && (
+                    <p className="text-xs text-muted-foreground mt-1">Senha já está salva com segurança. Preencha para atualizar.</p>
+                  )}
                 </div>
                 
                 <div>

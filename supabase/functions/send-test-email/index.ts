@@ -140,7 +140,25 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     if (result?.error) {
-      throw result.error;
+      console.error('Primary send result with error:', result.error);
+      try {
+        const fallback = await resend.emails.send({
+          from: 'Keeptur <onboarding@resend.dev>',
+          to: [to_email],
+          subject: emailSubject + ' [teste] ',
+          html: emailContent,
+        }) as any;
+        if (fallback?.error) throw fallback.error;
+        return new Response(
+          JSON.stringify({ success: true, message: 'Email de teste enviado (fallback)', template_type, warning: 'Remetente não verificado. Ajuste o Email de Envio para um domínio verificado na Resend.' }),
+          { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        );
+      } catch (fallbackErr: any) {
+        return new Response(
+          JSON.stringify({ success: false, error: fallbackErr?.message || result?.error?.message || 'Falha ao enviar email' }),
+          { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        );
+      }
     }
 
     return new Response(
