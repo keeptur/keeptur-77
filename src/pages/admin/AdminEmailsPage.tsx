@@ -369,7 +369,7 @@ export default function AdminEmailsPage() {
       </header>
 
       <Tabs defaultValue="templates" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="templates" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Templates
@@ -385,10 +385,6 @@ export default function AdminEmailsPage() {
           <TabsTrigger value="logs" className="flex items-center gap-2">
             <Mail className="h-4 w-4" />
             Logs de Email
-          </TabsTrigger>
-          <TabsTrigger value="smtp" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            Configurações SMTP
           </TabsTrigger>
         </TabsList>
 
@@ -633,70 +629,6 @@ export default function AdminEmailsPage() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Status da Conexão SMTP</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-3">
-                  {connectionStatus === 'success' && (
-                    <>
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                      <span className="text-green-600">Conexão OK</span>
-                    </>
-                  )}
-                  {connectionStatus === 'error' && (
-                    <>
-                      <XCircle className="h-5 w-5 text-red-500" />
-                      <span className="text-red-600">Falha na Conexão</span>
-                    </>
-                  )}
-                  {connectionStatus === 'testing' && (
-                    <>
-                      <RefreshCw className="h-5 w-5 animate-spin text-blue-500" />
-                      <span className="text-blue-600">Testando...</span>
-                    </>
-                  )}
-                  {connectionStatus === 'idle' && (
-                    <>
-                      <AlertCircle className="h-5 w-5 text-orange-500" />
-                      <span className="text-orange-600">Não testado</span>
-                    </>
-                  )}
-                </div>
-                
-                <Button onClick={testSMTPConnection} className="w-full">
-                  <TestTube className="h-4 w-4 mr-2" />
-                  Testar Conexão SMTP
-                </Button>
-
-                {smtpSettings && (
-                  <div className="text-sm space-y-2">
-                    <div><strong>Host:</strong> {smtpSettings.host}</div>
-                    <div><strong>Porta:</strong> {smtpSettings.port}</div>
-                    <div><strong>From:</strong> {smtpSettings.from_email}</div>
-                    {connectionInfo && (
-                      <>
-                        <Separator />
-                        <div><strong>Resultado:</strong> {connectionInfo.message || (connectionInfo.success ? 'OK' : 'Falha')}</div>
-                        {connectionInfo.details?.domain && (
-                          <div>
-                            <div><strong>Domínio:</strong> {connectionInfo.details.domain}</div>
-                            {connectionInfo.details.domain_status && (
-                              <div><strong>Status do domínio:</strong> {connectionInfo.details.domain_status}</div>
-                            )}
-                          </div>
-                        )}
-                        {connectionInfo.fallback && (
-                          <div className="text-orange-600">Usando remetente padrão da Resend (onboarding@resend.dev).</div>
-                        )}
-                        <p className="text-xs text-muted-foreground">Obs.: este teste valida provedor/domínio. A existência da caixa postal não é verificada.</p>
-                      </>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </div>
         </TabsContent>
 
@@ -768,93 +700,6 @@ export default function AdminEmailsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="smtp" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Configurações SMTP</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <Label htmlFor="host">Host SMTP</Label>
-                  <Input
-                    id="host"
-                    value={smtpForm.host}
-                    onChange={(e) => setSMTPForm(prev => ({ ...prev, host: e.target.value }))}
-                    placeholder="smtp.gmail.com"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="port">Porta</Label>
-                  <Input
-                    id="port"
-                    type="number"
-                    value={smtpForm.port}
-                    onChange={(e) => setSMTPForm(prev => ({ ...prev, port: parseInt(e.target.value) }))}
-                    placeholder="587"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="username">Usuário</Label>
-                  <Input
-                    id="username"
-                    value={smtpForm.username}
-                    onChange={(e) => setSMTPForm(prev => ({ ...prev, username: e.target.value }))}
-                    placeholder="seu@email.com"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="password">Senha SMTP</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={smtpForm.password}
-                    onChange={(e) => setSMTPForm(prev => ({ ...prev, password: e.target.value }))}
-                    placeholder="Digite a senha SMTP"
-                  />
-                  {smtpHasPassword && smtpForm.password === '' && (
-                    <p className="text-xs text-muted-foreground mt-1">Senha já está salva com segurança. Preencha para atualizar.</p>
-                  )}
-                </div>
-                
-                <div>
-                  <Label htmlFor="from_email">Email de Envio</Label>
-                  <Input
-                    id="from_email"
-                    type="email"
-                    value={smtpForm.from_email}
-                    onChange={(e) => setSMTPForm(prev => ({ ...prev, from_email: e.target.value }))}
-                    placeholder="noreply@seudominio.com"
-                  />
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="secure"
-                  checked={smtpForm.secure}
-                  onChange={(e) => setSMTPForm(prev => ({ ...prev, secure: e.target.checked }))}
-                />
-                <Label htmlFor="secure">Usar conexão segura (TLS/SSL)</Label>
-              </div>
-              
-              <div className="flex gap-2">
-                <Button onClick={testSMTPConnection} variant="outline">
-                  <TestTube className="h-4 w-4 mr-2" />
-                  Testar Conexão
-                </Button>
-                <Button onClick={saveSMTPSettings}>
-                  <Settings className="h-4 w-4 mr-2" />
-                  Salvar Configurações
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </div>
   );
