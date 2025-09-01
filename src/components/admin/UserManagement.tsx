@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Users, UserPlus, Trash2, Crown, Calendar, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { InputValidation } from "@/utils/inputValidation";
 
 interface ActiveUser {
   id: string;
@@ -91,6 +92,32 @@ export function UserManagement() {
       return;
     }
 
+    // Validate email format
+    const emailValidation = InputValidation.validateEmail(newUser.email);
+    if (!emailValidation.isValid) {
+      toast({
+        title: "Erro de validação",
+        description: emailValidation.error,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Sanitize inputs
+    const sanitizedName = InputValidation.sanitizeText(newUser.name, { maxLength: 100 });
+    const sanitizedEmail = InputValidation.sanitizeText(newUser.email, { maxLength: 254 });
+
+    // Check for suspicious patterns
+    if (InputValidation.checkSQLInjection(sanitizedName) || 
+        InputValidation.checkSQLInjection(sanitizedEmail)) {
+      toast({
+        title: "Erro de segurança",
+        description: "Dados contêm caracteres não permitidos",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (accountInfo.used_seats >= accountInfo.total_seats) {
       toast({
         title: "Limite Atingido",
@@ -104,8 +131,8 @@ export function UserManagement() {
       const { error } = await supabase
         .from("subscribers")
         .insert({
-          email: newUser.email,
-          display_name: newUser.name,
+          email: sanitizedEmail,
+          display_name: sanitizedName,
           subscribed: true,
           subscription_tier: accountInfo.subscription_tier,
           subscription_end: accountInfo.subscription_end,

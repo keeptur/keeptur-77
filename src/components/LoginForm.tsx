@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { Loader2, Shield } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { InputValidation } from "@/utils/inputValidation";
 export default function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [credentials, setCredentials] = useState({
@@ -33,6 +34,30 @@ export default function LoginForm() {
     e.preventDefault();
     setLoading(true);
     setAuthErrorInfo(null);
+    
+    // Validate inputs
+    const emailValidation = InputValidation.validateEmail(credentials.login);
+    if (!emailValidation.isValid) {
+      toast({
+        title: "Erro de validação",
+        description: emailValidation.error,
+        variant: "destructive"
+      });
+      setLoading(false);
+      return;
+    }
+
+    // Check for SQL injection patterns
+    if (InputValidation.checkSQLInjection(credentials.login) || 
+        InputValidation.checkSQLInjection(credentials.password)) {
+      toast({
+        title: "Erro de segurança",
+        description: "Entrada contém caracteres não permitidos",
+        variant: "destructive"
+      });
+      setLoading(false);
+      return;
+    }
     
     try {
       // 1) First try Monde API authentication

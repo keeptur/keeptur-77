@@ -15,6 +15,7 @@ import {
   UpdateTaskHistoricData
 } from "@/types/api";
 import { supabase } from "@/integrations/supabase/client";
+import { TokenSecurity } from "@/utils/tokenSecurity";
 
 const API_BASE_URL = "https://web.monde.com.br/api/v2";
 
@@ -22,8 +23,14 @@ class MondeAPI {
   private token: string | null = null;
 
   constructor() {
-    // Try to load token from localStorage
-    this.token = localStorage.getItem("monde_token");
+    // Try to load token from localStorage with validation
+    const storedToken = localStorage.getItem("monde_token");
+    if (storedToken && TokenSecurity.validateToken(storedToken)) {
+      this.token = storedToken;
+    } else {
+      this.token = null;
+      localStorage.removeItem("monde_token");
+    }
   }
 
   private async request<T>(
@@ -238,7 +245,7 @@ class MondeAPI {
 
   logout(): void {
     this.token = null;
-    localStorage.removeItem("monde_token");
+    TokenSecurity.clearSensitiveData();
   }
 
   isAuthenticated(): boolean {

@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import DOMPurify from 'dompurify';
 import { 
   Bold, 
   Italic, 
@@ -96,10 +97,17 @@ export default function VisualEmailEditor({ template, onSave, onClose }: VisualE
   const handleSave = () => {
     const finalHtml = activeTab === 'visual' ? htmlContent : rawHtml;
     
+    // Sanitize HTML content to prevent XSS
+    const sanitizedHtml = DOMPurify.sanitize(finalHtml, {
+      ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'a', 'img', 'ul', 'ol', 'li', 'span', 'div'],
+      ALLOWED_ATTR: ['href', 'src', 'alt', 'style', 'class', 'target'],
+      ALLOW_DATA_ATTR: false
+    });
+    
     onSave({
       ...template,
-      subject,
-      html: finalHtml
+      subject: DOMPurify.sanitize(subject, { ALLOWED_TAGS: [] }),
+      html: sanitizedHtml
     });
   };
 
