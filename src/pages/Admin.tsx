@@ -7,7 +7,7 @@ import DashboardSection from "./admin/sections/DashboardSection";
 import UsersSection from "./admin/sections/UsersSection";
 import PlansSection from "./admin/sections/PlansSection";
 import BillingSettingsSection from "./admin/sections/BillingSettingsSection";
-import EmailsSection from "./admin/sections/EmailsSection";
+import { EmailsSection } from "./admin/sections/EmailsSection";
 export default function AdminPage() {
   const [tab, setTab] = useState("dashboard");
   const [searchParams, setSearchParams] = useSearchParams();

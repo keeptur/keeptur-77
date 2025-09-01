@@ -1,31 +1,15 @@
-
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { 
-  Zap, 
-  Clock, 
-  Users, 
-  Mail, 
-  Settings, 
-  Play, 
-  Pause, 
-  RefreshCw,
-  TrendingUp,
-  AlertCircle,
-  CheckCircle,
-  XCircle,
-  Edit,
-  Trash2
-} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Plus, Edit, Trash2 } from "lucide-react";
 
 interface AutomationRule {
   id: string;
@@ -33,554 +17,199 @@ interface AutomationRule {
   trigger: string;
   template_type: string;
   delay_hours: number;
+  conditions: Record<string, any>;
   active: boolean;
-  conditions?: Record<string, any>;
   created_at: string;
 }
 
-interface EmailLog {
-  id: string;
-  user_email: string;
-  template_type: string;
-  status: 'sent' | 'failed' | 'pending';
-  sent_at: string;
-  error_message?: string;
-}
-
-interface PlanSettings {
-  trial_days: number;
-  auto_trial: boolean;
-  auto_billing: boolean;
-}
-
-const AUTOMATION_TRIGGERS = [
-  { 
-    value: 'user_signup', 
-    label: 'Novo usuário cadastrado', 
-    description: 'Dispara quando um novo usuário faz login pela primeira vez',
-    icon: Users,
-    color: 'bg-blue-500'
-  },
-  { 
-    value: 'trial_start', 
-    label: 'Início do trial', 
-    description: 'Dispara quando o período de trial é iniciado',
-    icon: Play,
-    color: 'bg-green-500'
-  },
-  { 
-    value: 'trial_ending', 
-    label: 'Trial próximo ao fim', 
-    description: 'Dispara X dias antes do trial expirar',
-    icon: Clock,
-    color: 'bg-yellow-500'
-  },
-  { 
-    value: 'trial_expired', 
-    label: 'Trial expirado', 
-    description: 'Dispara quando o trial expira',
-    icon: XCircle,
-    color: 'bg-red-500'
-  },
-  { 
-    value: 'subscription_active', 
-    label: 'Assinatura ativada', 
-    description: 'Dispara quando o usuário assina um plano',
-    icon: CheckCircle,
-    color: 'bg-emerald-500'
-  },
-  { 
-    value: 'payment_failed', 
-    label: 'Falha no pagamento', 
-    description: 'Dispara quando há falha na cobrança',
-    icon: AlertCircle,
-    color: 'bg-orange-500'
-  }
-];
-
-const EMAIL_TEMPLATE_TYPES = [
-  { value: 'welcome', label: 'Boas-vindas ao sistema' },
-  { value: 'trial_start', label: 'Início do período trial' },
-  { value: 'trial_ending', label: '7 dias para fim do trial' },
-  { value: 'trial_ended', label: 'Fim do período trial' },
-  { value: 'subscription_welcome', label: 'Bem-vindo assinante' },
-  { value: 'subscription_renewal', label: 'Renovação próxima ao vencimento' },
-  { value: 'payment_failed', label: 'Falha no pagamento' },
-  { value: 'tutorial_inicial', label: 'Tutorial inicial' }
-];
-
-export default function EmailAutomationManager() {
-  const [automationRules, setAutomationRules] = useState<AutomationRule[]>([]);
-  const [emailLogs, setEmailLogs] = useState<EmailLog[]>([]);
-  const [planSettings, setPlanSettings] = useState<PlanSettings | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [newRule, setNewRule] = useState({
-    name: '',
-    trigger: '',
-    template_type: '',
-    delay_hours: 0,
-    active: true,
-    conditions: {}
-  });
-  const [showNewRuleForm, setShowNewRuleForm] = useState(false);
+export const EmailAutomationManager = () => {
+  const [isCreating, setIsCreating] = useState(false);
   const [editingRule, setEditingRule] = useState<AutomationRule | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  // Fetch automation rules
+  const { data: rules, isLoading, refetch } = useQuery({
+    queryKey: ['automation-rules'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('automation_rules')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      await Promise.all([
-        loadPlanSettings(),
-        loadAutomationRules(),
-        loadEmailLogs()
-      ]);
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar dados de automação",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (error) throw error;
+      return data as AutomationRule[];
+    },
+  });
 
-  const loadPlanSettings = async () => {
-    const { data } = await supabase
-      .from('plan_settings')
-      .select('trial_days, auto_trial, auto_billing')
-      .limit(1)
-      .maybeSingle();
-
-    if (data) {
-      setPlanSettings(data);
-    }
-  };
-
-  const loadAutomationRules = async () => {
-    const { data } = await supabase
-      .from('automation_rules')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (data) {
-      const mapped = data.map((r: any) => ({
-        ...r,
-        conditions: typeof r.conditions === 'object' && r.conditions !== null ? (r.conditions as Record<string, any>) : {},
-      }));
-      setAutomationRules(mapped);
-    }
-  };
-
-  const loadEmailLogs = async () => {
-    const { data } = await supabase
-      .from('email_logs')
-      .select('*')
-      .order('sent_at', { ascending: false })
-      .limit(50);
-
-    if (data) {
-      const mapped = data.map((l: any) => ({
-        ...l,
-        status: (['sent','failed','pending'].includes(l.status) ? l.status : 'pending') as EmailLog['status'],
-      }));
-      setEmailLogs(mapped);
-    }
-  };
-
-  const createAutomationRule = async () => {
-    if (!newRule.name || !newRule.trigger || !newRule.template_type) {
-      toast({
-        title: "Campos obrigatórios",
-        description: "Preencha nome, trigger e tipo de template",
-        variant: "destructive"
-      });
-      return;
-    }
-
+  const createRule = async (ruleData: { name: string; trigger: string; template_type: string; delay_hours: number; conditions: Record<string, any>; active: boolean }) => {
     try {
       const { data, error } = await supabase
         .from('automation_rules')
-        .insert([{
-          name: newRule.name,
-          trigger: newRule.trigger,
-          template_type: newRule.template_type,
-          delay_hours: newRule.delay_hours,
-          active: newRule.active,
-          conditions: newRule.conditions,
-          updated_by: (await supabase.auth.getUser()).data.user?.id
-        }])
+        .insert([ruleData])
         .select()
         .single();
 
       if (error) throw error;
 
-      setAutomationRules([{ ...data, conditions: (typeof data.conditions === 'object' && data.conditions !== null) ? (data.conditions as Record<string, any>) : {} } as AutomationRule, ...automationRules]);
-      setNewRule({
-        name: '',
-        trigger: '',
-        template_type: '',
-        delay_hours: 0,
-        active: true,
-        conditions: {}
-      });
-      setShowNewRuleForm(false);
-
       toast({
-        title: "Sucesso",
-        description: "Regra de automação criada com sucesso!"
-      });
-    } catch (error) {
-      console.error('Erro ao criar regra:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao criar regra de automação",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const updateAutomationRule = async () => {
-    if (!editingRule) return;
-
-    try {
-      const { error } = await supabase
-        .from('automation_rules')
-        .update({
-          name: newRule.name,
-          trigger: newRule.trigger,
-          template_type: newRule.template_type,
-          delay_hours: newRule.delay_hours,
-          active: newRule.active,
-          conditions: newRule.conditions,
-          updated_by: (await supabase.auth.getUser()).data.user?.id
-        })
-        .eq('id', editingRule.id);
-
-      if (error) throw error;
-
-      await loadAutomationRules();
-      setEditingRule(null);
-      setNewRule({
-        name: '',
-        trigger: '',
-        template_type: '',
-        delay_hours: 0,
-        active: true,
-        conditions: {}
-      });
-      setShowNewRuleForm(false);
-
-      toast({
-        title: "Sucesso",
-        description: "Regra atualizada com sucesso!"
-      });
-    } catch (error) {
-      console.error('Erro ao atualizar regra:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao atualizar regra",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const deleteAutomationRule = async (ruleId: string) => {
-    try {
-      const { error } = await supabase
-        .from('automation_rules')
-        .delete()
-        .eq('id', ruleId);
-
-      if (error) throw error;
-
-      setAutomationRules(rules => rules.filter(rule => rule.id !== ruleId));
-      
-      toast({
-        title: "Sucesso",
-        description: "Regra deletada com sucesso!"
-      });
-    } catch (error) {
-      console.error('Erro ao deletar regra:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao deletar regra",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const toggleRuleStatus = async (ruleId: string) => {
-    try {
-      const rule = automationRules.find(r => r.id === ruleId);
-      if (!rule) return;
-
-      const { error } = await supabase
-        .from('automation_rules')
-        .update({ 
-          active: !rule.active,
-          updated_by: (await supabase.auth.getUser()).data.user?.id
-        })
-        .eq('id', ruleId);
-
-      if (error) throw error;
-
-      setAutomationRules(rules => 
-        rules.map(r => 
-          r.id === ruleId 
-            ? { ...r, active: !r.active }
-            : r
-        )
-      );
-
-      toast({
-        title: "Status atualizado",
-        description: "Regra de automação atualizada com sucesso!"
-      });
-    } catch (error) {
-      console.error('Erro ao atualizar status:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao atualizar status da regra",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const editRule = (rule: AutomationRule) => {
-    setEditingRule(rule);
-    setNewRule({
-      name: rule.name,
-      trigger: rule.trigger,
-      template_type: rule.template_type,
-      delay_hours: rule.delay_hours,
-      active: rule.active,
-      conditions: rule.conditions || {}
-    });
-    setShowNewRuleForm(true);
-  };
-
-  const testAutomation = async (trigger: string) => {
-    try {
-      // Buscar um usuário real para teste usando o email correto do subscribers
-      const { data: subscriber } = await supabase
-        .from('subscribers')
-        .select('email, display_name')
-        .limit(1)
-        .maybeSingle();
-
-      if (!subscriber) {
-        toast({
-          title: "Aviso",
-          description: "Nenhum usuário encontrado para teste",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const { error } = await supabase.functions.invoke('send-automated-email', {
-        body: {
-          to_email: subscriber.email,
-          template_type: 'welcome', // Template padrão para teste
-          variables: {
-            nome_usuario: subscriber.display_name || 'Usuário',
-            email: subscriber.email,
-            nome_sistema: 'Keeptur',
-            empresa: subscriber.email.split('@')[1]?.split('.')[0] || '',
-            subdominio: subscriber.email.split('@')[1]?.split('.')[0] || '',
-            dias_trial: planSettings?.trial_days?.toString() || '14',
-            data_vencimento: new Date(Date.now() + (planSettings?.trial_days || 14) * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR')
-          }
-        }
+        title: "Regra criada",
+        description: "Nova regra de automação foi criada com sucesso",
       });
 
-      if (error) {
-        console.error('Erro no teste:', error);
-        toast({
-          title: "Erro no teste",
-          description: error.message || "Erro desconhecido",
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Teste enviado",
-          description: `Email de teste enviado para ${subscriber.email}`
-        });
-        
-        // Recarregar logs
-        await loadEmailLogs();
-      }
+      refetch();
+      setIsCreating(false);
     } catch (error: any) {
-      console.error('Erro ao testar automação:', error);
       toast({
         title: "Erro",
-        description: error.message || "Erro ao enviar email de teste",
-        variant: "destructive"
+        description: error.message,
+        variant: "destructive",
       });
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'sent': return 'bg-green-500';
-      case 'failed': return 'bg-red-500';
-      case 'pending': return 'bg-yellow-500';
-      default: return 'bg-gray-500';
+  const toggleRule = async (id: string, active: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('automation_rules')
+        .update({ active })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: active ? "Regra ativada" : "Regra desativada",
+        description: `A regra foi ${active ? 'ativada' : 'desativada'} com sucesso`,
+      });
+
+      refetch();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
-  const getTriggerConfig = (trigger: string) => {
-    return AUTOMATION_TRIGGERS.find(t => t.value === trigger);
-  };
+  const triggers = [
+    { value: 'trial_start', label: 'Início do Trial' },
+    { value: 'trial_ending', label: 'Final do Trial' },
+    { value: 'trial_ended', label: 'Trial Expirado' },
+    { value: 'subscription_welcome', label: 'Boas-vindas da Assinatura' },
+  ];
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <RefreshCw className="h-8 w-8 animate-spin" />
-      </div>
-    );
+  const templates = [
+    { value: 'welcome', label: 'Boas-vindas' },
+    { value: 'trial_reminder', label: 'Lembrete de Trial' },
+    { value: 'trial_ending', label: 'Trial Expirando' },
+    { value: 'subscription_welcome', label: 'Boas-vindas Premium' },
+  ];
+
+  if (isLoading) {
+    return <div className="p-4">Carregando regras...</div>;
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Automação de Emails</h2>
-          <p className="text-muted-foreground">
-            Configure disparos automáticos baseados em eventos do sistema
+          <h3 className="text-lg font-semibold">Regras de Automação</h3>
+          <p className="text-sm text-muted-foreground">
+            Configure quando e quais emails devem ser enviados automaticamente
           </p>
         </div>
-        <Button onClick={() => {
-          setEditingRule(null);
-          setNewRule({
-            name: '',
-            trigger: '',
-            template_type: '',
-            delay_hours: 0,
-            active: true,
-            conditions: {}
-          });
-          setShowNewRuleForm(true);
-        }}>
-          <Zap className="h-4 w-4 mr-2" />
+        <Button onClick={() => setIsCreating(true)} className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
           Nova Regra
         </Button>
       </div>
 
-      {/* Configurações Gerais */}
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              Configurações do Trial
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
+      {/* Lista de regras */}
+      <div className="space-y-3">
+        {rules?.map((rule) => (
+          <Card key={rule.id}>
+            <CardContent className="p-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm">Dias de trial:</span>
-                <Badge variant="outline">{planSettings?.trial_days || 14} dias</Badge>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-medium">{rule.name}</h4>
+                    <Badge variant={rule.active ? "default" : "secondary"}>
+                      {rule.active ? "Ativa" : "Inativa"}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Trigger: {triggers.find(t => t.value === rule.trigger)?.label} • 
+                    Template: {templates.find(t => t.value === rule.template_type)?.label} • 
+                    Delay: {rule.delay_hours}h
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={rule.active}
+                    onCheckedChange={(active) => toggleRule(rule.id, active)}
+                  />
+                  <Button variant="ghost" size="sm">
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Auto trial:</span>
-                <Badge variant={planSettings?.auto_trial ? "default" : "secondary"}>
-                  {planSettings?.auto_trial ? "Ativo" : "Inativo"}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Auto billing:</span>
-                <Badge variant={planSettings?.auto_billing ? "default" : "secondary"}>
-                  {planSettings?.auto_billing ? "Ativo" : "Inativo"}
-                </Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ))}
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Estatísticas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Regras ativas:</span>
-                <Badge>{automationRules.filter(r => r.active).length}</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Emails enviados hoje:</span>
-                <Badge variant="outline">{emailLogs.filter(log => 
-                  new Date(log.sent_at).toDateString() === new Date().toDateString()
-                ).length}</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Taxa de sucesso:</span>
-                <Badge variant="outline">
-                  {emailLogs.length > 0 
-                    ? Math.round((emailLogs.filter(log => log.status === 'sent').length / emailLogs.length) * 100)
-                    : 0}%
-                </Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Zap className="h-4 w-4" />
-              Ações Rápidas
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Button size="sm" variant="outline" onClick={() => testAutomation('user_signup')} className="w-full">
-              Testar Boas-vindas
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => testAutomation('trial_ending')} className="w-full">
-              Testar Trial Ending
-            </Button>
-            <Button size="sm" variant="outline" onClick={loadData} className="w-full">
-              <RefreshCw className="h-3 w-3 mr-2" />
-              Atualizar Dados
-            </Button>
-          </CardContent>
-        </Card>
+        {(!rules || rules.length === 0) && (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <p className="text-muted-foreground">
+                Nenhuma regra de automação configurada
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
-      {/* Formulário Nova Regra */}
-      {showNewRuleForm && (
+      {/* Modal de criação simples */}
+      {isCreating && (
         <Card>
           <CardHeader>
-            <CardTitle>{editingRule ? 'Editar Regra' : 'Nova Regra de Automação'}</CardTitle>
+            <CardTitle>Nova Regra de Automação</CardTitle>
+            <CardDescription>
+              Configure uma nova regra para envio automático de emails
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
+          <CardContent className="space-y-4">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                createRule({
+                  name: formData.get('name') as string,
+                  trigger: formData.get('trigger') as string,
+                  template_type: formData.get('template_type') as string,
+                  delay_hours: parseInt(formData.get('delay_hours') as string) || 0,
+                  conditions: {},
+                  active: true,
+                });
+              }}
+              className="space-y-4"
+            >
               <div>
-                <Label htmlFor="rule-name">Nome da Regra</Label>
+                <Label htmlFor="name">Nome da Regra</Label>
                 <Input
-                  id="rule-name"
-                  value={newRule.name}
-                  onChange={(e) => setNewRule({...newRule, name: e.target.value})}
-                  placeholder="Ex: Boas-vindas para novos usuários"
+                  id="name"
+                  name="name"
+                  placeholder="Ex: Boas-vindas Trial"
+                  required
                 />
               </div>
 
               <div>
-                <Label htmlFor="rule-trigger">Trigger</Label>
-                <Select value={newRule.trigger} onValueChange={(value) => setNewRule({...newRule, trigger: value})}>
+                <Label htmlFor="trigger">Evento Disparador</Label>
+                <Select name="trigger" required>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o evento" />
                   </SelectTrigger>
                   <SelectContent>
-                    {AUTOMATION_TRIGGERS.map(trigger => (
+                    {triggers.map(trigger => (
                       <SelectItem key={trigger.value} value={trigger.value}>
                         {trigger.label}
                       </SelectItem>
@@ -590,13 +219,13 @@ export default function EmailAutomationManager() {
               </div>
 
               <div>
-                <Label htmlFor="rule-template">Template de Email</Label>
-                <Select value={newRule.template_type} onValueChange={(value) => setNewRule({...newRule, template_type: value})}>
+                <Label htmlFor="template_type">Template de Email</Label>
+                <Select name="template_type" required>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o template" />
                   </SelectTrigger>
                   <SelectContent>
-                    {EMAIL_TEMPLATE_TYPES.map(template => (
+                    {templates.map(template => (
                       <SelectItem key={template.value} value={template.value}>
                         {template.label}
                       </SelectItem>
@@ -606,165 +235,31 @@ export default function EmailAutomationManager() {
               </div>
 
               <div>
-                <Label htmlFor="rule-delay">Delay (horas)</Label>
+                <Label htmlFor="delay_hours">Delay (horas)</Label>
                 <Input
-                  id="rule-delay"
+                  id="delay_hours"
+                  name="delay_hours"
                   type="number"
-                  value={newRule.delay_hours}
-                  onChange={(e) => setNewRule({...newRule, delay_hours: parseInt(e.target.value) || 0})}
+                  min="0"
+                  defaultValue="0"
                   placeholder="0"
                 />
               </div>
-            </div>
 
-            <div className="flex gap-2 mt-6">
-              {editingRule ? (
-                <Button onClick={updateAutomationRule}>
-                  Atualizar Regra
+              <div className="flex gap-2">
+                <Button type="submit">Criar Regra</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsCreating(false)}
+                >
+                  Cancelar
                 </Button>
-              ) : (
-                <Button onClick={createAutomationRule}>
-                  Criar Regra
-                </Button>
-              )}
-              <Button variant="outline" onClick={() => {
-                setShowNewRuleForm(false);
-                setEditingRule(null);
-              }}>
-                Cancelar
-              </Button>
-            </div>
+              </div>
+            </form>
           </CardContent>
         </Card>
       )}
-
-      {/* Regras Existentes */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Regras de Automação ({automationRules.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {automationRules.length > 0 ? (
-            <div className="space-y-4">
-              {automationRules.map((rule) => {
-                const triggerConfig = getTriggerConfig(rule.trigger);
-                const TriggerIcon = triggerConfig?.icon || Zap;
-                
-                return (
-                  <div key={rule.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-4">
-                      <div className={`p-2 rounded-full ${triggerConfig?.color || 'bg-gray-500'}`}>
-                        <TriggerIcon className="h-4 w-4 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="font-medium">{rule.name}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {triggerConfig?.description}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline" className="text-xs">
-                            {EMAIL_TEMPLATE_TYPES.find(t => t.value === rule.template_type)?.label}
-                          </Badge>
-                          {rule.delay_hours > 0 && (
-                            <Badge variant="outline" className="text-xs">
-                              Delay: {rule.delay_hours}h
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={rule.active}
-                        onCheckedChange={() => toggleRuleStatus(rule.id)}
-                      />
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => editRule(rule)}
-                      >
-                        <Edit className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => testAutomation(rule.trigger)}
-                      >
-                        Testar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => deleteAutomationRule(rule.id)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Mail className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">Nenhuma regra configurada</h3>
-              <p className="text-muted-foreground mb-4">
-                Configure regras de automação para enviar emails baseados em eventos do sistema
-              </p>
-              <Button onClick={() => setShowNewRuleForm(true)}>
-                Criar Primeira Regra
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Logs de Email */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Logs de Emails Enviados ({emailLogs.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Email</TableHead>
-                <TableHead>Template</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Enviado em</TableHead>
-                <TableHead>Erro</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {emailLogs.map((log) => (
-                <TableRow key={log.id}>
-                  <TableCell>{log.user_email}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
-                      {EMAIL_TEMPLATE_TYPES.find(t => t.value === log.template_type)?.label || log.template_type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${getStatusColor(log.status)}`} />
-                      {log.status}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {new Date(log.sent_at).toLocaleString('pt-BR')}
-                  </TableCell>
-                  <TableCell>
-                    {log.error_message && (
-                      <span className="text-red-500 text-xs">{log.error_message}</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
     </div>
   );
-}
+};

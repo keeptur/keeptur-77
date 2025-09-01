@@ -1,345 +1,282 @@
+import { useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { Plus, Edit, Eye } from "lucide-react";
 
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
-import DOMPurify from 'dompurify';
-import { 
-  Bold, 
-  Italic, 
-  Underline, 
-  Link, 
-  Image, 
-  AlignLeft, 
-  AlignCenter, 
-  AlignRight,
-  List,
-  ListOrdered,
-  Palette,
-  Type,
-  Smartphone,
-  Tablet,
-  Monitor,
-  Code,
-  Eye,
-  Save
-} from 'lucide-react';
-
-interface VisualEmailEditorProps {
-  template: any;
-  onSave: (template: any) => void;
-  onClose: () => void;
+interface EmailTemplate {
+  id: string;
+  type: string;
+  subject: string;
+  html: string;
+  created_at: string;
+  updated_at: string;
 }
 
-const EMAIL_VARIABLES = [
-  { variable: '{{nome_usuario}}', description: 'Nome do usuário' },
-  { variable: '{{email}}', description: 'Email do usuário' },
-  { variable: '{{nome_sistema}}', description: 'Nome do sistema' },
-  { variable: '{{empresa}}', description: 'Nome da empresa' },
-  { variable: '{{subdominio}}', description: 'Subdomínio da empresa' },
-  { variable: '{{dias_trial}}', description: 'Dias de trial' },
-  { variable: '{{data_vencimento}}', description: 'Data de vencimento' },
-  { variable: '{{dias_restantes}}', description: 'Dias restantes do trial' },
-  { variable: '{{valor_plano}}', description: 'Valor do plano' },
-  { variable: '{{nome_plano}}', description: 'Nome do plano' },
-  { variable: '{{link_acesso}}', description: 'Link de acesso ao sistema' },
-  { variable: '{{link_pagamento}}', description: 'Link para pagamento' }
-];
+export const VisualEmailEditor = () => {
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
 
-const DEVICE_SIZES = [
-  { key: 'desktop', label: 'Desktop', icon: Monitor, width: '100%' },
-  { key: 'tablet', label: 'Tablet', icon: Tablet, width: '768px' },
-  { key: 'mobile', label: 'Mobile', icon: Smartphone, width: '375px' }
-];
+  // Fetch email templates
+  const { data: templates, isLoading, refetch } = useQuery({
+    queryKey: ['email-templates'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('email_templates')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-export default function VisualEmailEditor({ template, onSave, onClose }: VisualEmailEditorProps) {
-  const [subject, setSubject] = useState(template?.subject || '');
-  const [htmlContent, setHtmlContent] = useState(template?.html || '');
-  const [activeTab, setActiveTab] = useState('visual');
-  const [previewDevice, setPreviewDevice] = useState('desktop');
-  const [rawHtml, setRawHtml] = useState(template?.html || '');
+      if (error) throw error;
+      return data as EmailTemplate[];
+    },
+  });
 
-  // Configuração do Quill para não reformatar demais
-  const quillModules = {
-    toolbar: [
-      ['bold', 'italic', 'underline'],
-      [{ 'header': [1, 2, 3, false] }],
-      [{ 'color': [] }, { 'background': [] }],
-      [{ 'align': [] }],
-      ['link', 'image'],
-      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-      ['clean']
-    ],
-  };
+  const saveTemplate = async (templateData: { type: string; subject: string; html: string }) => {
+    try {
+      const { data, error } = await supabase
+        .from('email_templates')
+        .upsert([{
+          ...templateData,
+          type: templateData.type as any,
+          updated_by: (await supabase.auth.getUser()).data.user?.id,
+        }])
+        .select()
+        .single();
 
-  const quillFormats = [
-    'header', 'bold', 'italic', 'underline',
-    'color', 'background', 'align',
-    'link', 'image', 'list', 'bullet'
-  ];
+      if (error) throw error;
 
-  const insertVariable = (variable: string) => {
-    if (activeTab === 'visual') {
-      setHtmlContent(prev => prev + ` ${variable} `);
-    } else {
-      setRawHtml(prev => prev + ` ${variable} `);
+      toast({
+        title: "Template salvo",
+        description: "Template de email foi salvo com sucesso",
+      });
+
+      refetch();
+      setIsEditing(false);
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
-  const handleSave = () => {
-    const finalHtml = activeTab === 'visual' ? htmlContent : rawHtml;
-    
-    // Sanitize HTML content to prevent XSS
-    const sanitizedHtml = DOMPurify.sanitize(finalHtml, {
-      ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'a', 'img', 'ul', 'ol', 'li', 'span', 'div'],
-      ALLOWED_ATTR: ['href', 'src', 'alt', 'style', 'class', 'target'],
-      ALLOW_DATA_ATTR: false
-    });
-    
-    onSave({
-      ...template,
-      subject: DOMPurify.sanitize(subject, { ALLOWED_TAGS: [] }),
-      html: sanitizedHtml
-    });
-  };
+  const templateTypes = [
+    { value: 'welcome', label: 'Boas-vindas' },
+    { value: 'trial_reminder', label: 'Lembrete de Trial' },
+    { value: 'trial_ending', label: 'Trial Expirando' },
+    { value: 'subscription_welcome', label: 'Boas-vindas Premium' },
+  ];
 
-  const getPreviewHtml = () => {
-    const content = activeTab === 'visual' ? htmlContent : rawHtml;
-    
-    // Substituir variáveis para preview
-    let previewContent = content;
-    EMAIL_VARIABLES.forEach(({ variable }) => {
-      previewContent = previewContent.replace(
-        new RegExp(variable.replace(/[{}]/g, '\\$&'), 'g'),
-        `<span style="background: #fef3c7; padding: 2px 4px; border-radius: 3px; font-size: 0.8em;">${variable}</span>`
-      );
-    });
+  const defaultTemplates = {
+    welcome: {
+      subject: 'Bem-vindo ao {{nome_sistema}}!',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1>Olá {{nome_usuario}}!</h1>
+          <p>Bem-vindo ao <strong>{{nome_sistema}}</strong>!</p>
+          <p>Seu trial de {{dias_trial}} dias já começou. Aproveite todos os recursos disponíveis.</p>
+          <p>
+            <a href="{{link_acesso}}" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+              Acessar Sistema
+            </a>
+          </p>
+          <p>Se precisar de ajuda, estamos aqui para apoiá-lo!</p>
+        </div>
+      `
+    },
+    trial_reminder: {
+      subject: 'Seu trial expira em {{dias_restantes}} dias',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1>Olá {{nome_usuario}}!</h1>
+          <p>Seu trial do {{nome_sistema}} expira em {{dias_restantes}} dias.</p>
+          <p>Para continuar aproveitando todos os recursos, considere assinar um de nossos planos.</p>
+          <p>
+            <a href="{{link_pagamento}}" style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+              Ver Planos
+            </a>
+          </p>
+        </div>
+      `
+    }
+  } as const;
 
-    return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>${subject}</title>
-          <style>
-            body { 
-              font-family: Arial, sans-serif; 
-              line-height: 1.6; 
-              margin: 0; 
-              padding: 20px;
-              background-color: #f5f5f5;
-            }
-            .email-container {
-              max-width: 600px;
-              margin: 0 auto;
-              background: white;
-              padding: 20px;
-              border-radius: 8px;
-              box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            }
-            img { max-width: 100%; height: auto; }
-            a { color: #0066cc; }
-            .button {
-              display: inline-block;
-              padding: 12px 24px;
-              background: #0066cc;
-              color: white;
-              text-decoration: none;
-              border-radius: 4px;
-              margin: 10px 0;
-            }
-            @media (max-width: 480px) {
-              .email-container { padding: 10px; }
-              .button { display: block; text-align: center; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="email-container">
-            ${previewContent}
-          </div>
-        </body>
-      </html>
-    `;
-  };
+  const currentTemplate = templates?.find(t => t.type === selectedTemplate);
+
+  if (isLoading) {
+    return <div className="p-4">Carregando templates...</div>;
+  }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-7xl h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b">
-          <div>
-            <h2 className="text-2xl font-bold">Editor Visual de Email</h2>
-            <p className="text-gray-600">Template: {template?.type}</p>
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700">
-              <Save className="w-4 h-4 mr-2" />
-              Salvar
-            </Button>
-            <Button variant="outline" onClick={onClose}>
-              Fechar
-            </Button>
-          </div>
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <div className="flex-1">
+          <Label htmlFor="template-select">Selecionar Template</Label>
+          <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
+            <SelectTrigger>
+              <SelectValue placeholder="Escolha um template para editar" />
+            </SelectTrigger>
+            <SelectContent>
+              {templateTypes.map(type => (
+                <SelectItem key={type.value} value={type.value}>
+                  {type.label}
+                  {templates?.find(t => t.type === type.value) && (
+                    <Badge variant="secondary" className="ml-2">Configurado</Badge>
+                  )}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
+        
+        {selectedTemplate && (
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setPreviewMode(!previewMode)}
+              className="flex items-center gap-2"
+            >
+              <Eye className="h-4 w-4" />
+              {previewMode ? "Editor" : "Preview"}
+            </Button>
+            <Button
+              onClick={() => setIsEditing(!isEditing)}
+              className="flex items-center gap-2"
+            >
+              <Edit className="h-4 w-4" />
+              {isEditing ? "Cancelar" : "Editar"}
+            </Button>
+          </div>
+        )}
+      </div>
 
-        <div className="flex flex-1 overflow-hidden">
-          {/* Painel Esquerdo - Editor */}
-          <div className="w-1/2 flex flex-col border-r">
-            <div className="p-4 border-b bg-gray-50">
-              <Label htmlFor="subject" className="text-sm font-medium">
-                Assunto do Email
-              </Label>
-              <Input
-                id="subject"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="Digite o assunto do email..."
-                className="mt-1"
-              />
-            </div>
-
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-              <TabsList className="grid w-full grid-cols-2 m-4 mb-0">
-                <TabsTrigger value="visual" className="flex items-center gap-2">
-                  <Eye className="w-4 h-4" />
-                  Visual
-                </TabsTrigger>
-                <TabsTrigger value="html" className="flex items-center gap-2">
-                  <Code className="w-4 h-4" />
-                  HTML
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="visual" className="flex-1 p-4 pt-2">
-                <div className="h-full">
-                  <ReactQuill
-                    value={htmlContent}
-                    onChange={setHtmlContent}
-                    modules={quillModules}
-                    formats={quillFormats}
-                    style={{ height: 'calc(100% - 42px)' }}
-                    className="bg-white"
+      {selectedTemplate && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              Template: {templateTypes.find(t => t.value === selectedTemplate)?.label}
+            </CardTitle>
+            <CardDescription>
+              {currentTemplate ? "Última atualização: " + new Date(currentTemplate.updated_at).toLocaleString('pt-BR') : "Template não configurado"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {previewMode ? (
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium mb-2">Assunto:</h4>
+                  <div className="p-3 bg-muted rounded">
+                    {currentTemplate?.subject || defaultTemplates[selectedTemplate as keyof typeof defaultTemplates]?.subject || "Sem assunto"}
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-medium mb-2">Conteúdo:</h4>
+                  <div 
+                    className="p-4 bg-white border rounded"
+                    dangerouslySetInnerHTML={{
+                      __html: currentTemplate?.html || defaultTemplates[selectedTemplate as keyof typeof defaultTemplates]?.html || "Sem conteúdo"
+                    }}
                   />
                 </div>
-              </TabsContent>
-
-              <TabsContent value="html" className="flex-1 p-4 pt-2">
-                <Textarea
-                  value={rawHtml}
-                  onChange={(e) => setRawHtml(e.target.value)}
-                  placeholder="Cole ou edite o HTML do email aqui..."
-                  className="h-full resize-none font-mono text-sm"
-                />
-              </TabsContent>
-            </Tabs>
-
-            {/* Variáveis */}
-            <div className="p-4 border-t bg-gray-50">
-              <Label className="text-sm font-medium mb-2 block">
-                Variáveis Disponíveis
-              </Label>
-              <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
-                {EMAIL_VARIABLES.map(({ variable, description }) => (
-                  <Button
-                    key={variable}
-                    size="sm"
-                    variant="outline"
-                    onClick={() => insertVariable(variable)}
-                    className="text-xs h-7"
-                    title={description}
-                  >
-                    {variable}
-                  </Button>
-                ))}
               </div>
-            </div>
-          </div>
-
-          {/* Painel Direito - Preview */}
-          <div className="w-1/2 flex flex-col">
-            <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
-              <Label className="text-sm font-medium">Preview do Email</Label>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">Visualizar em:</span>
-                <Select value={previewDevice} onValueChange={setPreviewDevice}>
-                  <SelectTrigger className="w-32 h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DEVICE_SIZES.map(device => {
-                      const Icon = device.icon;
-                      return (
-                        <SelectItem key={device.key} value={device.key}>
-                          <div className="flex items-center gap-2">
-                            <Icon className="w-3 h-3" />
-                            {device.label}
-                          </div>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="flex-1 p-4 bg-gray-100 overflow-auto">
-              <div 
-                className="mx-auto transition-all duration-300"
-                style={{ 
-                  width: DEVICE_SIZES.find(d => d.key === previewDevice)?.width,
-                  maxWidth: '100%'
+            ) : isEditing ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  saveTemplate({
+                    type: selectedTemplate as string,
+                    subject: formData.get('subject') as string,
+                    html: formData.get('html') as string,
+                  });
                 }}
+                className="space-y-4"
               >
-                <iframe
-                  srcDoc={getPreviewHtml()}
-                  className="w-full h-full border rounded-lg bg-white shadow-lg"
-                  style={{ 
-                    minHeight: '500px',
-                    height: previewDevice === 'mobile' ? '700px' : '600px'
-                  }}
-                  title="Email Preview"
-                />
-              </div>
-            </div>
+                <div>
+                  <Label htmlFor="subject">Assunto do Email</Label>
+                  <Input
+                    id="subject"
+                    name="subject"
+                    defaultValue={currentTemplate?.subject || defaultTemplates[selectedTemplate as keyof typeof defaultTemplates]?.subject}
+                    placeholder="Assunto do email"
+                    required
+                  />
+                </div>
 
-            <div className="p-4 border-t bg-gray-50">
-              <div className="text-xs text-gray-600 space-y-1">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs">
-                    Assunto
-                  </Badge>
-                  <span>{subject || 'Sem assunto'}</span>
+                <div>
+                  <Label htmlFor="html">Conteúdo HTML</Label>
+                  <Textarea
+                    id="html"
+                    name="html"
+                    defaultValue={currentTemplate?.html || defaultTemplates[selectedTemplate as keyof typeof defaultTemplates]?.html}
+                    placeholder="Conteúdo HTML do email"
+                    rows={15}
+                    className="font-mono text-sm"
+                    required
+                  />
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs">
-                    Caracteres
-                  </Badge>
-                  <span>{(activeTab === 'visual' ? htmlContent : rawHtml).length}</span>
+
+                <div className="flex gap-2">
+                  <Button type="submit">Salvar Template</Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsEditing(false)}
+                  >
+                    Cancelar
+                  </Button>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs">
-                    Variáveis
-                  </Badge>
-                  <span>
-                    {EMAIL_VARIABLES.filter(v => 
-                      (activeTab === 'visual' ? htmlContent : rawHtml).includes(v.variable)
-                    ).length} de {EMAIL_VARIABLES.length}
-                  </span>
+              </form>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium mb-2">Assunto:</h4>
+                  <div className="p-3 bg-muted rounded">
+                    {currentTemplate?.subject || "Template não configurado"}
+                  </div>
                 </div>
+                <div>
+                  <h4 className="font-medium mb-2">Variáveis disponíveis:</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {['nome_usuario', 'email', 'nome_sistema', 'empresa', 'link_acesso', 'dias_trial', 'link_pagamento'].map(variable => (
+                      <Badge key={variable} variant="outline">
+                        {`{{${variable}}}`}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+                
+                {!currentTemplate && (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded">
+                    <p className="text-sm text-yellow-800">
+                      Este template ainda não foi configurado. Clique em "Editar" para criar o template.
+                    </p>
+                  </div>
+                )}
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {!selectedTemplate && (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <p className="text-muted-foreground">
+              Selecione um template acima para começar a editar
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
-}
+};

@@ -24,8 +24,8 @@ import {
   Zap
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import VisualEmailEditor from "@/components/emails/VisualEmailEditor";
-import EmailAutomationManager from "@/components/emails/EmailAutomationManager";
+import { VisualEmailEditor } from "@/components/emails/VisualEmailEditor";
+import { EmailAutomationManager } from "@/components/emails/EmailAutomationManager";
 import { useRealTimeData } from "@/components/emails/RealTimeDataManager";
 
 const EMAIL_TEMPLATE_TYPES = [
@@ -466,17 +466,6 @@ export default function AdminEmailsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Editor Visual Modal */}
-      {showVisualEditor && editingTemplate && (
-        <VisualEmailEditor
-          template={editingTemplate}
-          onSave={saveEditedTemplate}
-          onClose={() => {
-            setShowVisualEditor(false);
-            setEditingTemplate(null);
-          }}
-        />
-      )}
     </div>
   );
 }
