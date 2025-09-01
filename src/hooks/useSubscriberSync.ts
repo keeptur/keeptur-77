@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 // Defaults when settings are not accessible to regular users
-const DEFAULT_TRIAL_DAYS = 14; // Atualizado para usar o mesmo padrão das configurações
+const DEFAULT_TRIAL_DAYS = 7;
 
 function getMondeTokenPayload(): { email?: string; name?: string } | null {
   try {

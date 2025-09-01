@@ -22,7 +22,7 @@ export const usePlanSettings = () => {
       
       const { data, error } = await supabase
         .from('plan_settings')
-        .select('trial_days, auto_trial, auto_billing, annual_discount, coupons_enabled, first_purchase_discount')
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();

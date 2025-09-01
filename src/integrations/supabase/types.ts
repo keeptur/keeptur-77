@@ -705,14 +705,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      log_auth_attempt_system: {
-        Args: {
-          client_ip?: unknown
-          user_email: string
-          was_successful?: boolean
-        }
-        Returns: undefined
-      }
       manual_process_emails: {
         Args: Record<PropertyKey, never>
         Returns: {

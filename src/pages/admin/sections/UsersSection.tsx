@@ -126,16 +126,16 @@ export default function UsersSection() {
   useEffect(() => {
     const load = async () => {
       try {
-        // Otimizar carregamento com menos campos
-        const [profilesRes, rolesRes, subscribersRes] = await Promise.all([
-          supabase.from("profiles").select("id, email, full_name"),
+        const [ { data: p }, { data: r }, { data: s } ] = await Promise.all([
+          supabase.from("profiles").select("id, email, full_name, created_at"),
           supabase.from("user_roles").select("user_id, role"),
-          supabase.from("subscribers").select("id, user_id, email, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at").limit(500)
+          supabase
+            .from("subscribers")
+            .select("id, user_id, email, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at, updated_at, username, user_email"),
         ]);
-        
-        setProfiles((profilesRes.data || []) as any);
-        setRoles((rolesRes.data || []) as any);
-        setSubscribers((subscribersRes.data || []) as any);
+        setProfiles((p || []) as any);
+        setRoles((r || []) as any);
+        setSubscribers((s || []) as any);
       } finally {
         setLoading(false);
       }
@@ -143,10 +143,10 @@ export default function UsersSection() {
     load().catch(() => setLoading(false));
   }, []);
 
-  // Remover auto-consolidate para melhorar performance
-  // useEffect(() => {
-  //   consolidateDuplicates().catch(() => {});
-  // }, []);
+  // Auto-consolidate duplicates on first load (admin convenience)
+  useEffect(() => {
+    consolidateDuplicates().catch(() => {});
+  }, []);
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'trial' | 'inactive'>('all');
   const [planFilter, setPlanFilter] = useState<'all' | 'basic' | 'pro' | 'enterprise'>('all');
