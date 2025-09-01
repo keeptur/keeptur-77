@@ -25,6 +25,8 @@ interface AutomationRule {
 export const EmailAutomationManager = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [editingRule, setEditingRule] = useState<AutomationRule | null>(null);
+  const [selectedTrigger, setSelectedTrigger] = useState('');
+  const [editSelectedTrigger, setEditSelectedTrigger] = useState('');
 
   // Fetch automation rules
   const { data: rules, isLoading, refetch } = useQuery({
@@ -160,9 +162,7 @@ export const EmailAutomationManager = () => {
   const triggers = [
     { value: 'user_signup', label: 'Usuário se cadastrou', description: 'Quando um novo usuário cria conta no sistema' },
     { value: 'trial_start', label: 'Início do período trial', description: 'Quando o trial do usuário é iniciado' },
-    { value: 'trial_reminder_7days', label: 'Trial expira em 7 dias', description: 'Lembrete 7 dias antes do trial expirar' },
-    { value: 'trial_reminder_3days', label: 'Trial expira em 3 dias', description: 'Lembrete 3 dias antes do trial expirar' },
-    { value: 'trial_reminder_1day', label: 'Trial expira em 1 dia', description: 'Lembrete 1 dia antes do trial expirar' },
+    { value: 'trial_reminder', label: 'Lembrete de trial', description: 'X dias antes do trial expirar (configurável)' },
     { value: 'trial_ending', label: 'Trial expirando hoje', description: 'No dia que o trial expira' },
     { value: 'trial_ended', label: 'Trial expirado', description: 'Após o trial ter expirado' },
     { value: 'subscription_welcome', label: 'Boas-vindas assinante', description: 'Quando usuário se torna assinante' },
@@ -213,7 +213,10 @@ export const EmailAutomationManager = () => {
             Configure quando e quais emails devem ser enviados automaticamente
           </p>
         </div>
-        <Button onClick={() => setIsCreating(true)} className="flex items-center gap-2">
+        <Button onClick={() => {
+          setIsCreating(true);
+          setSelectedTrigger('');
+        }} className="flex items-center gap-2">
           <Plus className="h-4 w-4" />
           Nova Regra
         </Button>
@@ -233,7 +236,10 @@ export const EmailAutomationManager = () => {
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Trigger: {triggers.find(t => t.value === rule.trigger)?.label} • 
+                    Trigger: {triggers.find(t => t.value === rule.trigger)?.label}
+                    {rule.trigger === 'trial_reminder' && rule.conditions?.days_before && 
+                      ` (${rule.conditions.days_before} dias antes)`
+                    } • 
                     Template: {templates.find(t => t.value === rule.template_type)?.label} • 
                     Delay: {rule.delay_hours}h
                   </p>
@@ -243,7 +249,10 @@ export const EmailAutomationManager = () => {
                     checked={rule.active}
                     onCheckedChange={(active) => toggleRule(rule.id, active)}
                   />
-                  <Button variant="ghost" size="sm" onClick={() => setEditingRule(rule)}>
+                  <Button variant="ghost" size="sm" onClick={() => {
+                    setEditingRule(rule);
+                    setEditSelectedTrigger(rule.trigger);
+                  }}>
                     <Edit className="h-4 w-4" />
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => deleteRule(rule.id)}>
@@ -280,12 +289,17 @@ export const EmailAutomationManager = () => {
               onSubmit={(e) => {
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget);
+                const trigger = formData.get('trigger') as string;
+                const conditions = trigger === 'trial_reminder' ? 
+                  { days_before: parseInt(formData.get('days_before') as string) || 7 } : 
+                  {};
+                
                 createRule({
                   name: formData.get('name') as string,
-                  trigger: formData.get('trigger') as string,
+                  trigger,
                   template_type: formData.get('template_type') as string,
                   delay_hours: parseInt(formData.get('delay_hours') as string) || 0,
-                  conditions: {},
+                  conditions,
                   active: true,
                 });
               }}
@@ -303,7 +317,7 @@ export const EmailAutomationManager = () => {
 
               <div>
                 <Label htmlFor="trigger">Evento Disparador</Label>
-                <Select name="trigger" required>
+                <Select name="trigger" value={selectedTrigger} onValueChange={setSelectedTrigger} required>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o evento" />
                   </SelectTrigger>
@@ -316,6 +330,24 @@ export const EmailAutomationManager = () => {
                   </SelectContent>
                 </Select>
               </div>
+
+              {selectedTrigger === 'trial_reminder' && (
+                <div>
+                  <Label htmlFor="days_before">Dias antes do vencimento</Label>
+                  <Input
+                    id="days_before"
+                    name="days_before"
+                    type="number"
+                    min="1"
+                    defaultValue="7"
+                    placeholder="7"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Email será enviado X dias antes do trial expirar
+                  </p>
+                </div>
+              )}
 
               <div>
                 <Label htmlFor="template_type">Template de Email</Label>
@@ -350,7 +382,10 @@ export const EmailAutomationManager = () => {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setIsCreating(false)}
+                  onClick={() => {
+                    setIsCreating(false);
+                    setSelectedTrigger('');
+                  }}
                 >
                   Cancelar
                 </Button>
@@ -374,12 +409,17 @@ export const EmailAutomationManager = () => {
               onSubmit={(e) => {
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget);
+                const trigger = formData.get('trigger') as string;
+                const conditions = trigger === 'trial_reminder' ? 
+                  { days_before: parseInt(formData.get('days_before') as string) || 7 } : 
+                  editingRule.conditions;
+                
                 updateRule(editingRule.id, {
                   name: formData.get('name') as string,
-                  trigger: formData.get('trigger') as string,
+                  trigger,
                   template_type: formData.get('template_type') as string,
                   delay_hours: parseInt(formData.get('delay_hours') as string) || 0,
-                  conditions: editingRule.conditions,
+                  conditions,
                   active: editingRule.active,
                 });
               }}
@@ -398,7 +438,7 @@ export const EmailAutomationManager = () => {
 
               <div>
                 <Label htmlFor="edit-trigger">Evento Disparador</Label>
-                <Select name="trigger" defaultValue={editingRule.trigger} required>
+                <Select name="trigger" value={editSelectedTrigger} onValueChange={setEditSelectedTrigger} required>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o evento" />
                   </SelectTrigger>
@@ -411,6 +451,24 @@ export const EmailAutomationManager = () => {
                   </SelectContent>
                 </Select>
               </div>
+
+              {editSelectedTrigger === 'trial_reminder' && (
+                <div>
+                  <Label htmlFor="edit-days_before">Dias antes do vencimento</Label>
+                  <Input
+                    id="edit-days_before"
+                    name="days_before"
+                    type="number"
+                    min="1"
+                    defaultValue={editingRule.conditions?.days_before || 7}
+                    placeholder="7"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Email será enviado X dias antes do trial expirar
+                  </p>
+                </div>
+              )}
 
               <div>
                 <Label htmlFor="edit-template_type">Template de Email</Label>
@@ -445,7 +503,10 @@ export const EmailAutomationManager = () => {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setEditingRule(null)}
+                  onClick={() => {
+                    setEditingRule(null);
+                    setEditSelectedTrigger('');
+                  }}
                 >
                   Cancelar
                 </Button>
