@@ -24,19 +24,21 @@ const handler = async (req: Request): Promise<Response> => {
     // Buscar RESEND_API_KEY de forma robusta
     let RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
     
-    // Se não encontrou, buscar entre todas as variáveis com normalização
     if (!RESEND_API_KEY || RESEND_API_KEY.trim() === '') {
-      console.log('Buscando RESEND_API_KEY entre todas as variáveis...');
       const allVars = Deno.env.toObject();
-      const normalizedKeys = Object.keys(allVars).map(key => ({
-        original: key,
-        normalized: key.replace(/[\r\n\t\s]/g, '').toUpperCase()
-      }));
-      
-      const resendKey = normalizedKeys.find(k => k.normalized === 'RESEND_API_KEY');
-      if (resendKey) {
-        RESEND_API_KEY = allVars[resendKey.original];
-        console.log(`Encontrado RESEND_API_KEY em: "${resendKey.original}"`);
+      const candidates = Object.entries(allVars)
+        .map(([k, v]) => ({
+          original: k,
+          normalized: k.replace(/[\r\n\t\s]/g, '').toUpperCase(),
+          value: (v || '').trim(),
+        }))
+        .filter(k => k.normalized === 'RESEND_API_KEY')
+        .filter(k => k.value.length > 0);
+      const preferPattern = /^re_[A-Za-z0-9_-]{10,}$/;
+      const best = candidates.find(c => preferPattern.test(c.value)) || candidates[0];
+      if (best) {
+        RESEND_API_KEY = best.value;
+        console.log(`Encontrado RESEND_API_KEY em: "${best.original}" (len=${RESEND_API_KEY.length})`);
       }
     }
     

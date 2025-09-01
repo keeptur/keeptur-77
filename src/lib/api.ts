@@ -42,6 +42,15 @@ class MondeAPI {
       headers["Authorization"] = `Bearer ${this.token}`;
     }
 
+    // Evitar chamadas sem token para endpoints que exigem autenticação
+    const requiresAuth = !endpoint.includes('/tokens');
+    if (!this.token && requiresAuth) {
+      console.info(`Endpoint ${endpoint} requer token. Ignorado porque não há token.`);
+      const err: any = new Error('Não autenticado');
+      err.status = 401;
+      throw err;
+    }
+
     console.log(`API Request: ${options.method || 'GET'} ${url}`, {
       hasToken: !!this.token,
       endpoint,
