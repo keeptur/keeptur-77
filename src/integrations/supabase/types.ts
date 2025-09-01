@@ -659,6 +659,16 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_user_subscription_safe: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          subscribed: boolean
+          subscription_end: string
+          subscription_tier: string
+          trial_end: string
+          trial_start: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -689,6 +699,19 @@ export type Database = {
           client_ip?: unknown
           user_email: string
           was_successful?: boolean
+        }
+        Returns: undefined
+      }
+      upsert_subscriber_secure: {
+        Args: {
+          p_email: string
+          p_stripe_customer_id?: string
+          p_subscribed?: boolean
+          p_subscription_end?: string
+          p_subscription_tier?: string
+          p_trial_end?: string
+          p_trial_start?: string
+          p_user_id: string
         }
         Returns: undefined
       }
