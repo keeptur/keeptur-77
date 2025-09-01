@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { usePlanSettings } from "@/hooks/usePlanSettings";
 import { Percent, Gift, Clock, Check } from "lucide-react";
 
 interface DiscountManagerProps {
@@ -14,12 +15,6 @@ interface DiscountManagerProps {
   onDiscountApplied?: (discount: number, finalPrice: number) => void;
 }
 
-interface PlanSettings {
-  annual_discount: number;
-  coupons_enabled: boolean;
-  first_purchase_discount: number;
-}
-
 export default function DiscountManager({ 
   planPrice, 
   isAnnual = false, 
@@ -27,7 +22,7 @@ export default function DiscountManager({
   onDiscountApplied 
 }: DiscountManagerProps) {
   const { toast } = useToast();
-  const [settings, setSettings] = useState<PlanSettings | null>(null);
+  const { settings } = usePlanSettings();
   const [isFirstPurchase, setIsFirstPurchase] = useState(false);
   const [couponCode, setCouponCode] = useState("");
   const [appliedDiscounts, setAppliedDiscounts] = useState<{
@@ -38,7 +33,6 @@ export default function DiscountManager({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    loadSettings();
     if (userEmail) {
       checkFirstPurchase();
     }
@@ -47,24 +41,6 @@ export default function DiscountManager({
   useEffect(() => {
     calculateDiscounts();
   }, [settings, isFirstPurchase, isAnnual, planPrice]);
-
-  const loadSettings = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('plan_settings')
-        .select('annual_discount, coupons_enabled, first_purchase_discount')
-        .limit(1)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-
-      setSettings(data);
-    } catch (error) {
-      console.error('Erro ao carregar configurações:', error);
-    }
-  };
 
   const checkFirstPurchase = async () => {
     if (!userEmail) return;

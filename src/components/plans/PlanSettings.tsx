@@ -29,10 +29,11 @@ export default function PlanSettings() {
       const { data, error } = await supabase
         .from('plan_settings')
         .select('*')
+        .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         throw error;
       }
 
@@ -61,19 +62,56 @@ export default function PlanSettings() {
   const saveSettings = async () => {
     setSaving(true);
     try {
-      const { error } = await supabase
+      // Primeiro, verificar se já existe alguma configuração
+      const { data: existingSettings } = await supabase
         .from('plan_settings')
-        .upsert({
-          trial_days: settings.trialDays,
-          auto_trial: settings.autoTrial,
-          auto_billing: settings.autoBilling,
-          annual_discount: settings.annualDiscount,
-          coupons_enabled: settings.couponsEnabled,
-          first_purchase_discount: settings.firstPurchaseDiscount,
-          updated_at: new Date().toISOString()
-        });
+        .select('id')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
 
-      if (error) throw error;
+      let result;
+      if (existingSettings?.id) {
+        // Atualizar o registro existente
+        result = await supabase
+          .from('plan_settings')
+          .update({
+            trial_days: settings.trialDays,
+            auto_trial: settings.autoTrial,
+            auto_billing: settings.autoBilling,
+            annual_discount: settings.annualDiscount,
+            coupons_enabled: settings.couponsEnabled,
+            first_purchase_discount: settings.firstPurchaseDiscount,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingSettings.id);
+      } else {
+        // Criar novo registro
+        result = await supabase
+          .from('plan_settings')
+          .insert({
+            trial_days: settings.trialDays,
+            auto_trial: settings.autoTrial,
+            auto_billing: settings.autoBilling,
+            annual_discount: settings.annualDiscount,
+            coupons_enabled: settings.couponsEnabled,
+            first_purchase_discount: settings.firstPurchaseDiscount
+          });
+      }
+
+      if (result.error) throw result.error;
+
+      // Disparar evento customizado para notificar outros componentes
+      window.dispatchEvent(new CustomEvent('plan-settings-updated', {
+        detail: {
+          trialDays: settings.trialDays,
+          autoTrial: settings.autoTrial,
+          autoBilling: settings.autoBilling,
+          annualDiscount: settings.annualDiscount,
+          couponsEnabled: settings.couponsEnabled,
+          firstPurchaseDiscount: settings.firstPurchaseDiscount
+        }
+      }));
 
       toast({
         title: "Sucesso",
