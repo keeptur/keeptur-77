@@ -26,7 +26,7 @@ import AdminLogsPage from "./pages/admin/AdminLogsPage";
 
 import { UserRoute } from "./components/auth/UserRoute";
 import { PaymentVerifier } from "./components/PaymentVerifier";
-import { SecurityProvider } from "./components/SecurityProvider";
+import { SessionSecurity } from "./components/security/SessionSecurity";
 
 const queryClient = new QueryClient();
 
@@ -76,69 +76,68 @@ const AppWrapper = () => {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="keeptur-theme">
         <TooltipProvider>
-          <SecurityProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-            <TokenManagerInside />
-            <SubscriberSync />
-            <PaymentVerifier />
-            <Routes>
-              {/* Public routes */}
-              <Route path="/login" element={
-                <PublicRoute>
-                  <LoginForm />
-                </PublicRoute>
+          <Toaster />
+          <Sonner />
+          <SessionSecurity />
+          <BrowserRouter>
+          <TokenManagerInside />
+          <SubscriberSync />
+          <PaymentVerifier />
+          <Routes>
+            {/* Public routes */}
+            <Route path="/login" element={
+              <PublicRoute>
+                <LoginForm />
+              </PublicRoute>
+            } />
+            
+            {/* Protected routes */}
+            <Route path="/" element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }>
+              <Route index element={
+                <UserRoute>
+                  <Dashboard />
+                </UserRoute>
               } />
-              
-              {/* Protected routes */}
-              <Route path="/" element={
-                <ProtectedRoute>
-                  <Layout />
-                </ProtectedRoute>
-              }>
-                <Route index element={
-                  <UserRoute>
-                    <Dashboard />
-                  </UserRoute>
-                } />
-                <Route path="people" element={
-                  <UserRoute>
-                    <PeoplePage />
-                  </UserRoute>
-                } />
-                <Route path="profile" element={
-                  <UserRoute allowAdmin>
-                    <ProfilePage />
-                  </UserRoute>
-                } />
-                <Route path="subscription" element={
-                  <UserRoute>
-                    <SubscriptionPage />
-                  </UserRoute>
-                } />
-                <Route path="plans" element={
-                  <UserRoute>
-                    <SubscriptionPage />
-                  </UserRoute>
-                } />
-                {/* Legacy single admin page (kept) */}
-                <Route path="admin" element={
-                  <AdminRoute>
-                    <AdminPage />
-                  </AdminRoute>
-                } />
-                {/* Redirect legacy admin subroutes to unified /admin */}
-                <Route path="admin/dashboard" element={<Navigate to="/admin?t=dashboard" replace />} />
-                <Route path="admin/users" element={<Navigate to="/admin?t=users" replace />} />
-                <Route path="admin/plans" element={<Navigate to="/admin?t=plans" replace />} />
-                <Route path="admin/billing" element={<Navigate to="/admin?t=billing" replace />} />
-                <Route path="admin/emails" element={<AdminRoute><AdminEmailsPage /></AdminRoute>} />
-                <Route path="admin/logs" element={<Navigate to="/admin?t=logs" replace />} />
-              </Route>
-            </Routes>
-           </BrowserRouter>
-          </SecurityProvider>
+              <Route path="people" element={
+                <UserRoute>
+                  <PeoplePage />
+                </UserRoute>
+              } />
+              <Route path="profile" element={
+                <UserRoute allowAdmin>
+                  <ProfilePage />
+                </UserRoute>
+              } />
+              <Route path="subscription" element={
+                <UserRoute>
+                  <SubscriptionPage />
+                </UserRoute>
+              } />
+              <Route path="plans" element={
+                <UserRoute>
+                  <SubscriptionPage />
+                </UserRoute>
+              } />
+              {/* Legacy single admin page (kept) */}
+              <Route path="admin" element={
+                <AdminRoute>
+                  <AdminPage />
+                </AdminRoute>
+              } />
+              {/* Redirect legacy admin subroutes to unified /admin */}
+              <Route path="admin/dashboard" element={<Navigate to="/admin?t=dashboard" replace />} />
+              <Route path="admin/users" element={<Navigate to="/admin?t=users" replace />} />
+              <Route path="admin/plans" element={<Navigate to="/admin?t=plans" replace />} />
+              <Route path="admin/billing" element={<Navigate to="/admin?t=billing" replace />} />
+              <Route path="admin/emails" element={<AdminRoute><AdminEmailsPage /></AdminRoute>} />
+              <Route path="admin/logs" element={<Navigate to="/admin?t=logs" replace />} />
+            </Route>
+          </Routes>
+         </BrowserRouter>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
