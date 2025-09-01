@@ -195,15 +195,17 @@ export default function PlanSettings() {
         </CardContent>
       </Card>
 
-      {/* Botão de Salvar */}
-      <div className="flex justify-end mt-6">
-        <Button 
-          onClick={saveSettings}
-          disabled={saving || loading}
-          className="min-w-32"
-        >
-          {saving ? "Salvando..." : "Salvar Configurações"}
-        </Button>
+      {/* Botão de Salvar - span completo */}
+      <div className="lg:col-span-2">
+        <div className="flex justify-end">
+          <Button 
+            onClick={saveSettings}
+            disabled={saving || loading}
+            className="min-w-32"
+          >
+            {saving ? "Salvando..." : "Salvar Configurações"}
+          </Button>
+        </div>
       </div>
     </div>
   );

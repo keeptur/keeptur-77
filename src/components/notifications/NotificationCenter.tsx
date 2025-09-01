@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { useAdminStatus } from "@/hooks/useAdminStatus";
 
 export interface Notification {
   id: string;
@@ -97,17 +98,27 @@ const mockNotifications: Notification[] = [
 ];
 
 export function NotificationCenter({ 
-  notifications = mockNotifications,
+  notifications = [],
   onMarkAsRead,
   onMarkAllAsRead,
   onDismiss,
   className 
 }: NotificationCenterProps) {
-  const [localNotifications, setLocalNotifications] = useState<Notification[]>(notifications);
+  const [localNotifications, setLocalNotifications] = useState<Notification[]>([]);
+  const { isAdmin } = useAdminStatus();
 
   useEffect(() => {
-    setLocalNotifications(notifications);
-  }, [notifications]);
+    // Filtrar notificações de tarefas para admins
+    if (isAdmin) {
+      const filteredNotifications = notifications.filter(notification => 
+        !notification.title.toLowerCase().includes('tarefa') &&
+        !notification.message.toLowerCase().includes('tarefa')
+      );
+      setLocalNotifications(filteredNotifications);
+    } else {
+      setLocalNotifications(notifications);
+    }
+  }, [notifications, isAdmin]);
 
   const unreadCount = localNotifications.filter(n => !n.read).length;
 
