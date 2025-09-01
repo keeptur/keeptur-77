@@ -159,16 +159,15 @@ if (!email) {
 }
 
 const { data: settings } = await admin
-  .from("settings")
+  .from("plan_settings")
   .select("trial_days")
-  .order("created_at", { ascending: true })
+  .order("created_at", { ascending: false })
   .limit(1)
   .maybeSingle();
-const trialDays = Math.max(0, Number(settings?.trial_days ?? 7));
+const trialDays = Math.max(0, Number(settings?.trial_days ?? 14));
+console.log(`Trial days from plan_settings: ${trialDays}, raw settings:`, settings);
 
-    const now = new Date();
-
-    // Tenta encontrar um assinante existente pelo user_id ou email
+const now = new Date();
     let existing;
     if (user_id) {
         const { data } = await admin.from("subscribers").select("*").eq("user_id", user_id).maybeSingle();
@@ -319,9 +318,11 @@ if (allRecords && allRecords.length > 1) {
       if (!existing.user_id && user_id) update.user_id = user_id;
 
       await admin.from("subscribers").update(update).eq("id", existing.id);
+      console.log(`Updated existing subscriber ${existing.id} with trial: ${trial_start} - ${trial_end}`);
     } else {
       trial_start = now.toISOString();
       trial_end = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000).toISOString();
+      console.log(`Creating new subscriber with ${trialDays} day trial: ${trial_start} - ${trial_end}`);
       const { data: inserted } = await admin.from("subscribers").insert({
         email: finalEmail,
         user_email: finalLoginEmail, // Store the original login email
@@ -336,6 +337,7 @@ if (allRecords && allRecords.length > 1) {
       }).select('id').single();
       subId = inserted?.id ?? null;
       subscribed = false;
+      console.log(`Created new subscriber with ID: ${subId}`);
     }
 
     return new Response(JSON.stringify({ ok: true, id: subId, email: finalEmail, trial_start, trial_end, subscribed }), {
