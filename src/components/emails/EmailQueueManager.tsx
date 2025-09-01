@@ -41,16 +41,20 @@ export const EmailQueueManager = () => {
   const processQueue = async () => {
     setIsProcessing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('process-email-jobs');
+      const { data, error } = await supabase.functions.invoke('trigger-email-processing');
       
       if (error) throw error;
       
       toast({
-        title: "Fila processada",
-        description: data?.message || "Emails processados com sucesso",
+        title: "Processamento iniciado",
+        description: data?.message || "Emails sendo processados",
       });
       
-      refetch();
+      // Refetch após um tempo para ver os resultados
+      setTimeout(() => {
+        refetch();
+      }, 3000);
+      
     } catch (error: any) {
       console.error('Erro ao processar fila:', error);
       toast({
