@@ -702,6 +702,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      process_pending_emails: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       upsert_subscriber_secure: {
         Args: {
           p_email: string
