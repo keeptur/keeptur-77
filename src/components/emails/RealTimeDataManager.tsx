@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -27,7 +28,7 @@ export const useRealTimeData = () => {
     loadPlanSettings();
     loadUsers();
     
-    // Escutar mudanças em tempo real
+    // Escutar mudanças em tempo real nos subscribers (não nos profiles)
     const channel = supabase
       .channel('email-data-changes')
       .on(
@@ -35,14 +36,16 @@ export const useRealTimeData = () => {
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'profiles'
+          table: 'subscribers'
         },
         async (payload) => {
-          console.log('Novo usuário cadastrado:', payload.new);
+          console.log('Novo subscriber cadastrado:', payload.new);
           
-          // Disparar email de boas-vindas automaticamente
-          const newUser = payload.new as any;
-          await sendWelcomeEmail(newUser);
+          // Disparar email de boas-vindas automaticamente para o email correto
+          const newSubscriber = payload.new as any;
+          if (newSubscriber.email) {
+            await sendWelcomeEmail(newSubscriber);
+          }
           
           // Atualizar lista de usuários
           loadUsers();
@@ -56,7 +59,7 @@ export const useRealTimeData = () => {
           table: 'subscribers'
         },
         (payload) => {
-          console.log('Status de assinatura atualizado:', payload.new);
+          console.log('Subscriber atualizado:', payload.new);
           // Disparar emails baseados em mudança de status
           handleSubscriptionStatusChange(payload.new as any);
         }
@@ -86,26 +89,28 @@ export const useRealTimeData = () => {
 
   const loadUsers = async () => {
     try {
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, email, full_name, created_at')
+      // Buscar dados dos subscribers, não dos profiles
+      const { data: subscribers } = await supabase
+        .from('subscribers')
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (profiles) {
-        // Processar dados dos usuários para extrair empresa e subdomínio
-        const processedUsers = profiles.map(profile => {
-          const emailParts = profile.email.split('@');
+      if (subscribers) {
+        // Processar dados dos subscribers
+        const processedUsers = subscribers.map(subscriber => {
+          // Usar o email correto do subscriber, não o de login
+          const emailParts = subscriber.email.split('@');
           const subdomain = emailParts[1]?.split('.')[0] || '';
           
           return {
-            id: profile.id,
-            email: profile.email,
-            full_name: profile.full_name || profile.email,
+            id: subscriber.id,
+            email: subscriber.email, // Email correto do subscriber
+            full_name: subscriber.display_name || subscriber.username || subscriber.email,
             empresa: subdomain,
             subdominio: subdomain,
-            trial_start: calculateTrialStart(profile.created_at),
-            trial_end: calculateTrialEnd(profile.created_at),
-            subscription_status: 'trial'
+            trial_start: subscriber.trial_start || calculateTrialStart(subscriber.created_at),
+            trial_end: subscriber.trial_end || calculateTrialEnd(subscriber.created_at),
+            subscription_status: subscriber.subscribed ? 'active' : 'trial'
           };
         });
 
@@ -116,22 +121,39 @@ export const useRealTimeData = () => {
     }
   };
 
-  const sendWelcomeEmail = async (user: any) => {
+  const sendWelcomeEmail = async (subscriber: any) => {
     try {
-      // Preparar dados reais do usuário
+      // Verificar se existe regra de automação ativa para user_signup
+      const { data: rule } = await supabase
+        .from('automation_rules')
+        .select('*')
+        .eq('trigger', 'user_signup')
+        .eq('active', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (!rule) {
+        console.log('Nenhuma regra ativa para user_signup');
+        return;
+      }
+
+      // Preparar dados reais do subscriber
       const emailData = {
-        to_email: user.email,
-        template_type: 'welcome',
+        to_email: subscriber.email, // Email correto do subscriber
+        template_type: rule.template_type,
         variables: {
-          nome_usuario: user.full_name || user.email.split('@')[0],
-          email: user.email,
+          nome_usuario: subscriber.display_name || subscriber.username || subscriber.email.split('@')[0],
+          email: subscriber.email,
           nome_sistema: 'Keeptur',
-          empresa: user.email.split('@')[1]?.split('.')[0] || '',
-          subdominio: user.email.split('@')[1]?.split('.')[0] || '',
-          link_acesso: `https://${user.email.split('@')[1]?.split('.')[0] || 'app'}.keeptur.com`,
-          dias_trial: planSettings?.trial_days || 14,
-          data_vencimento: calculateTrialEnd(new Date().toISOString())
-        }
+          empresa: subscriber.email.split('@')[1]?.split('.')[0] || '',
+          subdominio: subscriber.email.split('@')[1]?.split('.')[0] || '',
+          link_acesso: `https://${subscriber.email.split('@')[1]?.split('.')[0] || 'app'}.keeptur.com`,
+          dias_trial: planSettings?.trial_days?.toString() || '14',
+          data_vencimento: subscriber.trial_end ? 
+            new Date(subscriber.trial_end).toLocaleDateString('pt-BR') : 
+            calculateTrialEnd(subscriber.created_at)
+        },
+        delay_hours: rule.delay_hours || 0
       };
 
       // Enviar via edge function
@@ -141,10 +163,33 @@ export const useRealTimeData = () => {
 
       if (error) {
         console.error('Erro ao enviar email de boas-vindas:', error);
+        
+        // Log do erro no banco
+        await supabase
+          .from('email_logs')
+          .insert([{
+            user_email: subscriber.email,
+            template_type: rule.template_type,
+            status: 'failed',
+            error_message: error.message,
+            metadata: { subscriber_id: subscriber.id }
+          }]);
       } else {
+        console.log('Email de boas-vindas enviado:', subscriber.email);
+        
+        // Log do sucesso
+        await supabase
+          .from('email_logs')
+          .insert([{
+            user_email: subscriber.email,
+            template_type: rule.template_type,
+            status: 'sent',
+            metadata: { subscriber_id: subscriber.id }
+          }]);
+
         toast({
           title: "Email enviado",
-          description: `Email de boas-vindas enviado para ${user.email}`
+          description: `Email de boas-vindas enviado para ${subscriber.email}`
         });
       }
     } catch (error) {
@@ -153,103 +198,112 @@ export const useRealTimeData = () => {
   };
 
   const handleSubscriptionStatusChange = async (subscriber: any) => {
-    // Implementar lógica para emails baseados em mudança de status
-    if (subscriber.subscribed && !subscriber.previous_subscribed) {
-      // Usuário se tornou assinante - enviar email de boas-vindas premium
-      await sendSubscriptionWelcomeEmail(subscriber);
-    }
-    
-    if (!subscriber.subscribed && subscriber.trial_end) {
-      const trialEndDate = new Date(subscriber.trial_end);
-      const now = new Date();
-      const daysUntilEnd = Math.ceil((trialEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      
-      if (daysUntilEnd === 7) {
-        // 7 dias para o fim do trial
-        await sendTrialEndingEmail(subscriber);
-      } else if (daysUntilEnd === 1) {
-        // 1 dia para o fim do trial
-        await sendTrialEndingSoonEmail(subscriber);
-      } else if (daysUntilEnd <= 0) {
-        // Trial expirado
-        await sendTrialExpiredEmail(subscriber);
+    try {
+      // Verificar mudanças de status e disparar emails apropriados
+      if (subscriber.subscribed && !subscriber.previous_subscribed) {
+        // Usuário se tornou assinante - verificar regra subscription_active
+        const { data: rule } = await supabase
+          .from('automation_rules')
+          .select('*')
+          .eq('trigger', 'subscription_active')
+          .eq('active', true)
+          .limit(1)
+          .maybeSingle();
+
+        if (rule) {
+          await sendSubscriptionWelcomeEmail(subscriber, rule);
+        }
       }
+      
+      // Verificar status do trial
+      if (!subscriber.subscribed && subscriber.trial_end) {
+        const trialEndDate = new Date(subscriber.trial_end);
+        const now = new Date();
+        const daysUntilEnd = Math.ceil((trialEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (daysUntilEnd === 7) {
+          await checkAndSendTrialEmail('trial_ending', subscriber, '7');
+        } else if (daysUntilEnd === 1) {
+          await checkAndSendTrialEmail('trial_ending', subscriber, '1');
+        } else if (daysUntilEnd <= 0) {
+          await checkAndSendTrialEmail('trial_expired', subscriber, '0');
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao processar mudança de status:', error);
     }
   };
 
-  const sendSubscriptionWelcomeEmail = async (subscriber: any) => {
+  const checkAndSendTrialEmail = async (trigger: string, subscriber: any, daysRemaining: string) => {
+    const { data: rule } = await supabase
+      .from('automation_rules')
+      .select('*')
+      .eq('trigger', trigger)
+      .eq('active', true)
+      .limit(1)
+      .maybeSingle();
+
+    if (!rule) return;
+
     const emailData = {
       to_email: subscriber.email,
-      template_type: 'subscription_welcome',
+      template_type: rule.template_type,
       variables: {
-        nome_usuario: subscriber.display_name || subscriber.email.split('@')[0],
+        nome_usuario: subscriber.display_name || subscriber.username || subscriber.email.split('@')[0],
+        email: subscriber.email,
+        nome_sistema: 'Keeptur',
+        dias_restantes: daysRemaining,
+        data_vencimento: new Date(subscriber.trial_end).toLocaleDateString('pt-BR'),
+        link_pagamento: `https://${subscriber.email.split('@')[1]?.split('.')[0] || 'app'}.keeptur.com/subscription`
+      },
+      delay_hours: rule.delay_hours || 0
+    };
+
+    const { error } = await supabase.functions.invoke('send-automated-email', {
+      body: emailData
+    });
+
+    // Log do resultado
+    await supabase
+      .from('email_logs')
+      .insert([{
+        user_email: subscriber.email,
+        template_type: rule.template_type,
+        status: error ? 'failed' : 'sent',
+        error_message: error?.message,
+        metadata: { subscriber_id: subscriber.id, trigger }
+      }]);
+  };
+
+  const sendSubscriptionWelcomeEmail = async (subscriber: any, rule: any) => {
+    const emailData = {
+      to_email: subscriber.email,
+      template_type: rule.template_type,
+      variables: {
+        nome_usuario: subscriber.display_name || subscriber.username || subscriber.email.split('@')[0],
         email: subscriber.email,
         nome_sistema: 'Keeptur',
         nome_plano: subscriber.subscription_tier || 'Premium',
         empresa: subscriber.email.split('@')[1]?.split('.')[0] || '',
         link_acesso: `https://${subscriber.email.split('@')[1]?.split('.')[0] || 'app'}.keeptur.com`
-      }
+      },
+      delay_hours: rule.delay_hours || 0
     };
 
-    await supabase.functions.invoke('send-automated-email', {
+    const { error } = await supabase.functions.invoke('send-automated-email', {
       body: emailData
     });
-  };
 
-  const sendTrialEndingEmail = async (subscriber: any) => {
-    const emailData = {
-      to_email: subscriber.email,
-      template_type: 'trial_ending',
-      variables: {
-        nome_usuario: subscriber.display_name || subscriber.email.split('@')[0],
-        email: subscriber.email,
-        nome_sistema: 'Keeptur',
-        dias_restantes: '7',
-        data_vencimento: new Date(subscriber.trial_end).toLocaleDateString('pt-BR'),
-        link_pagamento: `https://${subscriber.email.split('@')[1]?.split('.')[0] || 'app'}.keeptur.com/subscription`
-      }
-    };
-
-    await supabase.functions.invoke('send-automated-email', {
-      body: emailData
-    });
-  };
-
-  const sendTrialEndingSoonEmail = async (subscriber: any) => {
-    const emailData = {
-      to_email: subscriber.email,
-      template_type: 'trial_ending',
-      variables: {
-        nome_usuario: subscriber.display_name || subscriber.email.split('@')[0],
-        email: subscriber.email,
-        nome_sistema: 'Keeptur',
-        dias_restantes: '1',
-        data_vencimento: new Date(subscriber.trial_end).toLocaleDateString('pt-BR'),
-        link_pagamento: `https://${subscriber.email.split('@')[1]?.split('.')[0] || 'app'}.keeptur.com/subscription`
-      }
-    };
-
-    await supabase.functions.invoke('send-automated-email', {
-      body: emailData
-    });
-  };
-
-  const sendTrialExpiredEmail = async (subscriber: any) => {
-    const emailData = {
-      to_email: subscriber.email,
-      template_type: 'trial_ended',
-      variables: {
-        nome_usuario: subscriber.display_name || subscriber.email.split('@')[0],
-        email: subscriber.email,
-        nome_sistema: 'Keeptur',
-        data_vencimento: new Date(subscriber.trial_end).toLocaleDateString('pt-BR'),
-        link_pagamento: `https://${subscriber.email.split('@')[1]?.split('.')[0] || 'app'}.keeptur.com/subscription`
-      }
-    };
-
-    await supabase.functions.invoke('send-automated-email', {
-      body: emailData
-    });
+    // Log do resultado
+    await supabase
+      .from('email_logs')
+      .insert([{
+        user_email: subscriber.email,
+        template_type: rule.template_type,
+        status: error ? 'failed' : 'sent',
+        error_message: error?.message,
+        metadata: { subscriber_id: subscriber.id }
+      }]);
   };
 
   const calculateTrialStart = (createdAt: string) => {
@@ -260,7 +314,7 @@ export const useRealTimeData = () => {
     const trialDays = planSettings?.trial_days || 14;
     const startDate = new Date(createdAt);
     const endDate = new Date(startDate.getTime() + (trialDays * 24 * 60 * 60 * 1000));
-    return endDate.toISOString();
+    return endDate.toLocaleDateString('pt-BR');
   };
 
   const getRealTimeVariables = (user: UserData) => {
@@ -270,7 +324,7 @@ export const useRealTimeData = () => {
       nome_sistema: 'Keeptur',
       empresa: user.empresa || '',
       subdominio: user.subdominio || '',
-      dias_trial: planSettings?.trial_days || 14,
+      dias_trial: planSettings?.trial_days?.toString() || '14',
       data_vencimento: user.trial_end ? new Date(user.trial_end).toLocaleDateString('pt-BR') : '',
       dias_restantes: user.trial_end ? 
         Math.ceil((new Date(user.trial_end).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)).toString() : '0',

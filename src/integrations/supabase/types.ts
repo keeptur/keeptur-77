@@ -97,6 +97,123 @@ export type Database = {
           },
         ]
       }
+      automation_rules: {
+        Row: {
+          active: boolean
+          conditions: Json
+          created_at: string
+          delay_hours: number
+          id: string
+          name: string
+          template_type: string
+          trigger: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          active?: boolean
+          conditions?: Json
+          created_at?: string
+          delay_hours?: number
+          id?: string
+          name: string
+          template_type: string
+          trigger: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          active?: boolean
+          conditions?: Json
+          created_at?: string
+          delay_hours?: number
+          id?: string
+          name?: string
+          template_type?: string
+          trigger?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      email_jobs: {
+        Row: {
+          attempts: number
+          created_at: string
+          id: string
+          last_error: string | null
+          scheduled_for: string
+          status: string
+          template_type: string
+          to_email: string
+          updated_at: string
+          variables: Json
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          scheduled_for?: string
+          status?: string
+          template_type: string
+          to_email: string
+          updated_at?: string
+          variables?: Json
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          scheduled_for?: string
+          status?: string
+          template_type?: string
+          to_email?: string
+          updated_at?: string
+          variables?: Json
+        }
+        Relationships: []
+      }
+      email_logs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          metadata: Json | null
+          sent_at: string
+          status: string
+          subscriber_id: string | null
+          template_type: string
+          user_email: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          sent_at?: string
+          status?: string
+          subscriber_id?: string | null
+          template_type: string
+          user_email: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          sent_at?: string
+          status?: string
+          subscriber_id?: string | null
+          template_type?: string
+          user_email?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       email_templates: {
         Row: {
           created_at: string
