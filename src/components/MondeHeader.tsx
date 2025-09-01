@@ -10,6 +10,7 @@ import { useTasks } from "@/hooks/useTasks";
 import { isSameDay, parseISO } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAdminStatus } from "@/hooks/useAdminStatus";
 
 // ... (restante do código permanece praticamente idêntico ao original, apenas com useTheme importado do provider)
 
@@ -89,6 +90,7 @@ export function MondeHeader() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const { theme, setTheme } = useTheme();
+  const { isAdmin } = useAdminStatus();
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const navigate = useNavigate();
@@ -106,7 +108,6 @@ export function MondeHeader() {
   const [userName, setUserName] = useState<string>('...');
   const [userRole, setUserRole] = useState<string>('Usuário');
   const [avatarUrl, setAvatarUrl] = useState<string>('');
-  const [isAdmin, setIsAdmin] = useState(false);
   useEffect(() => {
     let mounted = true;
     const loadUserData = async () => {
@@ -131,16 +132,13 @@ export function MondeHeader() {
           // ignore
         }
       }
-      // Carregar dados do Supabase: avatar e admin status
+      // Carregar dados do Supabase: avatar
       try {
         const {
           data: { user },
         } = await supabase.auth.getUser();
         if (user && mounted) {
-          const { data: roles } = await supabase.from('user_roles').select('role').eq('user_id', user.id);
-          const userIsAdmin = roles?.some((r) => r.role === 'admin') || false;
-          setIsAdmin(userIsAdmin);
-          if (userIsAdmin) {
+          if (isAdmin) {
             setUserRole('Admin');
           }
           const { data: profile } = await supabase.from('profiles').select('avatar_url, full_name').eq('id', user.id).maybeSingle();
@@ -166,7 +164,7 @@ export function MondeHeader() {
       mounted = false;
       window.removeEventListener('profile-updated', handleProfileUpdate);
     };
-  }, [userName]);
+  }, [userName, isAdmin]);
   const initials = useMemo(() => {
     const parts = (userName || '').split(' ').filter(Boolean);
     const first = parts[0]?.[0] || 'U';
@@ -199,7 +197,9 @@ export function MondeHeader() {
   useEffect(() => {
     localStorage.setItem(`notif-dismiss-${dateKey}`, JSON.stringify(dismissed));
   }, [dismissed, dateKey]);
-  const notifItems = [
+  
+  // Para admins, não mostrar notificações de tarefas
+  const notifItems = isAdmin ? [] : [
     { id: 'pending-today', title: `Hoje você tem ${pendingToday} tarefas pendentes`, hidden: dismissed['pending-today'] || pendingToday === 0 },
     { id: 'overdue', title: `Você possui ${overdueCount} tarefas atrasadas`, hidden: dismissed['overdue'] || overdueCount === 0 },
   ];
@@ -271,8 +271,8 @@ export function MondeHeader() {
           </Button>
           {userDropdownOpen && (
             <div className="absolute right-0 mt-2 w-64 bg-white border border-border rounded-lg shadow-lg py-1 z-[1100]">
-              {/* Exibe o relógio de trial/assinatura para todos os usuários dentro do menu */}
-              <TrialStatus />
+              {/* Exibe o relógio de trial/assinatura apenas para não-admins */}
+              {!isAdmin && <TrialStatus />}
               {isAdmin && (
                 <button onClick={() => { navigate('/admin'); setUserDropdownOpen(false); }} className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted">Admin</button>
               )}
