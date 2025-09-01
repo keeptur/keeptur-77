@@ -169,14 +169,19 @@ console.log(`Trial days from plan_settings: ${trialDays}, raw settings:`, settin
 
 const now = new Date();
     let existing;
+    
+    console.log(`Looking for existing subscriber with user_id: ${user_id}, email: ${email}`);
+    
     if (user_id) {
         const { data } = await admin.from("subscribers").select("*").eq("user_id", user_id).maybeSingle();
         existing = data;
+        console.log(`Found by user_id: ${existing ? 'Yes' : 'No'}`);
     }
     
     if (!existing && email) {
         const { data } = await admin.from("subscribers").select("*").eq("email", email).maybeSingle();
         existing = data;
+        console.log(`Found by email: ${existing ? 'Yes' : 'No'}`);
     }
 
     // Se encontrar pelo email mas o user_id for nulo, atualiza o user_id
