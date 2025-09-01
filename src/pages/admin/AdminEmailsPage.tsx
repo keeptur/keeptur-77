@@ -95,7 +95,7 @@ export default function AdminEmailsPage() {
       const { error } = await supabase
         .from('email_templates')
         .upsert([{
-          type: newTemplate.type,
+          type: newTemplate.type as any,
           subject: newTemplate.subject,
           html: newTemplate.html,
           updated_by: (await supabase.auth.getUser()).data.user?.id

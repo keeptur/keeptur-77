@@ -168,7 +168,11 @@ export default function EmailAutomationManager() {
       .order('created_at', { ascending: false });
 
     if (data) {
-      setAutomationRules(data);
+      const mapped = data.map((r: any) => ({
+        ...r,
+        conditions: typeof r.conditions === 'object' && r.conditions !== null ? (r.conditions as Record<string, any>) : {},
+      }));
+      setAutomationRules(mapped);
     }
   };
 
@@ -180,7 +184,11 @@ export default function EmailAutomationManager() {
       .limit(50);
 
     if (data) {
-      setEmailLogs(data);
+      const mapped = data.map((l: any) => ({
+        ...l,
+        status: (['sent','failed','pending'].includes(l.status) ? l.status : 'pending') as EmailLog['status'],
+      }));
+      setEmailLogs(mapped);
     }
   };
 
@@ -211,7 +219,7 @@ export default function EmailAutomationManager() {
 
       if (error) throw error;
 
-      setAutomationRules([data, ...automationRules]);
+      setAutomationRules([{ ...data, conditions: (typeof data.conditions === 'object' && data.conditions !== null) ? (data.conditions as Record<string, any>) : {} } as AutomationRule, ...automationRules]);
       setNewRule({
         name: '',
         trigger: '',
