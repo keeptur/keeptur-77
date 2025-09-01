@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Shield, CheckCircle } from 'lucide-react';
 
 interface AdminSession {
   id: string;
@@ -11,7 +13,106 @@ interface AdminSession {
   is_current: boolean;
 }
 
-// Enhanced admin security monitoring
+// Admin security panel component
+export function AdminSecurityPanel() {
+  const { toast } = useToast();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isEnabling, setIsEnabling] = useState(false);
+  const [isPasswordProtectionEnabled, setIsPasswordProtectionEnabled] = useState<boolean | null>(null);
+
+  // Check admin status and password protection status
+  useEffect(() => {
+    const checkStatus = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: roles } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'admin');
+        
+        setIsAdmin(!!roles?.length);
+      }
+    };
+
+    checkStatus();
+  }, []);
+
+  const enablePasswordProtection = async () => {
+    if (!isAdmin) return;
+
+    setIsEnabling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('enable-password-protection');
+      
+      if (error) {
+        throw error;
+      }
+
+      if (data.success) {
+        setIsPasswordProtectionEnabled(true);
+        toast({
+          title: "Proteção Ativada",
+          description: "Proteção contra senhas vazadas foi ativada com sucesso",
+        });
+      } else {
+        throw new Error(data.error || 'Failed to enable password protection');
+      }
+    } catch (error) {
+      console.error('Error enabling password protection:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao ativar proteção de senhas. Verifique o token de gerenciamento.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsEnabling(false);
+    }
+  };
+
+  if (!isAdmin) return null;
+
+  return (
+    <div className="p-6 border rounded-lg bg-card">
+      <div className="flex items-center gap-3 mb-4">
+        <Shield className="h-5 w-5 text-primary" />
+        <h3 className="text-lg font-semibold">Configurações de Segurança</h3>
+      </div>
+      
+      <div className="space-y-4">
+        <div className="flex items-center justify-between p-4 border rounded-md">
+          <div className="flex-1">
+            <h4 className="font-medium">Proteção contra Senhas Vazadas</h4>
+            <p className="text-sm text-muted-foreground">
+              Impede que usuários usem senhas comprometidas em vazamentos de dados
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {isPasswordProtectionEnabled === true && (
+              <div className="flex items-center gap-1 text-green-600">
+                <CheckCircle className="h-4 w-4" />
+                <span className="text-sm">Ativo</span>
+              </div>
+            )}
+            
+            <Button
+              onClick={enablePasswordProtection}
+              disabled={isEnabling || isPasswordProtectionEnabled === true}
+              variant={isPasswordProtectionEnabled === true ? "outline" : "default"}
+              size="sm"
+            >
+              {isEnabling ? "Ativando..." : 
+               isPasswordProtectionEnabled === true ? "Ativado" : "Ativar"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Enhanced admin security monitoring (background component)
 export function AdminSecurity() {
   const { toast } = useToast();
   const [activeSessions, setActiveSessions] = useState<AdminSession[]>([]);

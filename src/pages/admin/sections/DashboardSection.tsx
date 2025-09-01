@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/api";
+import { AdminSecurityPanel } from "@/components/security/AdminSecurity";
 import {
   LineChart,
   Line,
@@ -425,6 +426,9 @@ export default function DashboardSection() {
           </CardContent>
         </Card>
       </div>
+      
+      {/* Painel de Segurança */}
+      <AdminSecurityPanel />
     </div>
   );
 }
