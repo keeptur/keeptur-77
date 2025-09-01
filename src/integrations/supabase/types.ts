@@ -706,6 +706,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      process_pending_emails_simple: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       upsert_subscriber_secure: {
         Args: {
           p_email: string
