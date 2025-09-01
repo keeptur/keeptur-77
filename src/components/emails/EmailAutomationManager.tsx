@@ -40,6 +40,20 @@ export const EmailAutomationManager = () => {
     },
   });
 
+  // Fetch email templates dinamicamente
+  const { data: emailTemplates } = useQuery({
+    queryKey: ['email-templates'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('email_templates')
+        .select('type, subject')
+        .order('type');
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const createRule = async (ruleData: { name: string; trigger: string; template_type: string; delay_hours: number; conditions: Record<string, any>; active: boolean }) => {
     try {
       const { data, error } = await supabase
@@ -144,18 +158,47 @@ export const EmailAutomationManager = () => {
   };
 
   const triggers = [
-    { value: 'trial_start', label: 'Início do Trial' },
-    { value: 'trial_ending', label: 'Final do Trial' },
-    { value: 'trial_ended', label: 'Trial Expirado' },
-    { value: 'subscription_welcome', label: 'Boas-vindas da Assinatura' },
+    { value: 'user_signup', label: 'Usuário se cadastrou', description: 'Quando um novo usuário cria conta no sistema' },
+    { value: 'trial_start', label: 'Início do período trial', description: 'Quando o trial do usuário é iniciado' },
+    { value: 'trial_reminder_7days', label: 'Trial expira em 7 dias', description: 'Lembrete 7 dias antes do trial expirar' },
+    { value: 'trial_reminder_3days', label: 'Trial expira em 3 dias', description: 'Lembrete 3 dias antes do trial expirar' },
+    { value: 'trial_reminder_1day', label: 'Trial expira em 1 dia', description: 'Lembrete 1 dia antes do trial expirar' },
+    { value: 'trial_ending', label: 'Trial expirando hoje', description: 'No dia que o trial expira' },
+    { value: 'trial_ended', label: 'Trial expirado', description: 'Após o trial ter expirado' },
+    { value: 'subscription_welcome', label: 'Boas-vindas assinante', description: 'Quando usuário se torna assinante' },
+    { value: 'subscription_renewed', label: 'Assinatura renovada', description: 'Quando assinatura é renovada' },
+    { value: 'subscription_expiring', label: 'Assinatura expirando', description: 'Quando assinatura está próxima do vencimento' },
+    { value: 'subscription_cancelled', label: 'Assinatura cancelada', description: 'Quando assinatura é cancelada' },
+    { value: 'payment_successful', label: 'Pagamento realizado', description: 'Quando pagamento é processado com sucesso' },
+    { value: 'payment_failed', label: 'Falha no pagamento', description: 'Quando pagamento falha' },
+    { value: 'password_reset', label: 'Redefinição de senha', description: 'Quando usuário solicita reset de senha' },
+    { value: 'email_confirmation', label: 'Confirmação de email', description: 'Para confirmar endereço de email' },
   ];
 
-  const templates = [
-    { value: 'welcome', label: 'Boas-vindas' },
-    { value: 'trial_reminder', label: 'Lembrete de Trial' },
-    { value: 'trial_ending', label: 'Trial Expirando' },
-    { value: 'subscription_welcome', label: 'Boas-vindas Premium' },
-  ];
+  // Mapeamento de tipos de template para labels amigáveis
+  const templateLabels: Record<string, string> = {
+    'welcome': 'Boas-vindas ao sistema',
+    'trial_start': 'Início do período trial',
+    'trial_reminder': 'Lembrete de trial',
+    'trial_ending': 'Trial expirando',
+    'trial_ended': 'Fim do período trial',
+    'subscription_welcome': 'Bem-vindo assinante',
+    'subscription_renewed': 'Assinatura renovada',
+    'subscription_cancelled': 'Assinatura cancelada',
+    'subscription_expiring': 'Renovação próxima ao vencimento',
+    'payment_failed': 'Falha no pagamento',
+    'payment_successful': 'Pagamento realizado',
+    'password_reset': 'Redefinição de senha',
+    'email_confirmation': 'Confirmação de email',
+    'tutorial': 'Tutorial inicial',
+  };
+
+  // Templates dinâmicos baseados no banco de dados
+  const templates = emailTemplates?.map(template => ({
+    value: template.type,
+    label: templateLabels[template.type] || template.type,
+    subject: template.subject
+  })) || [];
 
   if (isLoading) {
     return <div className="p-4">Carregando regras...</div>;
