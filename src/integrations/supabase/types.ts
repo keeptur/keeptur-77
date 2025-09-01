@@ -611,19 +611,7 @@ export type Database = {
       }
     }
     Views: {
-      admin_metrics: {
-        Row: {
-          active_subscriptions: number | null
-          active_trials: number | null
-          average_ticket_cents: number | null
-          revenue_growth_percentage: number | null
-          subscription_growth_percentage: number | null
-          total_admins: number | null
-          total_monthly_revenue_cents: number | null
-          total_users: number | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       check_auth_rate_limit: {
