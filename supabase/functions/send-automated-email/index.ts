@@ -22,10 +22,13 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    console.log('=== INÍCIO DO PROCESSAMENTO ===');
     const requestBody = await req.json();
-    console.log('Automated email request received:', requestBody);
+    console.log('Request body recebido:', JSON.stringify(requestBody, null, 2));
 
     const { to_email, template_type, variables = {}, delay_hours = 0 }: SendAutomatedEmailRequest = requestBody;
+
+    console.log(`Dados extraídos: to_email=${to_email}, template_type=${template_type}, delay_hours=${delay_hours}`);
 
     // Validar dados obrigatórios
     if (!to_email || !template_type) {
@@ -37,6 +40,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    console.log('Verificando RESEND_API_KEY...');
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
     if (!RESEND_API_KEY) {
       console.error('RESEND_API_KEY não configurado');
@@ -45,8 +49,10 @@ const handler = async (req: Request): Promise<Response> => {
         { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
+    console.log('RESEND_API_KEY configurado ✓');
 
     // Initialize Supabase client
+    console.log('Verificando credenciais do Supabase...');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
@@ -57,8 +63,10 @@ const handler = async (req: Request): Promise<Response> => {
         { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
+    console.log('Credenciais Supabase configuradas ✓');
 
     const supabase = createClient(supabaseUrl, supabaseKey);
+    console.log('Cliente Supabase inicializado ✓');
 
     // Se há delay, agendar para mais tarde
     if (delay_hours > 0) {
@@ -96,6 +104,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Buscar template no banco
+    console.log(`Buscando template: ${template_type}`);
     const { data: template, error: templateError } = await supabase
       .from('email_templates')
       .select('*')
@@ -105,18 +114,22 @@ const handler = async (req: Request): Promise<Response> => {
     if (templateError) {
       console.error('Erro ao buscar template:', templateError);
       return new Response(
-        JSON.stringify({ success: false, error: 'Erro ao buscar template no banco' }),
+        JSON.stringify({ success: false, error: 'Erro ao buscar template no banco', details: templateError.message }),
         { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
 
     if (!template) {
       console.error('Template não encontrado:', template_type);
+      console.log('Templates disponíveis no banco...');
+      const { data: allTemplates } = await supabase.from('email_templates').select('type');
+      console.log('Templates encontrados:', allTemplates?.map(t => t.type));
       return new Response(
         JSON.stringify({ success: false, error: `Template '${template_type}' não encontrado` }),
         { status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
+    console.log(`Template encontrado: ${template.subject}`);
 
     // Buscar configurações SMTP
     const { data: smtpSettings } = await supabase
@@ -176,7 +189,11 @@ const handler = async (req: Request): Promise<Response> => {
     let errorMessage = '';
     
     try {
-      console.log(`Tentando enviar email para ${to_email} com template ${template_type}`);
+      console.log(`=== TENTATIVA DE ENVIO ===`);
+      console.log(`Para: ${to_email}`);
+      console.log(`De: Keeptur <${fromEmail}>`);
+      console.log(`Assunto: ${emailSubject}`);
+      console.log(`Tamanho do HTML: ${emailContent.length} caracteres`);
       
       sendResult = await resend.emails.send({
         from: `Keeptur <${fromEmail}>`,
@@ -185,14 +202,19 @@ const handler = async (req: Request): Promise<Response> => {
         html: emailContent,
       }) as any;
 
-      console.log('Email enviado com sucesso:', sendResult);
+      console.log('=== RESULTADO DO ENVIO ===');
+      console.log('Email enviado com sucesso:', JSON.stringify(sendResult, null, 2));
     } catch (primaryErr: any) {
-      console.error('Erro no envio principal:', primaryErr);
+      console.error('=== ERRO NO ENVIO PRINCIPAL ===');
+      console.error('Erro detalhado:', JSON.stringify(primaryErr, null, 2));
+      console.error('Message:', primaryErr.message);
+      console.error('Stack:', primaryErr.stack);
       errorMessage = primaryErr.message;
       
       // Tentativa com email fallback
       try {
-        console.log('Tentando envio fallback...');
+        console.log('=== TENTATIVA FALLBACK ===');
+        console.log('Tentando envio fallback com onboarding@resend.dev...');
         sendResult = await resend.emails.send({
           from: 'Keeptur <onboarding@resend.dev>',
           to: [to_email],
@@ -200,18 +222,23 @@ const handler = async (req: Request): Promise<Response> => {
           html: emailContent,
         }) as any;
 
-        console.log('Fallback enviado com sucesso:', sendResult);
-        errorMessage = ''; // Limpat erro se fallback funcionou
+        console.log('=== RESULTADO FALLBACK ===');
+        console.log('Fallback enviado com sucesso:', JSON.stringify(sendResult, null, 2));
+        errorMessage = ''; // Limpar erro se fallback funcionou
       } catch (fallbackErr: any) {
-        console.error('Erro no fallback:', fallbackErr);
+        console.error('=== ERRO NO FALLBACK ===');
+        console.error('Erro fallback detalhado:', JSON.stringify(fallbackErr, null, 2));
         errorMessage = `Primary: ${primaryErr.message}, Fallback: ${fallbackErr.message}`;
         throw new Error(errorMessage);
       }
     }
 
+    console.log('Verificando resultado final...');
     if (sendResult?.error) {
+      console.error('Erro no resultado do Resend:', sendResult.error);
       throw new Error(sendResult.error.message || 'Erro desconhecido do Resend');
     }
+    console.log('Resultado validado com sucesso ✓');
 
     // Log de sucesso no banco
     try {
