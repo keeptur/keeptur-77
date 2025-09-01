@@ -702,6 +702,16 @@ export type Database = {
         }
         Returns: undefined
       }
+      manual_process_emails: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          error_message: string
+          job_id: string
+          status: string
+          template_type: string
+          to_email: string
+        }[]
+      }
       process_pending_emails: {
         Args: Record<PropertyKey, never>
         Returns: Json
