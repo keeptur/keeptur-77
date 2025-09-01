@@ -707,7 +707,7 @@ export type Database = {
         Returns: {
           error_message: string
           job_id: string
-          status: string
+          job_status: string
           template_type: string
           to_email: string
         }[]
