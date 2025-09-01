@@ -66,6 +66,59 @@ export const EmailAutomationManager = () => {
     }
   };
 
+  const updateRule = async (id: string, ruleData: { name: string; trigger: string; template_type: string; delay_hours: number; conditions: Record<string, any>; active: boolean }) => {
+    try {
+      const { error } = await supabase
+        .from('automation_rules')
+        .update(ruleData)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Regra atualizada",
+        description: "Regra de automação foi atualizada com sucesso",
+      });
+
+      refetch();
+      setEditingRule(null);
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteRule = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir esta regra de automação?")) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('automation_rules')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Regra excluída",
+        description: "Regra de automação foi excluída com sucesso",
+      });
+
+      refetch();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const toggleRule = async (id: string, active: boolean) => {
     try {
       const { error } = await supabase
@@ -147,8 +200,11 @@ export const EmailAutomationManager = () => {
                     checked={rule.active}
                     onCheckedChange={(active) => toggleRule(rule.id, active)}
                   />
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={() => setEditingRule(rule)}>
                     <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => deleteRule(rule.id)}>
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
@@ -167,7 +223,7 @@ export const EmailAutomationManager = () => {
         )}
       </div>
 
-      {/* Modal de criação simples */}
+      {/* Modal de criação */}
       {isCreating && (
         <Card>
           <CardHeader>
@@ -252,6 +308,101 @@ export const EmailAutomationManager = () => {
                   type="button"
                   variant="outline"
                   onClick={() => setIsCreating(false)}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Modal de edição */}
+      {editingRule && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Editar Regra de Automação</CardTitle>
+            <CardDescription>
+              Altere as configurações da regra de automação
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                updateRule(editingRule.id, {
+                  name: formData.get('name') as string,
+                  trigger: formData.get('trigger') as string,
+                  template_type: formData.get('template_type') as string,
+                  delay_hours: parseInt(formData.get('delay_hours') as string) || 0,
+                  conditions: editingRule.conditions,
+                  active: editingRule.active,
+                });
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <Label htmlFor="edit-name">Nome da Regra</Label>
+                <Input
+                  id="edit-name"
+                  name="name"
+                  defaultValue={editingRule.name}
+                  placeholder="Ex: Boas-vindas Trial"
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-trigger">Evento Disparador</Label>
+                <Select name="trigger" defaultValue={editingRule.trigger} required>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o evento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {triggers.map(trigger => (
+                      <SelectItem key={trigger.value} value={trigger.value}>
+                        {trigger.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="edit-template_type">Template de Email</Label>
+                <Select name="template_type" defaultValue={editingRule.template_type} required>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o template" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map(template => (
+                      <SelectItem key={template.value} value={template.value}>
+                        {template.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="edit-delay_hours">Delay (horas)</Label>
+                <Input
+                  id="edit-delay_hours"
+                  name="delay_hours"
+                  type="number"
+                  min="0"
+                  defaultValue={editingRule.delay_hours}
+                  placeholder="0"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button type="submit">Atualizar Regra</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditingRule(null)}
                 >
                   Cancelar
                 </Button>
