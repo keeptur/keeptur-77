@@ -78,8 +78,8 @@ const AppWrapper = () => {
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <SessionSecurity />
           <BrowserRouter>
+          <SessionSecurity />
           <TokenManagerInside />
           <SubscriberSync />
           <PaymentVerifier />

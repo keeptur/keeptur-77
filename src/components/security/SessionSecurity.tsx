@@ -1,10 +1,12 @@
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { TokenSecurity } from '@/utils/tokenSecurity';
 import { useToast } from '@/hooks/use-toast';
 
-// Session security manager component
+// Session security manager component (must be inside Router context)
 export function SessionSecurity() {
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Setup session timeout
@@ -18,9 +20,9 @@ export function SessionSecurity() {
         variant: "destructive"
       });
       
-      // Redirect to login
+      // Redirect to login using navigate
       setTimeout(() => {
-        window.location.href = '/login';
+        navigate('/login');
       }, 3000);
     };
 
@@ -36,7 +38,7 @@ export function SessionSecurity() {
             variant: "destructive"
           });
           TokenSecurity.clearSensitiveData();
-          window.location.href = '/login';
+          navigate('/login');
           break;
           
         case 'multiple_sessions':
@@ -57,7 +59,7 @@ export function SessionSecurity() {
       window.removeEventListener('session-timeout', handleSessionTimeout);
       window.removeEventListener('security-event', handleSecurityEvent as EventListener);
     };
-  }, [toast]);
+  }, [toast, navigate]);
 
   return null; // This component doesn't render anything
 }
