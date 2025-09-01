@@ -323,7 +323,8 @@ if (allRecords && allRecords.length > 1) {
       trial_start = now.toISOString();
       trial_end = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000).toISOString();
       console.log(`Creating new subscriber with ${trialDays} day trial: ${trial_start} - ${trial_end}`);
-      const { data: inserted } = await admin.from("subscribers").insert({
+      
+      const insertPayload = {
         email: finalEmail,
         user_email: finalLoginEmail, // Store the original login email
         user_id,
@@ -334,7 +335,17 @@ if (allRecords && allRecords.length > 1) {
         trial_end,
         subscribed: false,
         source,
-      }).select('id').single();
+      };
+      
+      console.log('Insert payload:', JSON.stringify(insertPayload, null, 2));
+      
+      const { data: inserted, error: insertError } = await admin.from("subscribers").insert(insertPayload).select('id').single();
+      
+      if (insertError) {
+        console.error('Insert error:', insertError);
+        throw new Error(`Failed to insert subscriber: ${insertError.message}`);
+      }
+      
       subId = inserted?.id ?? null;
       subscribed = false;
       console.log(`Created new subscriber with ID: ${subId}`);
