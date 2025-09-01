@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import DashboardSection from "./sections/DashboardSection";
+import { SecurityFixHelper } from "@/components/security/SecurityFixHelper";
 
 export default function AdminDashboardPage() {
   useEffect(() => {
@@ -13,6 +14,8 @@ export default function AdminDashboardPage() {
         <h1 className="text-3xl font-bold">Super Admin</h1>
         <p className="text-muted-foreground">Visão geral e métricas administrativas.</p>
       </header>
+
+      <SecurityFixHelper />
 
       <Card className="overflow-hidden">
         <CardHeader className="pb-2">

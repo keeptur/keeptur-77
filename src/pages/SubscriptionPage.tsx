@@ -10,6 +10,9 @@ import { useToast } from "@/hooks/use-toast";
 import { PlanSelectionModal } from "@/components/modals/PlanSelectionModal";
 import { ManageUsersModal } from "@/components/modals/ManageUsersModal";
 import { UserManagement } from "@/components/plans/UserManagement";
+import { TrialInfoCard } from "@/components/subscription/TrialInfoCard";
+import DiscountManager from "@/components/plans/DiscountManager";
+
 interface CompleteSubscriptionData {
   subscribed: boolean;
   subscription_tier?: string;
@@ -90,6 +93,7 @@ export default function SubscriptionPage() {
   const [planUsers, setPlanUsers] = useState<string[]>([]);
   const [contractedUsers, setContractedUsers] = useState<string[]>([]); // Usuários contratados
   const [paymentStatus, setPaymentStatus] = useState<'checking' | 'success' | 'pending' | null>(null);
+  const [userEmail, setUserEmail] = useState<string | undefined>(undefined);
   useEffect(() => {
     document.title = "Assinaturas | Keeptur";
     loadSubscriptionData();
@@ -129,6 +133,8 @@ export default function SubscriptionPage() {
           }
         } catch (_) {}
       }
+      
+      setUserEmail(email); // Armazenar email no estado
 
       // Parallel execution of all API calls for better performance
       const [syncResponse, ...dataResponses] = await Promise.allSettled([supabase.functions.invoke('sync-subscriber', {
@@ -454,8 +460,6 @@ export default function SubscriptionPage() {
                 </div>}
             </div>
           </div>
-
-          {/* Usage Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <div className="bg-white/10 rounded-lg p-4">
               <div className="flex items-center space-x-3">
@@ -499,6 +503,15 @@ export default function SubscriptionPage() {
               </div>
             </div>
           </div>
+
+          {/* Trial Info Card - só exibe se não estiver carregando */}
+          {!loading && (
+            <TrialInfoCard 
+              trialActive={subscriptionData.trial_active}
+              trialEnd={subscriptionData.trial_end}
+              daysRemaining={subscriptionData.days_remaining}
+            />
+          )}
 
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-3">
@@ -667,6 +680,13 @@ export default function SubscriptionPage() {
                           <span className="text-sm">{feature}</span>
                         </div>)}
                     </div>
+
+                    {/* Discount Manager para primeira compra */}
+                    <DiscountManager
+                      planPrice={monthlyPrice}
+                      isAnnual={isAnnual}
+                      userEmail={userEmail}
+                    />
                     
                     <Button 
                       className="w-full mt-6" 

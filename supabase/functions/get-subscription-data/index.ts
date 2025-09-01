@@ -90,12 +90,12 @@ if (!email) {
     if (!subscriber) {
       // No subscriber row yet: expose default trial window based on settings
       const { data: appSettings } = await supabase
-        .from("settings")
+        .from("plan_settings")
         .select("trial_days")
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      const trialDays = Math.max(0, Number(appSettings?.trial_days ?? 7));
+      const trialDays = Math.max(0, Number(appSettings?.trial_days ?? 14));
       const trialEndCalc = new Date();
       trialEndCalc.setDate(trialEndCalc.getDate() + trialDays);
 
