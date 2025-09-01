@@ -22,7 +22,16 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    console.log('=== INÍCIO DO PROCESSAMENTO ===');
+    console.log('=== NOVA VERSÃO - FUNÇÃO REDEPLOY v2.1 ===');
+    console.log('Timestamp:', new Date().toISOString());
+    
+    // Debug completo das variáveis de ambiente
+    console.log('=== DEBUG VARIÁVEIS DE AMBIENTE ===');
+    const allEnvVars = Object.keys(Deno.env.toObject());
+    console.log('Todas as variáveis disponíveis:', allEnvVars);
+    console.log('Variáveis que começam com RESEND:', allEnvVars.filter(key => key.startsWith('RESEND')));
+    console.log('Variáveis que começam com SUPABASE:', allEnvVars.filter(key => key.startsWith('SUPABASE')));
+    
     const requestBody = await req.json();
     console.log('Request body recebido:', JSON.stringify(requestBody, null, 2));
 
@@ -40,16 +49,29 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log('Verificando RESEND_API_KEY...');
+    console.log('=== VERIFICAÇÃO RESEND_API_KEY ===');
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-    if (!RESEND_API_KEY) {
-      console.error('RESEND_API_KEY não configurado');
+    console.log('RESEND_API_KEY existe?', !!RESEND_API_KEY);
+    console.log('RESEND_API_KEY length:', RESEND_API_KEY?.length || 0);
+    console.log('RESEND_API_KEY primeiros 10 chars:', RESEND_API_KEY?.substring(0, 10) || 'undefined');
+    
+    if (!RESEND_API_KEY || RESEND_API_KEY.trim() === '') {
+      console.error('RESEND_API_KEY não configurado ou vazio');
+      console.log('Valor exato da variável:', JSON.stringify(RESEND_API_KEY));
       return new Response(
-        JSON.stringify({ success: false, error: 'RESEND_API_KEY não configurado' }),
+        JSON.stringify({ 
+          success: false, 
+          error: 'RESEND_API_KEY não configurado ou vazio',
+          debug: {
+            has_key: !!RESEND_API_KEY,
+            key_length: RESEND_API_KEY?.length || 0,
+            all_env_keys: allEnvVars
+          }
+        }),
         { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
-    console.log('RESEND_API_KEY configurado ✓');
+    console.log('RESEND_API_KEY configurado e válido ✓');
 
     // Initialize Supabase client
     console.log('Verificando credenciais do Supabase...');
