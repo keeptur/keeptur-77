@@ -26,6 +26,7 @@ import AdminLogsPage from "./pages/admin/AdminLogsPage";
 
 import { UserRoute } from "./components/auth/UserRoute";
 import { PaymentVerifier } from "./components/PaymentVerifier";
+import { SecurityProvider } from "./components/SecurityProvider";
 
 const queryClient = new QueryClient();
 
@@ -75,9 +76,10 @@ const AppWrapper = () => {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="keeptur-theme">
         <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+          <SecurityProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
             <TokenManagerInside />
             <SubscriberSync />
             <PaymentVerifier />
@@ -135,7 +137,8 @@ const AppWrapper = () => {
                 <Route path="admin/logs" element={<Navigate to="/admin?t=logs" replace />} />
               </Route>
             </Routes>
-          </BrowserRouter>
+           </BrowserRouter>
+          </SecurityProvider>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

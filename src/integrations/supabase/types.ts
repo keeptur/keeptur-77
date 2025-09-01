@@ -97,6 +97,69 @@ export type Database = {
           },
         ]
       }
+      admin_audit_log: {
+        Row: {
+          action: string
+          admin_user_id: string
+          created_at: string
+          id: string
+          ip_address: unknown | null
+          new_values: Json | null
+          old_values: Json | null
+          target_id: string | null
+          target_table: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          admin_user_id: string
+          created_at?: string
+          id?: string
+          ip_address?: unknown | null
+          new_values?: Json | null
+          old_values?: Json | null
+          target_id?: string | null
+          target_table?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          admin_user_id?: string
+          created_at?: string
+          id?: string
+          ip_address?: unknown | null
+          new_values?: Json | null
+          old_values?: Json | null
+          target_id?: string | null
+          target_table?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
+      auth_attempts: {
+        Row: {
+          attempted_at: string
+          email: string
+          id: string
+          ip_address: unknown | null
+          success: boolean
+        }
+        Insert: {
+          attempted_at?: string
+          email: string
+          id?: string
+          ip_address?: unknown | null
+          success?: boolean
+        }
+        Update: {
+          attempted_at?: string
+          email?: string
+          id?: string
+          ip_address?: unknown | null
+          success?: boolean
+        }
+        Relationships: []
+      }
       automation_rules: {
         Row: {
           active: boolean
@@ -563,6 +626,10 @@ export type Database = {
       }
     }
     Functions: {
+      check_auth_rate_limit: {
+        Args: { client_ip?: unknown; user_email: string }
+        Returns: boolean
+      }
       get_admin_metrics: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -594,6 +661,24 @@ export type Database = {
       is_super_admin: {
         Args: { _user_id: string }
         Returns: boolean
+      }
+      log_admin_action: {
+        Args: {
+          action_type: string
+          new_data?: Json
+          old_data?: Json
+          record_id?: string
+          table_name?: string
+        }
+        Returns: undefined
+      }
+      log_auth_attempt: {
+        Args: {
+          client_ip?: unknown
+          user_email: string
+          was_successful?: boolean
+        }
+        Returns: undefined
       }
     }
     Enums: {
