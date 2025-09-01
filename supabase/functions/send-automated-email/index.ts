@@ -250,7 +250,13 @@ const handler = async (req: Request): Promise<Response> => {
     
     // Tentar salvar log de erro se temos dados suficientes
     try {
-      const requestBody = await req.clone().json().catch(() => ({}));
+      let requestBody: any = {};
+      try {
+        requestBody = await req.clone().json();
+      } catch (parseError) {
+        console.error('Failed to parse request body for error logging:', parseError);
+      }
+      
       const { to_email, template_type } = requestBody;
       
       if (to_email && template_type) {

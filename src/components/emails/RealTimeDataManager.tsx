@@ -25,8 +25,16 @@ export const useRealTimeData = () => {
   const [users, setUsers] = useState<UserData[]>([]);
 
   useEffect(() => {
-    loadPlanSettings();
-    loadUsers();
+    let mounted = true;
+    
+    const initData = async () => {
+      if (!mounted) return;
+      await loadPlanSettings();
+      if (!mounted) return;
+      await loadUsers();
+    };
+    
+    initData();
     
     // Escutar mudanças em tempo real nos subscribers (não nos profiles)
     const channel = supabase
@@ -39,6 +47,7 @@ export const useRealTimeData = () => {
           table: 'subscribers'
         },
         async (payload) => {
+          if (!mounted) return;
           console.log('Novo subscriber cadastrado:', payload.new);
           
           // Disparar email de boas-vindas automaticamente para o email correto
@@ -47,8 +56,10 @@ export const useRealTimeData = () => {
             await sendWelcomeEmail(newSubscriber);
           }
           
-          // Atualizar lista de usuários
-          loadUsers();
+          // Atualizar lista de usuários apenas se o componente ainda está montado
+          if (mounted) {
+            await loadUsers();
+          }
         }
       )
       .on(
@@ -59,6 +70,7 @@ export const useRealTimeData = () => {
           table: 'subscribers'
         },
         (payload) => {
+          if (!mounted) return;
           console.log('Subscriber atualizado:', payload.new);
           // Disparar emails baseados em mudança de status
           handleSubscriptionStatusChange(payload.new as any);
@@ -67,6 +79,7 @@ export const useRealTimeData = () => {
       .subscribe();
 
     return () => {
+      mounted = false;
       supabase.removeChannel(channel);
     };
   }, []);
