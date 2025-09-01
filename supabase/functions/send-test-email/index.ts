@@ -24,8 +24,26 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const { to_email, template_id, template_type, logo_url, base_url }: SendTestEmailRequest = await req.json();
 
-    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-    if (!RESEND_API_KEY) {
+    // Buscar RESEND_API_KEY de forma robusta
+    let RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+    
+    // Se não encontrou, buscar entre todas as variáveis com normalização
+    if (!RESEND_API_KEY || RESEND_API_KEY.trim() === '') {
+      console.log('Buscando RESEND_API_KEY entre todas as variáveis...');
+      const allVars = Deno.env.toObject();
+      const normalizedKeys = Object.keys(allVars).map(key => ({
+        original: key,
+        normalized: key.replace(/[\r\n\t\s]/g, '').toUpperCase()
+      }));
+      
+      const resendKey = normalizedKeys.find(k => k.normalized === 'RESEND_API_KEY');
+      if (resendKey) {
+        RESEND_API_KEY = allVars[resendKey.original];
+        console.log(`Encontrado RESEND_API_KEY em: "${resendKey.original}"`);
+      }
+    }
+    
+    if (!RESEND_API_KEY || RESEND_API_KEY.trim() === '') {
       return new Response(
         JSON.stringify({ success: false, error: 'Configure o RESEND_API_KEY nos secrets do Supabase.' }),
         { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }

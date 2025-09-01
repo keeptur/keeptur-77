@@ -50,35 +50,36 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     console.log('=== VERIFICAÇÃO RESEND_API_KEY ===');
-    let RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-    console.log('RESEND_API_KEY existe?', !!RESEND_API_KEY);
-    console.log('RESEND_API_KEY length:', RESEND_API_KEY?.length || 0);
-    console.log('RESEND_API_KEY primeiros 10 chars:', RESEND_API_KEY?.substring(0, 10) || 'undefined');
     
-    // Backup: tentar outros nomes possíveis
+    // Buscar RESEND_API_KEY de forma robusta
+    let RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+    
+    // Se não encontrou, buscar entre todas as variáveis com normalização
     if (!RESEND_API_KEY || RESEND_API_KEY.trim() === '') {
-      console.log('Tentando nomes alternativos para RESEND_API_KEY...');
-      RESEND_API_KEY = Deno.env.get('RESEND_KEY') || Deno.env.get('RESEND_SECRET') || '';
-      console.log('Tentativas alternativas encontraram:', !!RESEND_API_KEY);
+      console.log('Buscando RESEND_API_KEY entre todas as variáveis...');
+      const allVars = Deno.env.toObject();
+      const normalizedKeys = Object.keys(allVars).map(key => ({
+        original: key,
+        normalized: key.replace(/[\r\n\t\s]/g, '').toUpperCase()
+      }));
+      
+      const resendKey = normalizedKeys.find(k => k.normalized === 'RESEND_API_KEY');
+      if (resendKey) {
+        RESEND_API_KEY = allVars[resendKey.original];
+        console.log(`Encontrado RESEND_API_KEY em: "${resendKey.original}"`);
+      }
     }
     
-    // Fallback: usar uma chave hardcoded temporária para debug (NUNCA em produção)
+    console.log('RESEND_API_KEY encontrado:', !!RESEND_API_KEY);
+    console.log('RESEND_API_KEY length:', RESEND_API_KEY?.length || 0);
+    console.log('RESEND_API_KEY válido:', RESEND_API_KEY ? `${RESEND_API_KEY.substring(0, 6)}...${RESEND_API_KEY.substring(-4)}` : 'não encontrado');
+    
     if (!RESEND_API_KEY || RESEND_API_KEY.trim() === '') {
       console.error('RESEND_API_KEY não encontrado em nenhuma variável');
-      console.log('Valores de debug:');
-      console.log('- process.env type:', typeof process?.env);
-      console.log('- Deno.env type:', typeof Deno.env);
-      
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'RESEND_API_KEY não configurado ou vazio',
-          debug: {
-            has_key: !!RESEND_API_KEY,
-            key_length: RESEND_API_KEY?.length || 0,
-            all_env_keys: allEnvVars,
-            tried_alternatives: ['RESEND_API_KEY', 'RESEND_KEY', 'RESEND_SECRET']
-          }
+          error: 'Configure o RESEND_API_KEY nos secrets do Supabase.'
         }),
         { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
