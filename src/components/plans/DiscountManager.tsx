@@ -184,7 +184,7 @@ export default function DiscountManager({
         )}
 
         {/* Cupom de Desconto */}
-        {settings.coupons_enabled && isFirstPurchase && (
+        {settings.coupons_enabled && (
           <div className="space-y-2">
             <label className="text-sm font-medium">Cupom de Desconto</label>
             {appliedDiscounts.coupon ? (
@@ -224,9 +224,9 @@ export default function DiscountManager({
                 </Button>
               </div>
             )}
-            {isFirstPurchase && settings.coupons_enabled && (
-              <p className="text-xs text-green-600 bg-green-50 p-2 rounded">
-                🎉 Como novo cliente, você pode usar cupons de desconto especiais!
+            {settings.coupons_enabled && (
+              <p className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                💡 Use cupons de desconto para economizar na sua assinatura!
               </p>
             )}
           </div>
