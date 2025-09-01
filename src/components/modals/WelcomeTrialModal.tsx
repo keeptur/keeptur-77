@@ -45,8 +45,9 @@ export function WelcomeTrialModal() {
     if (!allowed) return;
     // Busca a configuração de dias de trial do admin
     const { data: settings } = await supabase
-      .from("settings")
+      .from("plan_settings")
       .select("trial_days")
+      .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
     const cfgDays = settings?.trial_days ?? configuredTrialDays;

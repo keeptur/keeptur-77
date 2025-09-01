@@ -31,8 +31,9 @@ function TrialInfo() {
       }
       // Buscar configurações dinâmicas para trial
       const { data: settings } = await supabase
-        .from('settings')
+        .from('plan_settings')
         .select('trial_days')
+        .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
       const trialDaysCfg = settings?.trial_days ?? null;

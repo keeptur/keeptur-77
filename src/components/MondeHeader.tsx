@@ -26,8 +26,9 @@ function TrialStatus() {
       } = await supabase.auth.getUser();
       if (!user?.email) return;
       const { data: settings } = await supabase
-        .from('settings')
+        .from('plan_settings')
         .select('trial_days')
+        .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
       const { data } = await supabase
@@ -65,11 +66,18 @@ function TrialStatus() {
       }
     };
     fetchStatus();
-    const handler = () => { fetchStatus(); };
-    window.addEventListener('subscription-updated', handler);
+    
+    // Listeners para atualizações
+    const handleSubscriptionUpdate = () => { fetchStatus(); };
+    const handlePlanSettingsUpdate = () => { fetchStatus(); };
+    
+    window.addEventListener('subscription-updated', handleSubscriptionUpdate);
+    window.addEventListener('plan-settings-updated', handlePlanSettingsUpdate);
+    
     return () => {
       mounted = false;
-      window.removeEventListener('subscription-updated', handler);
+      window.removeEventListener('subscription-updated', handleSubscriptionUpdate);
+      window.removeEventListener('plan-settings-updated', handlePlanSettingsUpdate);
     };
   }, []);
   if (daysRemaining === null) return null;

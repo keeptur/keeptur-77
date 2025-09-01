@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { triggerSettingsUpdate } from "@/utils/settingsUtils";
 
 export default function PlanSettings() {
   const { toast } = useToast();
@@ -101,17 +102,8 @@ export default function PlanSettings() {
 
       if (result.error) throw result.error;
 
-      // Disparar evento customizado para notificar outros componentes
-      window.dispatchEvent(new CustomEvent('plan-settings-updated', {
-        detail: {
-          trialDays: settings.trialDays,
-          autoTrial: settings.autoTrial,
-          autoBilling: settings.autoBilling,
-          annualDiscount: settings.annualDiscount,
-          couponsEnabled: settings.couponsEnabled,
-          firstPurchaseDiscount: settings.firstPurchaseDiscount
-        }
-      }));
+      // Disparar eventos customizados para notificar outros componentes
+      triggerSettingsUpdate();
 
       toast({
         title: "Sucesso",

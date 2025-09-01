@@ -364,6 +364,7 @@ export type Database = {
           created_at: string
           first_purchase_discount: number
           id: string
+          singleton_check: number | null
           trial_days: number
           updated_at: string
         }
@@ -375,6 +376,7 @@ export type Database = {
           created_at?: string
           first_purchase_discount?: number
           id?: string
+          singleton_check?: number | null
           trial_days?: number
           updated_at?: string
         }
@@ -386,6 +388,7 @@ export type Database = {
           created_at?: string
           first_purchase_discount?: number
           id?: string
+          singleton_check?: number | null
           trial_days?: number
           updated_at?: string
         }

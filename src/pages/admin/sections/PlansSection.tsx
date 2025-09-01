@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import PlanCard from "@/components/plans/PlanCard";
 import PlanModal from "@/components/plans/PlanModal";
 import PlanSettings from "@/components/plans/PlanSettings";
+import { usePlanSettings } from "@/hooks/usePlanSettings";
 
 interface PlanKit {
   id: string;
@@ -23,34 +24,15 @@ interface PlanKit {
 
 export default function PlansSection() {
   const { toast } = useToast();
+  const { settings } = usePlanSettings();
   const [plans, setPlans] = useState<PlanKit[]>([]);
-  const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlanKit | null>(null);
 
   useEffect(() => {
     loadPlans();
-    loadSettings();
   }, []);
-
-  const loadSettings = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('plan_settings')
-        .select('*')
-        .limit(1)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-
-      setSettings(data);
-    } catch (error) {
-      console.error('Erro ao carregar configurações:', error);
-    }
-  };
 
   const loadPlans = async () => {
     setLoading(true);
