@@ -27,6 +27,7 @@ import AdminLogsPage from "./pages/admin/AdminLogsPage";
 import { UserRoute } from "./components/auth/UserRoute";
 import { PaymentVerifier } from "./components/PaymentVerifier";
 import { SessionSecurity } from "./components/security/SessionSecurity";
+import { AdminSecurity } from "./components/security/AdminSecurity";
 
 const queryClient = new QueryClient();
 
@@ -79,10 +80,11 @@ const AppWrapper = () => {
           <Toaster />
           <Sonner />
           <BrowserRouter>
-          <SessionSecurity />
-          <TokenManagerInside />
-          <SubscriberSync />
-          <PaymentVerifier />
+           <SessionSecurity />
+           <AdminSecurity />
+           <TokenManagerInside />
+           <SubscriberSync />
+           <PaymentVerifier />
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={

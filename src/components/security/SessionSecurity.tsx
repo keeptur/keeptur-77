@@ -1,16 +1,77 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TokenSecurity } from '@/utils/tokenSecurity';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
-// Session security manager component (must be inside Router context)
+// Enhanced session security manager component (must be inside Router context)
 export function SessionSecurity() {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [sessionData, setSessionData] = useState<{
+    deviceFingerprint: string;
+    clientIP: string;
+    sessionStartTime: number;
+  } | null>(null);
 
   useEffect(() => {
-    // Setup session timeout
+    // Initialize session security data
+    const initializeSession = async () => {
+      const deviceFingerprint = TokenSecurity.getDeviceFingerprint();
+      const clientIP = await TokenSecurity.getClientIP();
+      const sessionStartTime = Date.now();
+      
+      const newSessionData = { deviceFingerprint, clientIP, sessionStartTime };
+      setSessionData(newSessionData);
+      
+      // Store session data for validation
+      localStorage.setItem('session_security', JSON.stringify(newSessionData));
+    };
+
+    initializeSession();
+
+    // Session validation function
+    const validateSession = async () => {
+      if (!sessionData) return;
+
+      const currentFingerprint = TokenSecurity.getDeviceFingerprint();
+      const currentIP = await TokenSecurity.getClientIP();
+      
+      // Check for device fingerprint mismatch
+      if (currentFingerprint !== sessionData.deviceFingerprint) {
+        window.dispatchEvent(new CustomEvent('security-event', {
+          detail: { type: 'suspicious_activity', details: 'Device fingerprint mismatch' }
+        }));
+        return;
+      }
+
+      // Check for IP change (warn but don't logout for mobile users)
+      if (currentIP !== sessionData.clientIP && currentIP !== 'unknown') {
+        toast({
+          title: "Mudança de IP Detectada",
+          description: "Sua sessão está sendo monitorada por segurança",
+          variant: "default"
+        });
+      }
+
+      // Check for session age (max 24 hours)
+      const maxSessionAge = 24 * 60 * 60 * 1000; // 24 hours
+      if (Date.now() - sessionData.sessionStartTime > maxSessionAge) {
+        window.dispatchEvent(new CustomEvent('session-timeout'));
+      }
+    };
+
+    // Setup enhanced session timeout
     const cleanup = TokenSecurity.setupSessionTimeout(30 * 60 * 1000); // 30 minutes
+
+    // Session validation every 5 minutes
+    const validationInterval = setInterval(() => {
+      validateSession();
+    }, 5 * 60 * 1000);
+
+    // Validate session on focus
+    const handleFocus = () => validateSession();
+    window.addEventListener('focus', handleFocus);
 
     // Listen for session timeout events
     const handleSessionTimeout = () => {
@@ -56,10 +117,12 @@ export function SessionSecurity() {
 
     return () => {
       cleanup();
+      clearInterval(validationInterval);
+      window.removeEventListener('focus', handleFocus);
       window.removeEventListener('session-timeout', handleSessionTimeout);
       window.removeEventListener('security-event', handleSecurityEvent as EventListener);
     };
-  }, [toast, navigate]);
+  }, [toast, navigate, sessionData]);
 
   return null; // This component doesn't render anything
 }
