@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Shield, CheckCircle } from 'lucide-react';
 
 interface AdminSession {
@@ -19,6 +20,7 @@ export function AdminSecurityPanel() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEnabling, setIsEnabling] = useState(false);
   const [isPasswordProtectionEnabled, setIsPasswordProtectionEnabled] = useState<boolean | null>(null);
+  const [managementToken, setManagementToken] = useState("");
 
   // Check admin status and password protection status
   useEffect(() => {
@@ -43,7 +45,9 @@ export function AdminSecurityPanel() {
 
     setIsEnabling(true);
     try {
-      const { data, error } = await supabase.functions.invoke('enable-password-protection');
+      const { data, error } = await supabase.functions.invoke('enable-password-protection', {
+        body: managementToken ? { managementToken } : undefined,
+      });
       
       if (error) {
         throw error;
@@ -89,22 +93,31 @@ export function AdminSecurityPanel() {
           </div>
           
           <div className="flex items-center gap-2">
-            {isPasswordProtectionEnabled === true && (
-              <div className="flex items-center gap-1 text-green-600">
-                <CheckCircle className="h-4 w-4" />
-                <span className="text-sm">Ativo</span>
-              </div>
-            )}
-            
-            <Button
-              onClick={enablePasswordProtection}
-              disabled={isEnabling || isPasswordProtectionEnabled === true}
-              variant={isPasswordProtectionEnabled === true ? "outline" : "default"}
-              size="sm"
-            >
-              {isEnabling ? "Ativando..." : 
-               isPasswordProtectionEnabled === true ? "Ativado" : "Ativar"}
-            </Button>
+            <div className="flex items-center gap-2">
+              {isPasswordProtectionEnabled === true && (
+                <div className="flex items-center gap-1 text-green-600">
+                  <CheckCircle className="h-4 w-4" />
+                  <span className="text-sm">Ativo</span>
+                </div>
+              )}
+
+              <Input
+                placeholder="Token de gerenciamento (PAT) — opcional"
+                value={managementToken}
+                onChange={(e) => setManagementToken(e.target.value)}
+                className="w-64"
+              />
+              
+              <Button
+                onClick={enablePasswordProtection}
+                disabled={isEnabling || isPasswordProtectionEnabled === true}
+                variant={isPasswordProtectionEnabled === true ? "outline" : "default"}
+                size="sm"
+              >
+                {isEnabling ? "Ativando..." : 
+                 isPasswordProtectionEnabled === true ? "Ativado" : "Ativar"}
+              </Button>
+            </div>
           </div>
         </div>
       </div>

@@ -55,12 +55,19 @@ serve(async (req) => {
       );
     }
 
-    // Get Supabase management token
-    const managementToken = Deno.env.get('SUPABASE_MANAGEMENT_TOKEN');
+    // Get Supabase management token (from body or env)
+    let bodyToken: string | undefined = undefined;
+    try {
+      const json = await req.json();
+      bodyToken = json?.managementToken;
+    } catch (_) {
+      // no body provided, ignore
+    }
+    const managementToken = bodyToken || Deno.env.get('SUPABASE_MANAGEMENT_TOKEN');
     if (!managementToken) {
-      console.error('Missing SUPABASE_MANAGEMENT_TOKEN');
+      console.error('Missing SUPABASE_MANAGEMENT_TOKEN and no token in body');
       return new Response(
-        JSON.stringify({ error: 'Management token not configured' }),
+        JSON.stringify({ error: 'Management token not configured', hint: 'Provide SUPABASE_MANAGEMENT_TOKEN secret or pass {managementToken} in request body' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
