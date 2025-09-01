@@ -43,7 +43,33 @@ export const EmailQueueManager = () => {
     try {
       console.log('Iniciando processamento de emails...');
       
-      // Chamar a função de processamento de emails diretamente
+      // Primeiro tentar via função RPC do banco (mais rápida)
+      try {
+        const { data: manualResult, error: manualError } = await supabase.rpc('manual_process_emails');
+        
+        if (!manualError && manualResult && manualResult.length > 0) {
+          console.log('Processamento via RPC concluído:', manualResult);
+          
+          // Depois chamar a edge function para enviar os emails marcados como ready_to_send
+          const { data: edgeResult, error: edgeError } = await supabase.functions.invoke('process-email-jobs');
+          
+          if (edgeError) {
+            console.warn('Aviso na edge function:', edgeError);
+          }
+          
+          toast({
+            title: "Emails processados",
+            description: `${manualResult.length} emails preparados para envio`,
+          });
+          
+          refetch();
+          return;
+        }
+      } catch (rpcError) {
+        console.warn('RPC não funcionou, tentando edge function:', rpcError);
+      }
+      
+      // Fallback: chamar edge function diretamente
       const { data, error } = await supabase.functions.invoke('process-email-jobs');
       
       if (error) {
@@ -58,14 +84,13 @@ export const EmailQueueManager = () => {
         description: data?.message || `${data?.processed || 0} emails processados`,
       });
       
-      // Refetch imediatamente para ver os resultados
       refetch();
       
     } catch (error: any) {
       console.error('Erro ao processar fila:', error);
       toast({
-        title: "Erro",
-        description: error.message || "Erro ao processar fila de emails",
+        title: "Erro no processamento",
+        description: `Erro: ${error.message || "Falha ao processar emails"}. Verifique se RESEND_API_KEY está configurado.`,
         variant: "destructive",
       });
     } finally {
