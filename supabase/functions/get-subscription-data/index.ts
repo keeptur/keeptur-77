@@ -80,10 +80,10 @@ if (!email) {
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
 }
 
-// Get subscriber data by email or user_email
+    // Get subscriber data by email or user_email
     const { data: subscriber } = await supabase
       .from("subscribers")
-      .select("*")
+      .select("*, additional_trial_days")
       .or(`email.eq.${email},user_email.eq.${email}`)
       .maybeSingle();
 
@@ -120,8 +120,14 @@ if (!email) {
     const trialEnd = subscriber.trial_end ? new Date(subscriber.trial_end) : null;
     const subscriptionEnd = subscriber.subscription_end ? new Date(subscriber.subscription_end) : null;
     
-    const trialActive = trialEnd && trialEnd > now && !subscriber.subscribed;
-    const daysRemaining = trialActive ? Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+    // Adicionar dias extras ao trial se disponíveis
+    let adjustedTrialEnd = trialEnd;
+    if (trialEnd && subscriber.additional_trial_days > 0) {
+      adjustedTrialEnd = new Date(trialEnd.getTime() + (subscriber.additional_trial_days * 24 * 60 * 60 * 1000));
+    }
+    
+    const trialActive = adjustedTrialEnd && adjustedTrialEnd > now && !subscriber.subscribed;
+    const daysRemaining = trialActive ? Math.ceil((adjustedTrialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 0;
 
     let currentPlan = null;
     let autoRenewal = false;
@@ -183,7 +189,7 @@ if (!email) {
       subscription_tier: subscriber.subscription_tier,
       subscription_end: subscriber.subscription_end,
       trial_active: trialActive,
-      trial_end: subscriber.trial_end,
+      trial_end: adjustedTrialEnd?.toISOString() || subscriber.trial_end,
       days_remaining: daysRemaining,
       current_plan: currentPlan,
       next_billing_date: subscriptionEnd?.toISOString(),

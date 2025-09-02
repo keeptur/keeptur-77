@@ -80,7 +80,7 @@ export function MondeAppSidebar() {
           // Checar subscriber via RLS
           const { data } = await supabase
             .from("subscribers")
-            .select("trial_end, subscription_end, subscribed, subscription_tier")
+            .select("trial_end, subscription_end, subscribed, subscription_tier, additional_trial_days")
             .or(`user_id.eq.${user.id},email.eq.${user.email}`)
             .order("updated_at", { ascending: false })
             .limit(1)
@@ -98,8 +98,10 @@ export function MondeAppSidebar() {
               setSubscriptionDays(Math.ceil((subEnd - now) / (1000 * 60 * 60 * 24)));
               setTrialDays(null);
             } else if (trialEnd && trialEnd > now && !data?.subscribed) {
-              // Trial ativo: calcular dias restantes do trial
-              setTrialDays(Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24)));
+              // Trial ativo: calcular dias restantes do trial incluindo dias adicionais
+              const additionalDays = (data as any)?.additional_trial_days || 0;
+              const adjustedTrialEnd = trialEnd + (additionalDays * 24 * 60 * 60 * 1000);
+              setTrialDays(Math.ceil((adjustedTrialEnd - now) / (1000 * 60 * 60 * 24)));
               setSubscriptionDays(null);
             } else {
               // Nem trial nem plano ativo

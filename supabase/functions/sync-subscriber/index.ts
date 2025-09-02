@@ -173,13 +173,13 @@ const now = new Date();
     console.log(`Looking for existing subscriber with user_id: ${user_id}, email: ${email}`);
     
     if (user_id) {
-        const { data } = await admin.from("subscribers").select("*").eq("user_id", user_id).maybeSingle();
+        const { data } = await admin.from("subscribers").select("*, additional_trial_days").eq("user_id", user_id).maybeSingle();
         existing = data;
         console.log(`Found by user_id: ${existing ? 'Yes' : 'No'}`);
     }
     
     if (!existing && email) {
-        const { data } = await admin.from("subscribers").select("*").eq("email", email).maybeSingle();
+        const { data } = await admin.from("subscribers").select("*, additional_trial_days").eq("email", email).maybeSingle();
         existing = data;
         console.log(`Found by email: ${existing ? 'Yes' : 'No'}`);
     }
@@ -205,7 +205,7 @@ if (email !== finalEmail) {
 // Find all potential duplicate records
 const { data: allRecords } = await admin
   .from("subscribers")
-  .select("*")
+  .select("*, additional_trial_days")
   .in("email", potentialEmails);
 
 if (allRecords && allRecords.length > 1) {
