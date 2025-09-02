@@ -13,7 +13,6 @@ import { UserManagement } from "@/components/plans/UserManagement";
 import { TrialInfoCard } from "@/components/subscription/TrialInfoCard";
 import DiscountManager from "@/components/plans/DiscountManager";
 import { usePlanSettings } from "@/hooks/usePlanSettings";
-
 interface CompleteSubscriptionData {
   subscribed: boolean;
   subscription_tier?: string;
@@ -70,7 +69,9 @@ export default function SubscriptionPage() {
   const {
     toast
   } = useToast();
-  const { settings: planSettings } = usePlanSettings();
+  const {
+    settings: planSettings
+  } = usePlanSettings();
   const [subscriptionData, setSubscriptionData] = useState<CompleteSubscriptionData>({
     subscribed: false,
     trial_active: false,
@@ -135,7 +136,6 @@ export default function SubscriptionPage() {
           }
         } catch (_) {}
       }
-      
       setUserEmail(email); // Armazenar email no estado
 
       // Parallel execution of all API calls for better performance
@@ -151,7 +151,9 @@ export default function SubscriptionPage() {
           mondeToken
         }
       }), supabase.functions.invoke('get-available-plans'), email ? supabase.functions.invoke('get-payment-history', hasSession ? {} : {
-        body: { customer_email: email }
+        body: {
+          customer_email: email
+        }
       }) : Promise.resolve({
         value: {
           data: {
@@ -172,7 +174,7 @@ export default function SubscriptionPage() {
           ...prev,
           autoRenewal: !!subResponse.value.data.auto_renewal
         }));
-        
+
         // Set contracted users from plan_users
         if (subResponse.value.data.plan_users) {
           setContractedUsers(subResponse.value.data.plan_users);
@@ -181,21 +183,17 @@ export default function SubscriptionPage() {
       }
       if (plansResponse.status === 'fulfilled' && plansResponse.value.data?.available_plans) {
         let plans = plansResponse.value.data.available_plans as AvailablePlan[];
-        const current = (subResponse.status === 'fulfilled' && subResponse.value.data?.current_plan)
-          ? subResponse.value.data.current_plan
-          : undefined;
+        const current = subResponse.status === 'fulfilled' && subResponse.value.data?.current_plan ? subResponse.value.data.current_plan : undefined;
         if (current) {
-          plans = plans.map((p) => ({
+          plans = plans.map(p => ({
             ...p,
-            is_current:
-              p.name === current.name ||
-              (typeof current.seats === 'number' && p.seats === current.seats && p.price_cents === current.price_cents),
+            is_current: p.name === current.name || typeof current.seats === 'number' && p.seats === current.seats && p.price_cents === current.price_cents,
             // Fallback for upgrade/downgrade by seats
-            is_upgrade: typeof current.seats === 'number' ? p.seats > current.seats : p.is_upgrade,
+            is_upgrade: typeof current.seats === 'number' ? p.seats > current.seats : p.is_upgrade
           }));
         }
         setAvailablePlans(plans);
-        
+
         // Update annual discount from plan settings if available
         if (plansResponse.value.data?.annual_discount) {
           // Annual discount is already handled by planSettings hook
@@ -460,7 +458,7 @@ export default function SubscriptionPage() {
                     Renovação: {subscriptionData.auto_renewal ? 'Automática' : 'Manual'}
                   </p>
                 </> : subscriptionData.trial_active ? <div className="text-right">
-                  <div className="text-2xl font-bold">Gratuito</div>
+                  <div className="text-2xl font-bold bg-transparent">Gratuito</div>
                   <p className="text-xs text-blue-100 mt-1">{subscriptionData.days_remaining} dias restantes</p>
                 </div> : <div className="text-right">
                   <div className="text-lg font-bold">Escolha um Plano</div>
@@ -512,13 +510,7 @@ export default function SubscriptionPage() {
           </div>
 
           {/* Trial Info Card - só exibe se não estiver carregando */}
-          {!loading && (
-            <TrialInfoCard 
-              trialActive={subscriptionData.trial_active}
-              trialEnd={subscriptionData.trial_end}
-              daysRemaining={subscriptionData.days_remaining}
-            />
-          )}
+          {!loading && <TrialInfoCard trialActive={subscriptionData.trial_active} trialEnd={subscriptionData.trial_end} daysRemaining={subscriptionData.days_remaining} />}
 
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-3">
@@ -689,21 +681,10 @@ export default function SubscriptionPage() {
                     </div>
 
                     {/* Discount Manager para primeira compra */}
-                    <DiscountManager
-                      planPrice={monthlyPrice}
-                      isAnnual={isAnnual}
-                      userEmail={userEmail}
-                    />
+                    <DiscountManager planPrice={monthlyPrice} isAnnual={isAnnual} userEmail={userEmail} />
                     
-                    <Button 
-                      className="w-full mt-6" 
-                      size="lg" 
-                      variant={plan.is_current ? "outline" : "default"} 
-                      onClick={() => handleSelectPlan(plan)} 
-                      disabled={plan.is_current}
-                    >
-                      {plan.is_current ? "Plano Atual" : 
-                       plan.is_upgrade ? <>
+                    <Button className="w-full mt-6" size="lg" variant={plan.is_current ? "outline" : "default"} onClick={() => handleSelectPlan(plan)} disabled={plan.is_current}>
+                      {plan.is_current ? "Plano Atual" : plan.is_upgrade ? <>
                           <Zap className="w-4 h-4 mr-2" />
                           Fazer Upgrade
                         </> : <>
@@ -778,12 +759,6 @@ export default function SubscriptionPage() {
       setPlanUsers(newUsers);
     }} />}
       
-      <PlanSelectionModal 
-        open={showPlanModal} 
-        onOpenChange={setShowPlanModal} 
-        plans={selectedPlan ? [selectedPlan] : availablePlans} 
-        onSuccess={loadSubscriptionData}
-        currentPlan={subscriptionData.current_plan}
-      />
+      <PlanSelectionModal open={showPlanModal} onOpenChange={setShowPlanModal} plans={selectedPlan ? [selectedPlan] : availablePlans} onSuccess={loadSubscriptionData} currentPlan={subscriptionData.current_plan} />
     </div>;
 }
