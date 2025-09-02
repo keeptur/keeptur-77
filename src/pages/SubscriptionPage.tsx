@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, Calendar, RefreshCw, ArrowUp, X, Download, Users, Star, Plus, Check, Zap } from "lucide-react";
+import { CreditCard, Calendar, RefreshCw, ArrowUp, X, Download, Users, Star, Plus, Check, Zap, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -415,7 +415,27 @@ export default function SubscriptionPage() {
         <div className="text-muted-foreground">Carregando assinatura...</div>
       </div>;
   }
+  // Check if trial is expired
+  const isTrialExpired = !subscriptionData.subscribed && (!subscriptionData.trial_active || subscriptionData.days_remaining <= 0);
+
   return <div className="max-w-6xl mx-auto space-y-8">
+      {/* Trial Expired Banner */}
+      {isTrialExpired && (
+        <Card className="border-2 border-red-500 bg-red-50">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+              <div>
+                <span className="font-bold text-red-700 text-lg">Trial Vencido!</span>
+                <p className="text-red-600 text-sm">
+                  Seu período de teste expirou. Assine um plano para continuar usando todos os recursos.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Status de pagamento */}
       {paymentStatus && <Card className={`border-2 ${paymentStatus === 'success' ? 'border-green-500 bg-green-50' : paymentStatus === 'checking' ? 'border-blue-500 bg-blue-50' : 'border-yellow-500 bg-yellow-50'}`}>
           <CardContent className="p-4">

@@ -23,6 +23,7 @@ import {
   Mail,
   Package,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -51,6 +52,7 @@ export function MondeAppSidebar() {
   const [subscribed, setSubscribed] = useState<boolean | null>(null);
   const [subscriptionDays, setSubscriptionDays] = useState<number | null>(null);
   const [planName, setPlanName] = useState<string | null>(null);
+  const [isTrialExpired, setIsTrialExpired] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -104,7 +106,9 @@ export function MondeAppSidebar() {
               setTrialDays(Math.ceil((adjustedTrialEnd - now) / (1000 * 60 * 60 * 24)));
               setSubscriptionDays(null);
             } else {
-              // Nem trial nem plano ativo
+              // Nem trial nem plano ativo - verificar se trial venceu
+              const isExpired = !data?.subscribed && (!trialEnd || trialEnd <= now);
+              setIsTrialExpired(isExpired);
               setTrialDays(null);
               setSubscriptionDays(null);
             }
@@ -136,6 +140,9 @@ export function MondeAppSidebar() {
                 setTrialDays(Math.ceil((t - now) / (1000 * 60 * 60 * 24)));
                 setSubscriptionDays(null);
               } else {
+                // Verificar se trial venceu via Monde token
+                const isExpired = !isSubscribed && (!trialEnd || new Date(trialEnd).getTime() <= Date.now());
+                setIsTrialExpired(isExpired);
                 setTrialDays(null);
                 setSubscriptionDays(null);
               }
@@ -258,22 +265,45 @@ export function MondeAppSidebar() {
                      location.pathname === "/admin" &&
                      (item.url.split("?")[1] || "").split("&").every((kv) => location.search.includes(kv)));
 
+                const isBlocked = isTrialExpired && !isAdmin && (item.url === "/" || item.url === "/people");
+                const isSubscriptionPage = item.url === "/subscription";
+
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
                       asChild
                       isActive={isActive}
                       tooltip={item.title}
-                      className={isCollapsed ? "justify-center px-2" : ""}
+                      disabled={isBlocked}
+                      className={`${isCollapsed ? "justify-center px-2" : ""} ${
+                        isBlocked ? "opacity-50 cursor-not-allowed" : ""
+                      } ${
+                        isTrialExpired && !isAdmin && isSubscriptionPage 
+                          ? "bg-destructive/10 border border-destructive/20" 
+                          : ""
+                      }`}
                     >
                       <NavLink
                         to={item.url}
-                        className={`flex items-center text-foreground hover:text-foreground ${
+                        className={`flex items-center ${
                           isCollapsed ? "justify-center" : "space-x-3"
+                        } ${
+                          isBlocked ? "pointer-events-none text-muted-foreground" : "text-foreground hover:text-foreground"
+                        } ${
+                          isTrialExpired && !isAdmin && isSubscriptionPage ? "text-destructive font-medium" : ""
                         }`}
                       >
                         <item.icon className={`h-4 w-4 ${isCollapsed ? "mx-auto" : ""}`} />
-                        {!isCollapsed && <span>{item.title}</span>}
+                        {!isCollapsed && (
+                          <div className="flex items-center gap-2">
+                            <span>{item.title}</span>
+                            {isTrialExpired && !isAdmin && isSubscriptionPage && (
+                              <Badge variant="destructive" className="text-xs">
+                                Renovar
+                              </Badge>
+                            )}
+                          </div>
+                        )}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -286,7 +316,39 @@ export function MondeAppSidebar() {
 
       {/* Footer: trial + sair */}
       <div className="mt-auto p-3 border-t border-border">
-        {(trialDays !== null && trialDays > 0) || (subscriptionDays !== null && subscriptionDays >= 0) ? (
+        {isAdmin ? (
+          <div className={isCollapsed ? "px-1 mb-2" : "mb-3"}>
+            <div className="rounded-lg border border-green-300 bg-green-50 p-2">
+              <div className={isCollapsed ? "flex justify-center" : "flex items-center justify-between gap-2"}>
+                {!isCollapsed && (
+                  <div>
+                    <div className="text-sm font-medium text-green-700">Status Vitalício</div>
+                    <div className="text-xs text-green-600">Acesso ilimitado</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : isTrialExpired ? (
+          <div className={isCollapsed ? "px-1 mb-2" : "mb-3"}>
+            <div className="rounded-lg border border-red-300 bg-red-50 p-2">
+              <div className={isCollapsed ? "flex justify-center" : "flex items-center justify-between gap-2"}>
+                {!isCollapsed && (
+                  <div>
+                    <div className="text-sm font-medium text-red-700">Trial Vencido</div>
+                    <div className="text-xs text-red-600">Renovar para continuar</div>
+                  </div>
+                )}
+                <NavLink
+                  to="/subscription"
+                  className="px-2 py-1 text-xs rounded-button bg-red-600 text-white hover:bg-red-700 inline-block text-center no-underline"
+                >
+                  Renovar Agora
+                </NavLink>
+              </div>
+            </div>
+          </div>
+        ) : (trialDays !== null && trialDays > 0) || (subscriptionDays !== null && subscriptionDays >= 0) ? (
           <div className={isCollapsed ? "px-1 mb-2" : "mb-3"}>
             <div className="rounded-lg border border-primary/30 bg-primary/10 p-2">
               <div className={isCollapsed ? "flex justify-center" : "flex items-center justify-between gap-2"}>

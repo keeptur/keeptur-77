@@ -1,18 +1,17 @@
-import { Outlet, useLocation } from "react-router-dom";
-import { MondeAppSidebar } from "@/components/MondeAppSidebar";
-import { MondeHeader } from "@/components/MondeHeader";
-import { SidebarProvider } from "@/components/ui/sidebar";
 import { useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { api } from "@/lib/api";
 import { useAdminStatus } from "@/hooks/useAdminStatus";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
-export function Layout() {
-  const location = useLocation();
-  const { isAdmin } = useAdminStatus();
-  const [isTrialExpired, setIsTrialExpired] = useState(false);
+
+interface TrialExpiredRouteProps {
+  children: React.ReactNode;
+}
+
+export const TrialExpiredRoute = ({ children }: TrialExpiredRouteProps) => {
   const [loading, setLoading] = useState(true);
+  const [isTrialExpired, setIsTrialExpired] = useState(false);
+  const { isAdmin } = useAdminStatus();
 
   useEffect(() => {
     const checkTrialStatus = async () => {
@@ -70,31 +69,23 @@ export function Layout() {
     };
 
     checkTrialStatus();
-  }, [isAdmin, location.pathname]);
+  }, [isAdmin]);
 
-  const shouldShowTrialExpiredBanner = !loading && isTrialExpired && !isAdmin && location.pathname !== "/subscription";
+  if (loading) {
+    return <div className="flex items-center justify-center h-64">
+      <div className="text-muted-foreground">Verificando status...</div>
+    </div>;
+  }
 
-  return (
-    <SidebarProvider defaultOpen={true}>
-      <div className="min-h-screen flex w-full bg-muted/30">
-        <MondeAppSidebar />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <MondeHeader />
-          <main className="flex-1 overflow-auto pt-0 pr-14 pb-14 pl-14 sm:pt-5 sm:pr-14 sm:pb-14 sm:pl-14">
-            <div className="max-w-7xl mx-auto space-y-6">
-              {shouldShowTrialExpiredBanner && (
-                <Alert variant="destructive" className="border-red-200 bg-red-50">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription className="font-medium">
-                    Seu período de trial expirou. Para continuar usando o sistema, você precisa assinar um plano.
-                  </AlertDescription>
-                </Alert>
-              )}
-              <Outlet />
-            </div>
-          </main>
-        </div>
-      </div>
-    </SidebarProvider>
-  );
-}
+  // Admins always have access
+  if (isAdmin) {
+    return <>{children}</>;
+  }
+
+  // Redirect to subscription page if trial expired
+  if (isTrialExpired) {
+    return <Navigate to="/subscription" replace />;
+  }
+
+  return <>{children}</>;
+};

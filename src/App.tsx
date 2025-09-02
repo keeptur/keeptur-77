@@ -25,6 +25,7 @@ import SubscriptionPage from "./pages/SubscriptionPage";
 
 
 import { UserRoute } from "./components/auth/UserRoute";
+import { TrialExpiredRoute } from "./components/auth/TrialExpiredRoute";
 import { PaymentVerifier } from "./components/PaymentVerifier";
 import { SessionSecurity } from "./components/security/SessionSecurity";
 import { AdminSecurity } from "./components/security/AdminSecurity";
@@ -101,12 +102,16 @@ const AppWrapper = () => {
             }>
               <Route index element={
                 <UserRoute>
-                  <Dashboard />
+                  <TrialExpiredRoute>
+                    <Dashboard />
+                  </TrialExpiredRoute>
                 </UserRoute>
               } />
               <Route path="people" element={
                 <UserRoute>
-                  <PeoplePage />
+                  <TrialExpiredRoute>
+                    <PeoplePage />
+                  </TrialExpiredRoute>
                 </UserRoute>
               } />
               <Route path="profile" element={
