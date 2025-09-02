@@ -99,16 +99,31 @@ export function MondeAppSidebar() {
               // Plano ativo: calcular dias restantes baseado na subscription_end
               setSubscriptionDays(Math.ceil((subEnd - now) / (1000 * 60 * 60 * 24)));
               setTrialDays(null);
-            } else if (trialEnd && trialEnd > now && !data?.subscribed) {
-              // Trial ativo: calcular dias restantes do trial incluindo dias adicionais
+              setIsTrialExpired(false);
+            } else if (trialEnd && !data?.subscribed) {
+              // Trial: verificar se ainda está ativo incluindo dias adicionais
               const additionalDays = (data as any)?.additional_trial_days || 0;
               const adjustedTrialEnd = trialEnd + (additionalDays * 24 * 60 * 60 * 1000);
-              setTrialDays(Math.ceil((adjustedTrialEnd - now) / (1000 * 60 * 60 * 24)));
+              
+              if (adjustedTrialEnd > now) {
+                // Trial ainda ativo
+                setTrialDays(Math.ceil((adjustedTrialEnd - now) / (1000 * 60 * 60 * 24)));
+                setSubscriptionDays(null);
+                setIsTrialExpired(false);
+              } else {
+                // Trial vencido
+                setTrialDays(null);
+                setSubscriptionDays(null);
+                setIsTrialExpired(true);
+              }
+            } else if (!data?.subscribed) {
+              // Sem assinatura e sem trial ativo = trial vencido
+              setIsTrialExpired(true);
+              setTrialDays(null);
               setSubscriptionDays(null);
             } else {
-              // Nem trial nem plano ativo - verificar se trial venceu
-              const isExpired = !data?.subscribed && (!trialEnd || trialEnd <= now);
-              setIsTrialExpired(isExpired);
+              // Estado padrão
+              setIsTrialExpired(false);
               setTrialDays(null);
               setSubscriptionDays(null);
             }
@@ -129,20 +144,33 @@ export function MondeAppSidebar() {
 
             if (mounted) {
               setSubscribed(isSubscribed);
+              const now = Date.now();
+              
               if (isSubscribed && subscriptionEnd) {
-                const now = Date.now();
                 const t = new Date(subscriptionEnd).getTime();
                 setSubscriptionDays(Math.ceil((t - now) / (1000 * 60 * 60 * 24)));
                 setTrialDays(null);
+                setIsTrialExpired(false);
               } else if (trialEnd && !isSubscribed) {
-                const now = Date.now();
                 const t = new Date(trialEnd).getTime();
-                setTrialDays(Math.ceil((t - now) / (1000 * 60 * 60 * 24)));
+                if (t > now) {
+                  // Trial ainda ativo
+                  setTrialDays(Math.ceil((t - now) / (1000 * 60 * 60 * 24)));
+                  setSubscriptionDays(null);
+                  setIsTrialExpired(false);
+                } else {
+                  // Trial vencido
+                  setTrialDays(null);
+                  setSubscriptionDays(null);
+                  setIsTrialExpired(true);
+                }
+              } else if (!isSubscribed) {
+                // Sem assinatura e sem trial ativo = trial vencido
+                setIsTrialExpired(true);
+                setTrialDays(null);
                 setSubscriptionDays(null);
               } else {
-                // Verificar se trial venceu via Monde token
-                const isExpired = !isSubscribed && (!trialEnd || new Date(trialEnd).getTime() <= Date.now());
-                setIsTrialExpired(isExpired);
+                setIsTrialExpired(false);
                 setTrialDays(null);
                 setSubscriptionDays(null);
               }
