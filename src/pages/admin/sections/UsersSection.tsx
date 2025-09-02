@@ -3,11 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { addDays } from "date-fns";
+import { addDays, differenceInDays, format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { usePlanSettings } from "@/hooks/usePlanSettings";
 interface ProfileRow {
   id: string;
@@ -386,7 +390,7 @@ export default function UsersSection() {
     const d = new Date(dateStr);
     return d.toLocaleDateString();
   };
-  async function updateTrialDays(user: CombinedUser, days: number) {
+  async function updateTrialEndDate(user: CombinedUser, newEndDate: Date) {
     try {
       // Não permitir modificar trial de admins
       if (user.id && isAdmin(user.id)) {
@@ -397,42 +401,41 @@ export default function UsersSection() {
         });
         return;
       }
+      
       const sub = subscribers.find(s => s.email === user.email) || null;
+      const baseDays = planSettings?.trial_days || 5;
+      
       if (sub) {
-        // Atualizar additional_trial_days
-        const newAdditionalDays = Math.max(0, (sub.additional_trial_days || 0) + days);
-
-        // Calcular nova data baseada nos dias base + dias adicionais
-        const baseDays = planSettings?.trial_days || 5;
-        const totalDays = baseDays + newAdditionalDays;
         const trialStart = sub.trial_start ? new Date(sub.trial_start) : new Date();
-        const newTrialEnd = addDays(trialStart, totalDays).toISOString();
+        const originalEndDate = addDays(trialStart, baseDays);
+        const additionalDays = differenceInDays(newEndDate, originalEndDate);
+        
         const {
           error
         } = await supabase.from('subscribers').update({
-          trial_end: newTrialEnd,
-          additional_trial_days: newAdditionalDays
+          trial_end: newEndDate.toISOString(),
+          additional_trial_days: additionalDays
         }).eq('id', sub.id);
         if (error) throw error;
+        
         setSubscribers(prev => prev.map(x => x.id === sub.id ? {
           ...x,
-          trial_end: newTrialEnd,
-          additional_trial_days: newAdditionalDays,
+          trial_end: newEndDate.toISOString(),
+          additional_trial_days: additionalDays,
           updated_at: new Date().toISOString()
         } as SubscriberRow : x));
       } else {
         // Criar novo subscriber com trial
-        const baseDays = planSettings?.trial_days || 5;
-        const additionalDays = Math.max(0, days);
-        const totalDays = baseDays + additionalDays;
         const trialStart = new Date();
-        const trialEnd = addDays(trialStart, totalDays);
+        const originalEndDate = addDays(trialStart, baseDays);
+        const additionalDays = differenceInDays(newEndDate, originalEndDate);
+        
         const payload = {
           email: user.email,
           user_id: user.id || user.user_id || null,
           subscribed: false,
           trial_start: trialStart.toISOString(),
-          trial_end: trialEnd.toISOString(),
+          trial_end: newEndDate.toISOString(),
           additional_trial_days: additionalDays
         };
         const {
@@ -442,10 +445,10 @@ export default function UsersSection() {
         if (error) throw error;
         if (data) setSubscribers(prev => [...prev, data as SubscriberRow]);
       }
-      const action = days > 0 ? 'adicionados' : 'removidos';
+      
       toast({
         title: 'Trial atualizado',
-        description: `${Math.abs(days)} dias ${action} do trial.`
+        description: `Data de vencimento do trial alterada para ${format(newEndDate, 'dd/MM/yyyy')}.`
       });
     } catch (e: any) {
       toast({
@@ -455,6 +458,63 @@ export default function UsersSection() {
       });
     }
   }
+  async function updateSubscriptionEndDate(user: CombinedUser, newEndDate: Date) {
+    try {
+      // Não permitir modificar assinatura de admins
+      if (user.id && isAdmin(user.id)) {
+        toast({
+          title: 'Aviso',
+          description: 'Admins têm assinatura vitalícia e não podem ser modificados.',
+          variant: 'destructive'
+        });
+        return;
+      }
+      
+      const sub = subscribers.find(s => s.email === user.email) || null;
+      
+      if (sub) {
+        const {
+          error
+        } = await supabase.from('subscribers').update({
+          subscription_end: newEndDate.toISOString(),
+          subscribed: true
+        }).eq('id', sub.id);
+        if (error) throw error;
+        
+        setSubscribers(prev => prev.map(x => x.id === sub.id ? {
+          ...x,
+          subscription_end: newEndDate.toISOString(),
+          subscribed: true,
+          updated_at: new Date().toISOString()
+        } as SubscriberRow : x));
+      } else {
+        const payload = {
+          email: user.email,
+          user_id: user.id || user.user_id || null,
+          subscribed: true,
+          subscription_end: newEndDate.toISOString()
+        };
+        const {
+          data,
+          error
+        } = await supabase.from('subscribers').insert(payload).select().single();
+        if (error) throw error;
+        if (data) setSubscribers(prev => [...prev, data as SubscriberRow]);
+      }
+      
+      toast({
+        title: 'Assinatura atualizada',
+        description: `Data de vencimento da assinatura alterada para ${format(newEndDate, 'dd/MM/yyyy')}.`
+      });
+    } catch (e: any) {
+      toast({
+        title: 'Erro ao atualizar assinatura',
+        description: e.message,
+        variant: 'destructive'
+      });
+    }
+  }
+
   async function addDaysTo(user: CombinedUser, field: 'subscription_end', days: number) {
     try {
       // Não permitir modificar assinatura de admins
@@ -650,53 +710,88 @@ export default function UsersSection() {
                   })()}
                       </td>
                       <td className="py-3 px-2">
-                        {userIsAdmin ? <div className="text-xs text-center text-muted-foreground">
-                            Vitalício
-                          </div> : <div className="flex items-center gap-1">
-                            <button onClick={() => updateTrialDays(u, -1)} className="w-6 h-6 text-xs border rounded hover:bg-muted" disabled={!u.subscriber?.additional_trial_days || u.subscriber.additional_trial_days <= 0}>
-                              -
-                            </button>
-                            <input type="number" placeholder="+" className="w-12 px-1 py-1 text-xs border rounded text-center" onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        const days = parseInt((e.currentTarget as HTMLInputElement).value);
-                        if (days && days !== 0) {
-                          updateTrialDays(u, days);
-                          (e.currentTarget as HTMLInputElement).value = '';
-                        }
-                      }
-                    }} onBlur={e => {
-                      const days = parseInt((e.currentTarget as HTMLInputElement).value);
-                      if (days && days !== 0) {
-                        updateTrialDays(u, days);
-                        (e.currentTarget as HTMLInputElement).value = '';
-                      }
-                    }} />
-                            <button onClick={() => updateTrialDays(u, 1)} className="w-6 h-6 text-xs border rounded hover:bg-muted">
-                              +
-                            </button>
-                          </div>}
-                        
+                        {userIsAdmin ? (
+                          <div className="text-xs text-center text-muted-foreground">
+                            Vitalício Keeptur Admin
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-1">
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className={cn(
+                                    "w-full justify-start text-left font-normal text-xs h-6 px-2",
+                                    !u.subscriber?.trial_end && "text-muted-foreground"
+                                  )}
+                                >
+                                  <CalendarIcon className="mr-1 h-3 w-3" />
+                                  {u.subscriber?.trial_end 
+                                    ? format(new Date(u.subscriber.trial_end), "dd/MM/yyyy")
+                                    : "Definir trial"
+                                  }
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={u.subscriber?.trial_end ? new Date(u.subscriber.trial_end) : undefined}
+                                  onSelect={(date) => {
+                                    if (date) {
+                                      updateTrialEndDate(u, date);
+                                    }
+                                  }}
+                                  initialFocus
+                                  className={cn("p-3 pointer-events-auto")}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            {u.subscriber?.additional_trial_days !== undefined && u.subscriber.additional_trial_days !== 0 && (
+                              <div className="text-xs text-muted-foreground text-center">
+                                {u.subscriber.additional_trial_days > 0 ? '+' : ''}{u.subscriber.additional_trial_days} dias
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="py-3 px-2">
-                        {userIsAdmin ? <div className="text-xs text-center text-muted-foreground">
-                            Vitalício
-                          </div> : <input type="number" placeholder="+" className="w-16 px-2 py-1 text-xs border rounded text-center" onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      const days = parseInt((e.currentTarget as HTMLInputElement).value);
-                      if (days > 0) {
-                        addDaysTo(u, 'subscription_end', days);
-                        (e.currentTarget as HTMLInputElement).value = '';
-                      }
-                    }
-                  }} onBlur={e => {
-                    const days = parseInt((e.currentTarget as HTMLInputElement).value);
-                    if (days > 0) {
-                      addDaysTo(u, 'subscription_end', days);
-                      (e.currentTarget as HTMLInputElement).value = '';
-                    }
-                  }} />}
-        
-      </td>
+                        {userIsAdmin ? (
+                          <div className="text-xs text-center text-muted-foreground">
+                            Vitalício Keeptur Admin
+                          </div>
+                        ) : (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal text-xs h-6 px-2",
+                                  !u.subscriber?.subscription_end && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarIcon className="mr-1 h-3 w-3" />
+                                {u.subscriber?.subscription_end 
+                                  ? format(new Date(u.subscriber.subscription_end), "dd/MM/yyyy")
+                                  : "Definir assinatura"
+                                }
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={u.subscriber?.subscription_end ? new Date(u.subscriber.subscription_end) : undefined}
+                                onSelect={(date) => {
+                                  if (date) {
+                                    updateSubscriptionEndDate(u, date);
+                                  }
+                                }}
+                                initialFocus
+                                className={cn("p-3 pointer-events-auto")}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        )}
+                      </td>
                       <td className="py-3 px-2">
                         <div className="flex gap-1">
                           {/* Mostrar botão de ativar assinatura apenas se o usuário não for admin */}
