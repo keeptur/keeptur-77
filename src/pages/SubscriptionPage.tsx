@@ -12,6 +12,7 @@ import { ManageUsersModal } from "@/components/modals/ManageUsersModal";
 import { UserManagement } from "@/components/plans/UserManagement";
 import { TrialInfoCard } from "@/components/subscription/TrialInfoCard";
 import DiscountManager from "@/components/plans/DiscountManager";
+import { usePlanSettings } from "@/hooks/usePlanSettings";
 
 interface CompleteSubscriptionData {
   subscribed: boolean;
@@ -69,6 +70,7 @@ export default function SubscriptionPage() {
   const {
     toast
   } = useToast();
+  const { settings: planSettings } = usePlanSettings();
   const [subscriptionData, setSubscriptionData] = useState<CompleteSubscriptionData>({
     subscribed: false,
     trial_active: false,
@@ -89,7 +91,7 @@ export default function SubscriptionPage() {
   const [showUsersModal, setShowUsersModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<AvailablePlan | null>(null);
   const [isAnnual, setIsAnnual] = useState(false);
-  const [annualDiscount, setAnnualDiscount] = useState(20);
+  const annualDiscount = planSettings?.annual_discount || 20;
   const [planUsers, setPlanUsers] = useState<string[]>([]);
   const [contractedUsers, setContractedUsers] = useState<string[]>([]); // Usuários contratados
   const [paymentStatus, setPaymentStatus] = useState<'checking' | 'success' | 'pending' | null>(null);
@@ -193,6 +195,11 @@ export default function SubscriptionPage() {
           }));
         }
         setAvailablePlans(plans);
+        
+        // Update annual discount from plan settings if available
+        if (plansResponse.value.data?.annual_discount) {
+          // Annual discount is already handled by planSettings hook
+        }
       }
       if (historyResponse.status === 'fulfilled' && historyResponse.value.data?.payment_history) {
         setPaymentHistory(historyResponse.value.data.payment_history);

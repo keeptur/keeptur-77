@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { usePlanSettings } from "@/hooks/usePlanSettings";
 
 interface ProfileRow {
   id: string;
@@ -56,6 +57,7 @@ import PaymentHistorySection from "./PaymentHistorySection";
 
 export default function UsersSection() {
   const { toast } = useToast();
+  const { settings: planSettings } = usePlanSettings();
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [roles, setRoles] = useState<RoleRow[]>([]);
   const [subscribers, setSubscribers] = useState<SubscriberRow[]>([]);
@@ -318,6 +320,14 @@ export default function UsersSection() {
     const target = new Date(dateStr).getTime();
     return Math.ceil((target - now) / (1000 * 60 * 60 * 24));
   };
+
+  const getTrialDaysDisplay = (user: CombinedUser) => {
+    const baseDays = planSettings?.trial_days || 5;
+    const remainingDays = getDaysRemaining(user.subscriber?.trial_end);
+    if (remainingDays === null) return `${baseDays} dias`;
+    const additionalDays = Math.max(0, remainingDays - baseDays);
+    return additionalDays > 0 ? `${baseDays} + ${additionalDays} dias` : `${baseDays} dias`;
+  };
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return '-';
     const d = new Date(dateStr);
@@ -562,7 +572,7 @@ export default function UsersSection() {
                           }}
                         />
                         <div className="text-xs text-muted-foreground mt-1">
-                          {u.subscriber?.trial_end ? `${getDaysRemaining(u.subscriber.trial_end) || 0}d` : '-'}
+                          {getTrialDaysDisplay(u)}
                         </div>
                       </td>
                       <td className="py-3 px-2">

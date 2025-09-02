@@ -95,7 +95,7 @@ if (!email) {
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      const trialDays = Math.max(0, Number(appSettings?.trial_days ?? 14));
+      const trialDays = Math.max(0, Number(appSettings?.trial_days ?? 5));
       const trialEndCalc = new Date();
       trialEndCalc.setDate(trialEndCalc.getDate() + trialDays);
 
