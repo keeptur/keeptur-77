@@ -214,7 +214,7 @@ export function MondeHeader() {
   const visibleNotif = notifItems.filter((n) => !n.hidden);
   const badgeCount = visibleNotif.length;
   return (
-    <header className="header relative isolate z-[1000] flex items-center justify-between h-16 px-10 bg-white border-b border-border transition-all duration-300">
+    <header className="header relative isolate z-[1000] flex items-center justify-between h-16 px-10 bg-background border-b border-border transition-all duration-300">
       <div className="flex items-center gap-2">
         <SidebarTrigger />
       </div>
@@ -238,7 +238,7 @@ export function MondeHeader() {
             )}
           </Button>
           {notifOpen && (
-            <div className="absolute right-0 mt-2 w-80 bg-white border border-border rounded-lg shadow-lg py-2 z-[1100]">
+            <div className="absolute right-0 mt-2 w-80 bg-background border border-border rounded-lg shadow-lg py-2 z-[1100]">
               {visibleNotif.length === 0 ? (
                 <div className="px-4 py-3 text-sm text-muted-foreground">Sem notificações</div>
               ) : (
@@ -278,7 +278,7 @@ export function MondeHeader() {
             </div>
           </Button>
           {userDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-64 bg-white border border-border rounded-lg shadow-lg py-1 z-[1100]">
+            <div className="absolute right-0 mt-2 w-64 bg-background border border-border rounded-lg shadow-lg py-1 z-[1100]">
               {/* Exibe o relógio de trial/assinatura apenas para não-admins */}
               {!isAdmin && <TrialStatus />}
               {isAdmin && (

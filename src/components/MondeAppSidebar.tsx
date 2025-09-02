@@ -203,11 +203,11 @@ export function MondeAppSidebar() {
   return (
     <Sidebar
       collapsible="icon"
-      className="border-r border-border bg-white"
+      className="border-r border-border bg-background"
       style={{ width: isCollapsed ? "64px" : "280px" }}
     >
       {/* Trigger moved to global header to avoid duplicates */}
-      <SidebarHeader className="p-4 border-b border-border bg-white">
+      <SidebarHeader className="p-4 border-b border-border bg-background">
         <div className="flex items-center justify-between h-8">
           <div className="relative flex-1 h-9">
             {/* Light - logo completa */}
@@ -246,7 +246,7 @@ export function MondeAppSidebar() {
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="px-2 py-4 bg-white">
+      <SidebarContent className="px-2 py-4 bg-background">
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
