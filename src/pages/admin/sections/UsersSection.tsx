@@ -695,9 +695,7 @@ export default function UsersSection() {
                       (e.currentTarget as HTMLInputElement).value = '';
                     }
                   }} />}
-        <div className="text-xs text-muted-foreground mt-1">
-          {getSubscriptionDaysDisplay(u)}
-        </div>
+        
       </td>
                       <td className="py-3 px-2">
                         <div className="flex gap-1">
