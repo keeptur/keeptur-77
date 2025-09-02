@@ -84,7 +84,7 @@ export default function UsersSection() {
       data: r
     }, {
       data: s
-    }] = await Promise.all([supabase.from("profiles").select("id, email, full_name, created_at"), supabase.from("user_roles").select("user_id, role"), supabase.from("subscribers").select("id, user_id, email, display_name, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at, updated_at, username, user_email")]);
+    }] = await Promise.all([supabase.from("profiles").select("id, email, full_name, created_at"), supabase.from("user_roles").select("user_id, role"), supabase.from("subscribers").select("id, user_id, email, display_name, subscribed, subscription_tier, trial_start, trial_end, subscription_end, additional_trial_days, created_at, updated_at, username, user_email")]);
     setProfiles((p || []) as any);
     setRoles((r || []) as any);
     setSubscribers((s || []) as any);
@@ -154,7 +154,7 @@ export default function UsersSection() {
     const load = async () => {
       try {
         // Otimizar carregamento com menos campos
-        const [profilesRes, rolesRes, subscribersRes] = await Promise.all([supabase.from("profiles").select("id, email, full_name"), supabase.from("user_roles").select("user_id, role"), supabase.from("subscribers").select("id, user_id, email, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at").limit(500)]);
+        const [profilesRes, rolesRes, subscribersRes] = await Promise.all([supabase.from("profiles").select("id, email, full_name"), supabase.from("user_roles").select("user_id, role"), supabase.from("subscribers").select("id, user_id, email, subscribed, subscription_tier, trial_start, trial_end, subscription_end, additional_trial_days, created_at").limit(500)]);
         setProfiles((profilesRes.data || []) as any);
         setRoles((rolesRes.data || []) as any);
         setSubscribers((subscribersRes.data || []) as any);

@@ -501,6 +501,7 @@ export type Database = {
       }
       subscribers: {
         Row: {
+          additional_trial_days: number
           created_at: string
           display_name: string | null
           email: string
@@ -519,6 +520,7 @@ export type Database = {
           username: string | null
         }
         Insert: {
+          additional_trial_days?: number
           created_at?: string
           display_name?: string | null
           email: string
@@ -537,6 +539,7 @@ export type Database = {
           username?: string | null
         }
         Update: {
+          additional_trial_days?: number
           created_at?: string
           display_name?: string | null
           email?: string
