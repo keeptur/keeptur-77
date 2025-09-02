@@ -313,55 +313,37 @@ export function PlanSelectionModal({ open, onOpenChange, plans, onSuccess, curre
                     </div>
 
                     <div className="space-y-3">
-                      {planSettings?.coupons_enabled && (
+                      {/* Só mostra seção de descontos se houver desconto de primeira compra configurado */}
+                      {planSettings && planSettings.first_purchase_discount > 0 && (
                         <>
                           <h4 className="font-medium text-sm">% Descontos Aplicáveis</h4>
                           
-                          {planSettings.first_purchase_discount > 0 && (
-                            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                              <div className="flex items-center space-x-2 text-green-700">
-                                <div className="w-2 h-2 bg-green-500 rounded-full" />
-                                <span className="text-sm font-medium">Desconto Primeira Compra</span>
-                                <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs">
-                                  -{planSettings.first_purchase_discount}%
-                                </Badge>
-                              </div>
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                            <div className="flex items-center space-x-2 text-green-700">
+                              <div className="w-2 h-2 bg-green-500 rounded-full" />
+                              <span className="text-sm font-medium">Desconto Primeira Compra</span>
+                              <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs">
+                                -{planSettings.first_purchase_discount}%
+                              </Badge>
                             </div>
-                          )}
-                          
-                          <div className="text-center">
-                            <p className="text-sm text-muted-foreground mb-2">Cupom de Desconto</p>
-                            <div className="flex space-x-2">
-                              <input 
-                                type="text" 
-                                placeholder="Digite seu cupom" 
-                                className="flex-1 px-3 py-1 text-sm border border-input rounded text-center"
-                              />
-                              <Button size="sm" variant="outline" className="text-xs">Aplicar</Button>
-                            </div>
-                            <p className="text-xs text-blue-600 mt-1">
-                              💡 Use cupons de desconto para economizar na sua assinatura!
-                            </p>
                           </div>
 
-                          {planSettings.first_purchase_discount > 0 && (
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-sm">
-                                <span>Preço original:</span>
-                                <span>{formatCurrency(isAnnual ? plan.yearly_price_cents / 12 : plan.price_cents)}</span>
-                              </div>
-                              <div className="flex justify-between text-sm text-green-600">
-                                <span>Desconto total ({planSettings.first_purchase_discount}%):</span>
-                                <span>-{formatCurrency(((isAnnual ? plan.yearly_price_cents / 12 : plan.price_cents) * (planSettings.first_purchase_discount / 100)))}</span>
-                              </div>
-                              <div className="border-t pt-2">
-                                <div className="flex justify-between font-bold text-lg text-blue-600">
-                                  <span>Preço final:</span>
-                                  <span>{formatCurrency(((isAnnual ? plan.yearly_price_cents / 12 : plan.price_cents) * (1 - planSettings.first_purchase_discount / 100)))}</span>
-                                </div>
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span>Preço original:</span>
+                              <span>{formatCurrency(isAnnual ? plan.yearly_price_cents / 12 : plan.price_cents)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-green-600">
+                              <span>Desconto total ({planSettings.first_purchase_discount}%):</span>
+                              <span>-{formatCurrency(((isAnnual ? plan.yearly_price_cents / 12 : plan.price_cents) * (planSettings.first_purchase_discount / 100)))}</span>
+                            </div>
+                            <div className="border-t pt-2">
+                              <div className="flex justify-between font-bold text-lg text-blue-600">
+                                <span>Preço final:</span>
+                                <span>{formatCurrency(((isAnnual ? plan.yearly_price_cents / 12 : plan.price_cents) * (1 - planSettings.first_purchase_discount / 100)))}</span>
                               </div>
                             </div>
-                          )}
+                          </div>
                         </>
                       )}
 
