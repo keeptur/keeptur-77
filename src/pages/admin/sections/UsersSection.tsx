@@ -30,6 +30,7 @@ interface SubscriberRow {
   trial_start: string | null;
   trial_end: string | null;
   subscription_end: string | null;
+  additional_trial_days?: number;
   created_at: string;
   updated_at: string;
   user_email?: string | null;
@@ -322,27 +323,127 @@ export default function UsersSection() {
   };
 
   const getTrialDaysDisplay = (user: CombinedUser) => {
+    // Para admins, mostrar "Vitalício"
+    if (user.id && isAdmin(user.id)) {
+      return "Vitalício Keeptur Admin";
+    }
+    
     const baseDays = planSettings?.trial_days || 5;
-    const remainingDays = getDaysRemaining(user.subscriber?.trial_end);
-    if (remainingDays === null) return `${baseDays} dias`;
-    const additionalDays = Math.max(0, remainingDays - baseDays);
-    return additionalDays > 0 ? `${baseDays} + ${additionalDays} dias` : `${baseDays} dias`;
+    const additionalDays = user.subscriber?.additional_trial_days || 0;
+    
+    if (additionalDays > 0) {
+      return `${baseDays} + ${additionalDays} dias`;
+    }
+    return `${baseDays} dias`;
+  };
+
+  const getSubscriptionDaysDisplay = (user: CombinedUser) => {
+    // Para admins, mostrar "Vitalício"
+    if (user.id && isAdmin(user.id)) {
+      return "Vitalício Keeptur Admin";
+    }
+    
+    const remainingDays = getDaysRemaining(user.subscriber?.subscription_end);
+    return remainingDays !== null ? `${remainingDays} dias` : "-";
   };
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return '-';
     const d = new Date(dateStr);
     return d.toLocaleDateString();
   };
-  async function addDaysTo(user: CombinedUser, field: 'trial_end' | 'subscription_end', days: number) {
+  async function updateTrialDays(user: CombinedUser, days: number) {
     try {
+      // Não permitir modificar trial de admins
+      if (user.id && isAdmin(user.id)) {
+        toast({ title: 'Aviso', description: 'Admins têm assinatura vitalícia e não podem ter trial modificado.', variant: 'destructive' });
+        return;
+      }
+
+      const sub = subscribers.find((s) => s.email === user.email) || null;
+      
+      if (sub) {
+        // Atualizar additional_trial_days
+        const newAdditionalDays = Math.max(0, (sub.additional_trial_days || 0) + days);
+        
+        // Calcular nova data baseada nos dias base + dias adicionais
+        const baseDays = planSettings?.trial_days || 5;
+        const totalDays = baseDays + newAdditionalDays;
+        const trialStart = sub.trial_start ? new Date(sub.trial_start) : new Date();
+        const newTrialEnd = addDays(trialStart, totalDays).toISOString();
+        
+        const { error } = await supabase
+          .from('subscribers')
+          .update({ 
+            trial_end: newTrialEnd,
+            additional_trial_days: newAdditionalDays
+          })
+          .eq('id', sub.id);
+          
+        if (error) throw error;
+        
+        setSubscribers((prev) =>
+          prev.map((x) =>
+            x.id === sub.id
+              ? ({
+                  ...x,
+                  trial_end: newTrialEnd,
+                  additional_trial_days: newAdditionalDays,
+                  updated_at: new Date().toISOString(),
+                } as SubscriberRow)
+              : x,
+          ),
+        );
+      } else {
+        // Criar novo subscriber com trial
+        const baseDays = planSettings?.trial_days || 5;
+        const additionalDays = Math.max(0, days);
+        const totalDays = baseDays + additionalDays;
+        const trialStart = new Date();
+        const trialEnd = addDays(trialStart, totalDays);
+        
+        const payload = {
+          email: user.email,
+          user_id: user.id || user.user_id || null,
+          subscribed: false,
+          trial_start: trialStart.toISOString(),
+          trial_end: trialEnd.toISOString(),
+          additional_trial_days: additionalDays
+        };
+        
+        const { data, error } = await supabase
+          .from('subscribers')
+          .insert(payload)
+          .select()
+          .single();
+          
+        if (error) throw error;
+        if (data) setSubscribers((prev) => [...prev, data as SubscriberRow]);
+      }
+      
+      const action = days > 0 ? 'adicionados' : 'removidos';
+      toast({ title: 'Trial atualizado', description: `${Math.abs(days)} dias ${action} do trial.` });
+    } catch (e: any) {
+      toast({ title: 'Erro ao atualizar trial', description: e.message, variant: 'destructive' });
+    }
+  }
+
+  async function addDaysTo(user: CombinedUser, field: 'subscription_end', days: number) {
+    try {
+      // Não permitir modificar assinatura de admins
+      if (user.id && isAdmin(user.id)) {
+        toast({ title: 'Aviso', description: 'Admins têm assinatura vitalícia e não podem ser modificados.', variant: 'destructive' });
+        return;
+      }
+
       const sub = subscribers.find((s) => s.email === user.email) || null;
       const baseDateStr = sub?.[field] || null;
       const base = baseDateStr ? new Date(baseDateStr) : new Date();
       const newDate = addDays(base, days).toISOString();
+      
       if (sub) {
         const { error } = await supabase
           .from('subscribers')
-          .update({ [field]: newDate, subscribed: field === 'subscription_end' ? true : sub.subscribed })
+          .update({ [field]: newDate, subscribed: true })
           .eq('id', sub.id);
         if (error) throw error;
         setSubscribers((prev) =>
@@ -351,7 +452,7 @@ export default function UsersSection() {
               ? ({
                   ...x,
                   [field]: newDate,
-                  subscribed: field === 'subscription_end' ? true : x.subscribed,
+                  subscribed: true,
                   updated_at: new Date().toISOString(),
                 } as SubscriberRow)
               : x,
@@ -361,7 +462,7 @@ export default function UsersSection() {
         const payload: any = {
           email: user.email,
           user_id: user.id || user.user_id || null,
-          subscribed: field === 'subscription_end',
+          subscribed: true,
           [field]: newDate,
         };
         const { data, error } = await supabase
@@ -372,9 +473,9 @@ export default function UsersSection() {
         if (error) throw error;
         if (data) setSubscribers((prev) => [...prev, data as SubscriberRow]);
       }
-      toast({ title: 'Prazo atualizado', description: `+${days} dias em ${field === 'trial_end' ? 'trial' : 'assinatura'}.` });
+      toast({ title: 'Assinatura atualizada', description: `+${days} dias na assinatura.` });
     } catch (e: any) {
-      toast({ title: 'Erro ao atualizar prazos', description: e.message, variant: 'destructive' });
+      toast({ title: 'Erro ao atualizar assinatura', description: e.message, variant: 'destructive' });
     }
   }
 
@@ -550,57 +651,84 @@ export default function UsersSection() {
                         })()}
                       </td>
                       <td className="py-3 px-2">
-                        <input
-                          type="number"
-                          placeholder="+"
-                          className="w-16 px-2 py-1 text-xs border rounded text-center"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              const days = parseInt((e.currentTarget as HTMLInputElement).value);
-                              if (days > 0) {
-                                addDaysTo(u, 'trial_end', days);
-                                (e.currentTarget as HTMLInputElement).value = '';
-                              }
-                            }
-                          }}
-                          onBlur={(e) => {
-                            const days = parseInt((e.currentTarget as HTMLInputElement).value);
-                            if (days > 0) {
-                              addDaysTo(u, 'trial_end', days);
-                              (e.currentTarget as HTMLInputElement).value = '';
-                            }
-                          }}
-                        />
+                        {userIsAdmin ? (
+                          <div className="text-xs text-center text-muted-foreground">
+                            Vitalício
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => updateTrialDays(u, -1)}
+                              className="w-6 h-6 text-xs border rounded hover:bg-muted"
+                              disabled={!u.subscriber?.additional_trial_days || u.subscriber.additional_trial_days <= 0}
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              placeholder="+"
+                              className="w-12 px-1 py-1 text-xs border rounded text-center"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  const days = parseInt((e.currentTarget as HTMLInputElement).value);
+                                  if (days && days !== 0) {
+                                    updateTrialDays(u, days);
+                                    (e.currentTarget as HTMLInputElement).value = '';
+                                  }
+                                }
+                              }}
+                              onBlur={(e) => {
+                                const days = parseInt((e.currentTarget as HTMLInputElement).value);
+                                if (days && days !== 0) {
+                                  updateTrialDays(u, days);
+                                  (e.currentTarget as HTMLInputElement).value = '';
+                                }
+                              }}
+                            />
+                            <button
+                              onClick={() => updateTrialDays(u, 1)}
+                              className="w-6 h-6 text-xs border rounded hover:bg-muted"
+                            >
+                              +
+                            </button>
+                          </div>
+                        )}
                         <div className="text-xs text-muted-foreground mt-1">
                           {getTrialDaysDisplay(u)}
                         </div>
                       </td>
                       <td className="py-3 px-2">
-                        <input
-                          type="number"
-                          placeholder="+"
-                          className="w-16 px-2 py-1 text-xs border rounded text-center"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
+                        {userIsAdmin ? (
+                          <div className="text-xs text-center text-muted-foreground">
+                            Vitalício
+                          </div>
+                        ) : (
+                          <input
+                            type="number"
+                            placeholder="+"
+                            className="w-16 px-2 py-1 text-xs border rounded text-center"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                const days = parseInt((e.currentTarget as HTMLInputElement).value);
+                                if (days > 0) {
+                                  addDaysTo(u, 'subscription_end', days);
+                                  (e.currentTarget as HTMLInputElement).value = '';
+                                }
+                              }
+                            }}
+                            onBlur={(e) => {
                               const days = parseInt((e.currentTarget as HTMLInputElement).value);
                               if (days > 0) {
                                 addDaysTo(u, 'subscription_end', days);
                                 (e.currentTarget as HTMLInputElement).value = '';
                               }
-                            }
-                          }}
-                          onBlur={(e) => {
-                            const days = parseInt((e.currentTarget as HTMLInputElement).value);
-                            if (days > 0) {
-                              addDaysTo(u, 'subscription_end', days);
-                              (e.currentTarget as HTMLInputElement).value = '';
-                            }
-                          }}
-                        />
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {u.subscriber?.subscription_end ? `${getDaysRemaining(u.subscriber.subscription_end) || 0}d` : '-'}
-                        </div>
-                      </td>
+                            }}
+                          />
+                        )}
+        <div className="text-xs text-muted-foreground mt-1">
+          {getSubscriptionDaysDisplay(u)}
+        </div>
+      </td>
                       <td className="py-3 px-2">
                         <div className="flex gap-1">
                           {/* Mostrar botão de ativar assinatura apenas se o usuário não for admin */}
