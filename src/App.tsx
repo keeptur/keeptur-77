@@ -22,7 +22,7 @@ import AdminUsersPage from "./pages/admin/AdminUsersPage";
 import AdminPlansPage from "./pages/admin/AdminPlansPage";
 import AdminEmailsPage from "./pages/admin/AdminEmailsPage";
 import SubscriptionPage from "./pages/SubscriptionPage";
-import AdminLogsPage from "./pages/admin/AdminLogsPage";
+
 
 import { UserRoute } from "./components/auth/UserRoute";
 import { PaymentVerifier } from "./components/PaymentVerifier";
@@ -136,7 +136,7 @@ const AppWrapper = () => {
               <Route path="admin/plans" element={<Navigate to="/admin?t=plans" replace />} />
               <Route path="admin/billing" element={<Navigate to="/admin?t=billing" replace />} />
               <Route path="admin/emails" element={<AdminRoute><AdminEmailsPage /></AdminRoute>} />
-              <Route path="admin/logs" element={<Navigate to="/admin?t=logs" replace />} />
+              
             </Route>
           </Routes>
          </BrowserRouter>

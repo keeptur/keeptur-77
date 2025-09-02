@@ -17,7 +17,7 @@ import {
 import {
   LayoutDashboard,
   Users,
-  FileText,
+  
   LogOut,
   CreditCard,
   Mail,
@@ -37,7 +37,6 @@ const navigationItems = [
     { title: "Usuários", url: "/admin?t=users", icon: Users },
     { title: "Planos", url: "/admin?t=plans", icon: Package },
     { title: "E-mails", url: "/admin/emails", icon: Mail },
-    { title: "Logs", url: "/admin?t=logs", icon: FileText },
   ];
 
 export function MondeAppSidebar() {
