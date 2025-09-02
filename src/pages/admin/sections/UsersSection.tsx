@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { usePlanSettings } from "@/hooks/usePlanSettings";
-
 interface ProfileRow {
   id: string;
   email: string;
@@ -55,10 +54,13 @@ type CombinedUser = {
  */
 import { UserManagement } from "@/components/admin/UserManagement";
 import PaymentHistorySection from "./PaymentHistorySection";
-
 export default function UsersSection() {
-  const { toast } = useToast();
-  const { settings: planSettings } = usePlanSettings();
+  const {
+    toast
+  } = useToast();
+  const {
+    settings: planSettings
+  } = usePlanSettings();
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [roles, setRoles] = useState<RoleRow[]>([]);
   const [subscribers, setSubscribers] = useState<SubscriberRow[]>([]);
@@ -71,15 +73,14 @@ export default function UsersSection() {
   // Altere o padrão de true para false para evitar criação acidental de admins
   const [newIsAdmin, setNewIsAdmin] = useState(false);
   const [creating, setCreating] = useState(false);
-
   const reload = async () => {
-    const [ { data: p }, { data: r }, { data: s } ] = await Promise.all([
-      supabase.from("profiles").select("id, email, full_name, created_at"),
-      supabase.from("user_roles").select("user_id, role"),
-       supabase
-         .from("subscribers")
-         .select("id, user_id, email, display_name, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at, updated_at, username, user_email"),
-    ]);
+    const [{
+      data: p
+    }, {
+      data: r
+    }, {
+      data: s
+    }] = await Promise.all([supabase.from("profiles").select("id, email, full_name, created_at"), supabase.from("user_roles").select("user_id, role"), supabase.from("subscribers").select("id, user_id, email, display_name, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at, updated_at, username, user_email")]);
     setProfiles((p || []) as any);
     setRoles((r || []) as any);
     setSubscribers((s || []) as any);
@@ -88,31 +89,47 @@ export default function UsersSection() {
   // Run edge function to merge duplicate subscribers (Monde alias -> real email)
   const consolidateDuplicates = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('merge-subscribers', { body: {} });
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('merge-subscribers', {
+        body: {}
+      });
       if (error) throw error;
       const msg = (data as any)?.message || 'Consolidação executada com sucesso';
-      toast({ title: 'Consolidado', description: msg });
+      toast({
+        title: 'Consolidado',
+        description: msg
+      });
       await reload();
     } catch (e: any) {
       console.error('merge-subscribers error:', e);
-      toast({ title: 'Erro ao consolidar', description: e.message || String(e), variant: 'destructive' });
+      toast({
+        title: 'Erro ao consolidar',
+        description: e.message || String(e),
+        variant: 'destructive'
+      });
     }
   };
-
   const handleCreateUser = async () => {
     if (!newEmail) return;
     setCreating(true);
     try {
-      const { error } = await supabase.functions.invoke('create-admin-user', {
+      const {
+        error
+      } = await supabase.functions.invoke('create-admin-user', {
         body: {
           email: newEmail,
           name: newName,
           // Utiliza o estado newIsAdmin diretamente (padrão false)
-          makeAdmin: newIsAdmin,
-        },
+          makeAdmin: newIsAdmin
+        }
       });
       if (error) throw error;
-      toast({ title: "Usuário criado", description: "Convite enviado por e-mail." });
+      toast({
+        title: "Usuário criado",
+        description: "Convite enviado por e-mail."
+      });
       setOpen(false);
       setNewEmail("");
       setNewName("");
@@ -120,22 +137,20 @@ export default function UsersSection() {
       setNewIsAdmin(false);
       await reload();
     } catch (e: any) {
-      toast({ title: "Erro ao criar usuário", description: e.message || String(e), variant: "destructive" });
+      toast({
+        title: "Erro ao criar usuário",
+        description: e.message || String(e),
+        variant: "destructive"
+      });
     } finally {
       setCreating(false);
     }
   };
-
   useEffect(() => {
     const load = async () => {
       try {
         // Otimizar carregamento com menos campos
-        const [profilesRes, rolesRes, subscribersRes] = await Promise.all([
-          supabase.from("profiles").select("id, email, full_name"),
-          supabase.from("user_roles").select("user_id, role"),
-          supabase.from("subscribers").select("id, user_id, email, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at").limit(500)
-        ]);
-        
+        const [profilesRes, rolesRes, subscribersRes] = await Promise.all([supabase.from("profiles").select("id, email, full_name"), supabase.from("user_roles").select("user_id, role"), supabase.from("subscribers").select("id, user_id, email, subscribed, subscription_tier, trial_start, trial_end, subscription_end, created_at").limit(500)]);
         setProfiles((profilesRes.data || []) as any);
         setRoles((rolesRes.data || []) as any);
         setSubscribers((subscribersRes.data || []) as any);
@@ -155,13 +170,13 @@ export default function UsersSection() {
   const [planFilter, setPlanFilter] = useState<'all' | 'basic' | 'pro' | 'enterprise'>('all');
 
   // Definir isAdmin primeiro
-  const isAdmin = (id: string) => roles.some((r) => r.user_id === id && r.role === 'admin');
+  const isAdmin = (id: string) => roles.some(r => r.user_id === id && r.role === 'admin');
 
   // Determina se um usuário é o super admin (o primeiro admin criado).
   const isSuperAdmin = (id: string): boolean => {
     if (!id || !roles.length) return false;
     // Como `RoleRow` não possui `created_at`, considera-se o primeiro admin encontrado como super admin.
-    const adminRoles = roles.filter((r) => r.role === 'admin');
+    const adminRoles = roles.filter(r => r.role === 'admin');
     return adminRoles.length > 0 && adminRoles[0].user_id === id;
   };
 
@@ -171,12 +186,26 @@ export default function UsersSection() {
    */
   const promote = async (userId: string) => {
     if (!userId) return;
-    const { error } = await supabase.from('user_roles').insert({ user_id: userId, role: 'admin' as any });
+    const {
+      error
+    } = await supabase.from('user_roles').insert({
+      user_id: userId,
+      role: 'admin' as any
+    });
     if (error) {
-      toast({ title: 'Erro ao promover', description: error.message, variant: 'destructive' });
+      toast({
+        title: 'Erro ao promover',
+        description: error.message,
+        variant: 'destructive'
+      });
     } else {
-      setRoles((prev) => [...prev, { user_id: userId, role: 'admin' } as any]);
-      toast({ title: 'Usuário promovido a admin' });
+      setRoles(prev => [...prev, {
+        user_id: userId,
+        role: 'admin'
+      } as any]);
+      toast({
+        title: 'Usuário promovido a admin'
+      });
     }
   };
 
@@ -185,12 +214,20 @@ export default function UsersSection() {
    * também atualiza o estado local de roles.
    */
   const demote = async (userId: string) => {
-    const { error } = await supabase.from('user_roles').delete().eq('user_id', userId).eq('role', 'admin');
+    const {
+      error
+    } = await supabase.from('user_roles').delete().eq('user_id', userId).eq('role', 'admin');
     if (error) {
-      toast({ title: 'Erro ao remover admin', description: error.message, variant: 'destructive' });
+      toast({
+        title: 'Erro ao remover admin',
+        description: error.message,
+        variant: 'destructive'
+      });
     } else {
-      setRoles((prev) => prev.filter((r) => !(r.user_id === userId && r.role === 'admin')));
-      toast({ title: 'Admin removido' });
+      setRoles(prev => prev.filter(r => !(r.user_id === userId && r.role === 'admin')));
+      toast({
+        title: 'Admin removido'
+      });
     }
   };
 
@@ -204,32 +241,39 @@ export default function UsersSection() {
     }
     try {
       const userId = user.id || user.user_id || null;
-      
       if (userId) {
         // Use the delete-user edge function for reliable deletion
-        const { error } = await supabase.functions.invoke('delete-user', {
-          body: { userId }
+        const {
+          error
+        } = await supabase.functions.invoke('delete-user', {
+          body: {
+            userId
+          }
         });
-        
         if (error) throw error;
-        
+
         // Update local state
-        setProfiles((prev) => prev.filter((p) => p.id !== userId && p.email !== user.email));
-        setSubscribers((prev) => prev.filter((s) => s.user_id !== userId && s.email !== user.email));
-        setRoles((prev) => prev.filter((r) => r.user_id !== userId));
+        setProfiles(prev => prev.filter(p => p.id !== userId && p.email !== user.email));
+        setSubscribers(prev => prev.filter(s => s.user_id !== userId && s.email !== user.email));
+        setRoles(prev => prev.filter(r => r.user_id !== userId));
       } else {
         // For users without Supabase ID, remove from subscribers table only
         await supabase.from('subscribers').delete().eq('email', user.email);
-        setSubscribers((prev) => prev.filter((s) => s.email !== user.email));
+        setSubscribers(prev => prev.filter(s => s.email !== user.email));
       }
-      
-      toast({ title: 'Usuário deletado', description: 'Usuário removido completamente do sistema.' });
+      toast({
+        title: 'Usuário deletado',
+        description: 'Usuário removido completamente do sistema.'
+      });
     } catch (e: any) {
       console.error('Delete user error:', e);
-      toast({ title: 'Erro ao deletar usuário', description: e.message || String(e), variant: 'destructive' });
+      toast({
+        title: 'Erro ao deletar usuário',
+        description: e.message || String(e),
+        variant: 'destructive'
+      });
     }
   };
-
   const getStatus = (u: CombinedUser): 'active' | 'trial' | 'inactive' => {
     const uid = u.id || u.user_id || '';
     if (uid && isAdmin(uid)) return 'active'; // Super admin sempre ativo/vitalício
@@ -243,19 +287,18 @@ export default function UsersSection() {
     if (inValidTrial) return 'trial';
     return 'inactive';
   };
-
   const combinedUsers = useMemo<CombinedUser[]>(() => {
     const byEmail = new Map<string, CombinedUser>();
-    (subscribers || []).forEach((su) => {
+    (subscribers || []).forEach(su => {
       byEmail.set(su.email, {
         id: su.user_id || null,
         user_id: su.user_id,
         email: su.email,
         full_name: null,
-        subscriber: su,
+        subscriber: su
       });
     });
-    (profiles || []).forEach((pr) => {
+    (profiles || []).forEach(pr => {
       const existing = byEmail.get(pr.email);
       if (existing) {
         existing.id = pr.id;
@@ -265,7 +308,7 @@ export default function UsersSection() {
           id: pr.id,
           user_id: pr.id,
           email: pr.email,
-          full_name: pr.full_name,
+          full_name: pr.full_name
         });
       }
     });
@@ -282,18 +325,17 @@ export default function UsersSection() {
     if (loginEmail) return loginEmail;
     return getBillingEmail(u);
   };
-
   const filtered = useMemo(() => {
     let list = combinedUsers;
     if (q) {
       const s = q.toLowerCase();
-      list = list.filter((u) => u.email?.toLowerCase().includes(s) || (u.full_name || '').toLowerCase().includes(s));
+      list = list.filter(u => u.email?.toLowerCase().includes(s) || (u.full_name || '').toLowerCase().includes(s));
     }
     if (statusFilter !== 'all') {
-      list = list.filter((u) => getStatus(u) === statusFilter);
+      list = list.filter(u => getStatus(u) === statusFilter);
     }
     if (planFilter !== 'all') {
-      list = list.filter((u) => (u.subscriber?.subscription_tier || '').toLowerCase() === planFilter);
+      list = list.filter(u => (u.subscriber?.subscription_tier || '').toLowerCase() === planFilter);
     }
 
     // Dedup by email prefix: prefer REAL email over Monde alias
@@ -313,36 +355,29 @@ export default function UsersSection() {
     }
     return Array.from(byPrefix.values());
   }, [q, combinedUsers, statusFilter, planFilter]);
-
-
   const getDaysRemaining = (dateStr: string | null | undefined) => {
     if (!dateStr) return null;
     const now = new Date().getTime();
     const target = new Date(dateStr).getTime();
     return Math.ceil((target - now) / (1000 * 60 * 60 * 24));
   };
-
   const getTrialDaysDisplay = (user: CombinedUser) => {
     // Para admins, mostrar "Vitalício"
     if (user.id && isAdmin(user.id)) {
       return "Vitalício Keeptur Admin";
     }
-    
     const baseDays = planSettings?.trial_days || 5;
     const additionalDays = user.subscriber?.additional_trial_days || 0;
-    
     if (additionalDays > 0) {
       return `${baseDays} + ${additionalDays} dias`;
     }
     return `${baseDays} dias`;
   };
-
   const getSubscriptionDaysDisplay = (user: CombinedUser) => {
     // Para admins, mostrar "Vitalício"
     if (user.id && isAdmin(user.id)) {
       return "Vitalício Keeptur Admin";
     }
-    
     const remainingDays = getDaysRemaining(user.subscriber?.subscription_end);
     return remainingDays !== null ? `${remainingDays} dias` : "-";
   };
@@ -355,44 +390,36 @@ export default function UsersSection() {
     try {
       // Não permitir modificar trial de admins
       if (user.id && isAdmin(user.id)) {
-        toast({ title: 'Aviso', description: 'Admins têm assinatura vitalícia e não podem ter trial modificado.', variant: 'destructive' });
+        toast({
+          title: 'Aviso',
+          description: 'Admins têm assinatura vitalícia e não podem ter trial modificado.',
+          variant: 'destructive'
+        });
         return;
       }
-
-      const sub = subscribers.find((s) => s.email === user.email) || null;
-      
+      const sub = subscribers.find(s => s.email === user.email) || null;
       if (sub) {
         // Atualizar additional_trial_days
         const newAdditionalDays = Math.max(0, (sub.additional_trial_days || 0) + days);
-        
+
         // Calcular nova data baseada nos dias base + dias adicionais
         const baseDays = planSettings?.trial_days || 5;
         const totalDays = baseDays + newAdditionalDays;
         const trialStart = sub.trial_start ? new Date(sub.trial_start) : new Date();
         const newTrialEnd = addDays(trialStart, totalDays).toISOString();
-        
-        const { error } = await supabase
-          .from('subscribers')
-          .update({ 
-            trial_end: newTrialEnd,
-            additional_trial_days: newAdditionalDays
-          })
-          .eq('id', sub.id);
-          
+        const {
+          error
+        } = await supabase.from('subscribers').update({
+          trial_end: newTrialEnd,
+          additional_trial_days: newAdditionalDays
+        }).eq('id', sub.id);
         if (error) throw error;
-        
-        setSubscribers((prev) =>
-          prev.map((x) =>
-            x.id === sub.id
-              ? ({
-                  ...x,
-                  trial_end: newTrialEnd,
-                  additional_trial_days: newAdditionalDays,
-                  updated_at: new Date().toISOString(),
-                } as SubscriberRow)
-              : x,
-          ),
-        );
+        setSubscribers(prev => prev.map(x => x.id === sub.id ? {
+          ...x,
+          trial_end: newTrialEnd,
+          additional_trial_days: newAdditionalDays,
+          updated_at: new Date().toISOString()
+        } as SubscriberRow : x));
       } else {
         // Criar novo subscriber com trial
         const baseDays = planSettings?.trial_days || 5;
@@ -400,7 +427,6 @@ export default function UsersSection() {
         const totalDays = baseDays + additionalDays;
         const trialStart = new Date();
         const trialEnd = addDays(trialStart, totalDays);
-        
         const payload = {
           email: user.email,
           user_id: user.id || user.user_id || null,
@@ -409,78 +435,82 @@ export default function UsersSection() {
           trial_end: trialEnd.toISOString(),
           additional_trial_days: additionalDays
         };
-        
-        const { data, error } = await supabase
-          .from('subscribers')
-          .insert(payload)
-          .select()
-          .single();
-          
+        const {
+          data,
+          error
+        } = await supabase.from('subscribers').insert(payload).select().single();
         if (error) throw error;
-        if (data) setSubscribers((prev) => [...prev, data as SubscriberRow]);
+        if (data) setSubscribers(prev => [...prev, data as SubscriberRow]);
       }
-      
       const action = days > 0 ? 'adicionados' : 'removidos';
-      toast({ title: 'Trial atualizado', description: `${Math.abs(days)} dias ${action} do trial.` });
+      toast({
+        title: 'Trial atualizado',
+        description: `${Math.abs(days)} dias ${action} do trial.`
+      });
     } catch (e: any) {
-      toast({ title: 'Erro ao atualizar trial', description: e.message, variant: 'destructive' });
+      toast({
+        title: 'Erro ao atualizar trial',
+        description: e.message,
+        variant: 'destructive'
+      });
     }
   }
-
   async function addDaysTo(user: CombinedUser, field: 'subscription_end', days: number) {
     try {
       // Não permitir modificar assinatura de admins
       if (user.id && isAdmin(user.id)) {
-        toast({ title: 'Aviso', description: 'Admins têm assinatura vitalícia e não podem ser modificados.', variant: 'destructive' });
+        toast({
+          title: 'Aviso',
+          description: 'Admins têm assinatura vitalícia e não podem ser modificados.',
+          variant: 'destructive'
+        });
         return;
       }
-
-      const sub = subscribers.find((s) => s.email === user.email) || null;
+      const sub = subscribers.find(s => s.email === user.email) || null;
       const baseDateStr = sub?.[field] || null;
       const base = baseDateStr ? new Date(baseDateStr) : new Date();
       const newDate = addDays(base, days).toISOString();
-      
       if (sub) {
-        const { error } = await supabase
-          .from('subscribers')
-          .update({ [field]: newDate, subscribed: true })
-          .eq('id', sub.id);
+        const {
+          error
+        } = await supabase.from('subscribers').update({
+          [field]: newDate,
+          subscribed: true
+        }).eq('id', sub.id);
         if (error) throw error;
-        setSubscribers((prev) =>
-          prev.map((x) =>
-            x.id === sub.id
-              ? ({
-                  ...x,
-                  [field]: newDate,
-                  subscribed: true,
-                  updated_at: new Date().toISOString(),
-                } as SubscriberRow)
-              : x,
-          ),
-        );
+        setSubscribers(prev => prev.map(x => x.id === sub.id ? {
+          ...x,
+          [field]: newDate,
+          subscribed: true,
+          updated_at: new Date().toISOString()
+        } as SubscriberRow : x));
       } else {
         const payload: any = {
           email: user.email,
           user_id: user.id || user.user_id || null,
           subscribed: true,
-          [field]: newDate,
+          [field]: newDate
         };
-        const { data, error } = await supabase
-          .from('subscribers')
-          .insert(payload)
-          .select()
-          .single();
+        const {
+          data,
+          error
+        } = await supabase.from('subscribers').insert(payload).select().single();
         if (error) throw error;
-        if (data) setSubscribers((prev) => [...prev, data as SubscriberRow]);
+        if (data) setSubscribers(prev => [...prev, data as SubscriberRow]);
       }
-      toast({ title: 'Assinatura atualizada', description: `+${days} dias na assinatura.` });
+      toast({
+        title: 'Assinatura atualizada',
+        description: `+${days} dias na assinatura.`
+      });
     } catch (e: any) {
-      toast({ title: 'Erro ao atualizar assinatura', description: e.message, variant: 'destructive' });
+      toast({
+        title: 'Erro ao atualizar assinatura',
+        description: e.message,
+        variant: 'destructive'
+      });
     }
   }
-
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       {/* User Management Component */}
       <UserManagement />
       
@@ -497,24 +527,16 @@ export default function UsersSection() {
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex-1">
-          <Input placeholder="Buscar por nome ou email..." value={q} onChange={(e) => setQ(e.target.value)} className="w-full" />
+          <Input placeholder="Buscar por nome ou email..." value={q} onChange={e => setQ(e.target.value)} className="w-full" />
         </div>
         <div className="flex gap-2">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="px-3 py-1 text-xs rounded-button bg-card border text-muted-foreground"
-          >
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="px-3 py-1 text-xs rounded-button bg-card border text-muted-foreground">
             <option value="all">Todos</option>
             <option value="active">Ativo</option>
             <option value="trial">Trial</option>
             <option value="inactive">Inativo</option>
           </select>
-          <select
-            value={planFilter}
-            onChange={(e) => setPlanFilter(e.target.value as any)}
-            className="px-3 py-1 text-xs rounded-button bg-card border text-muted-foreground"
-          >
+          <select value={planFilter} onChange={e => setPlanFilter(e.target.value as any)} className="px-3 py-1 text-xs rounded-button bg-card border text-muted-foreground">
             <option value="all">Planos</option>
             <option value="basic">Básico</option>
             <option value="pro">Pro</option>
@@ -539,80 +561,68 @@ export default function UsersSection() {
               </tr>
             </thead>
             <tbody>
-              {loading && (
-                <tr>
+              {loading && <tr>
           <td className="py-6 px-2 text-sm text-muted-foreground" colSpan={9}>
             Carregando...
           </td>
-                </tr>
-              )}
-              {!loading && filtered.length === 0 && (
-                <tr>
+                </tr>}
+              {!loading && filtered.length === 0 && <tr>
                   <td className="py-6 px-2 text-sm text-muted-foreground" colSpan={9}>
                     Nenhum usuário encontrado.
                   </td>
-                </tr>
-              )}
-              {!loading &&
-                filtered.map((u) => {
-                  const initials = (u.full_name || u.email)
-                    .split(/\s|@/)
-                    .filter(Boolean)
-                    .slice(0, 2)
-                    .map((s) => s[0])
-                    .join('')
-                    .toUpperCase();
-                  const idShort = (u.id || u.user_id || '').slice(0, 8) || '—';
-                  const status = getStatus(u);
-                  // Determinar se o usuário é admin. Admin é tratado como status próprio para
-                  // exibição, mas ainda filtra como ativo.
-                  const userIsAdmin = !!(u.id && isAdmin(u.id));
-                  const planRaw = (u.subscriber?.subscription_tier || '').toLowerCase();
-                  const plan = planRaw ? (planRaw === 'pro' ? 'Pro' : planRaw === 'enterprise' ? 'Enterprise' : 'Básico') : '—';
-                  const subCreated = u.subscriber?.created_at || undefined;
-                  const profileCreated = profiles.find((p) => p.email === u.email)?.created_at as string | undefined;
-                  const dateStr = subCreated || profileCreated ? new Date(subCreated || (profileCreated as string)).toLocaleDateString() : '—';
-                  const badgeStyle = (kind: 'plan-pro' | 'plan-enterprise' | 'plan-basic' | 'status-active' | 'status-trial' | 'status-inactive' | 'status-admin') => {
-                    switch (kind) {
-                      case 'plan-pro':
-                        return {
-                          backgroundColor: 'hsl(var(--warning) / 0.15)',
-                          color: 'hsl(var(--warning))',
-                        } as React.CSSProperties;
-                      case 'plan-enterprise':
-                        return {
-                          backgroundColor: 'hsl(var(--primary) / 0.15)',
-                          color: 'hsl(var(--primary))',
-                        } as React.CSSProperties;
-                      case 'plan-basic':
-                        return {
-                          backgroundColor: 'hsl(var(--muted))',
-                          color: 'hsl(var(--foreground))',
-                        } as React.CSSProperties;
-                      case 'status-active':
-                        return {
-                          backgroundColor: 'hsl(var(--success) / 0.15)',
-                          color: 'hsl(var(--success))',
-                        } as React.CSSProperties;
-                      case 'status-admin':
-                        return {
-                          backgroundColor: 'hsl(var(--secondary) / 0.15)',
-                          color: 'hsl(var(--secondary))',
-                        } as React.CSSProperties;
-                      case 'status-trial':
-                        return {
-                          backgroundColor: 'hsl(var(--primary) / 0.15)',
-                          color: 'hsl(var(--primary))',
-                        } as React.CSSProperties;
-                      default:
-                        return {
-                          backgroundColor: 'hsl(var(--muted))',
-                          color: 'hsl(var(--muted-foreground))',
-                        } as React.CSSProperties;
-                    }
-                  };
-                  return (
-                    <tr key={u.email} className="border-b last:border-b-0">
+                </tr>}
+              {!loading && filtered.map(u => {
+              const initials = (u.full_name || u.email).split(/\s|@/).filter(Boolean).slice(0, 2).map(s => s[0]).join('').toUpperCase();
+              const idShort = (u.id || u.user_id || '').slice(0, 8) || '—';
+              const status = getStatus(u);
+              // Determinar se o usuário é admin. Admin é tratado como status próprio para
+              // exibição, mas ainda filtra como ativo.
+              const userIsAdmin = !!(u.id && isAdmin(u.id));
+              const planRaw = (u.subscriber?.subscription_tier || '').toLowerCase();
+              const plan = planRaw ? planRaw === 'pro' ? 'Pro' : planRaw === 'enterprise' ? 'Enterprise' : 'Básico' : '—';
+              const subCreated = u.subscriber?.created_at || undefined;
+              const profileCreated = profiles.find(p => p.email === u.email)?.created_at as string | undefined;
+              const dateStr = subCreated || profileCreated ? new Date(subCreated || profileCreated as string).toLocaleDateString() : '—';
+              const badgeStyle = (kind: 'plan-pro' | 'plan-enterprise' | 'plan-basic' | 'status-active' | 'status-trial' | 'status-inactive' | 'status-admin') => {
+                switch (kind) {
+                  case 'plan-pro':
+                    return {
+                      backgroundColor: 'hsl(var(--warning) / 0.15)',
+                      color: 'hsl(var(--warning))'
+                    } as React.CSSProperties;
+                  case 'plan-enterprise':
+                    return {
+                      backgroundColor: 'hsl(var(--primary) / 0.15)',
+                      color: 'hsl(var(--primary))'
+                    } as React.CSSProperties;
+                  case 'plan-basic':
+                    return {
+                      backgroundColor: 'hsl(var(--muted))',
+                      color: 'hsl(var(--foreground))'
+                    } as React.CSSProperties;
+                  case 'status-active':
+                    return {
+                      backgroundColor: 'hsl(var(--success) / 0.15)',
+                      color: 'hsl(var(--success))'
+                    } as React.CSSProperties;
+                  case 'status-admin':
+                    return {
+                      backgroundColor: 'hsl(var(--secondary) / 0.15)',
+                      color: 'hsl(var(--secondary))'
+                    } as React.CSSProperties;
+                  case 'status-trial':
+                    return {
+                      backgroundColor: 'hsl(var(--primary) / 0.15)',
+                      color: 'hsl(var(--primary))'
+                    } as React.CSSProperties;
+                  default:
+                    return {
+                      backgroundColor: 'hsl(var(--muted))',
+                      color: 'hsl(var(--muted-foreground))'
+                    } as React.CSSProperties;
+                }
+              };
+              return <tr key={u.email} className="border-b last:border-b-0">
                       <td className="py-3 px-2">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground text-xs font-medium grid place-items-center">
@@ -626,105 +636,65 @@ export default function UsersSection() {
                       <td className="py-3 px-2 text-sm break-words whitespace-normal max-w-[260px]">{getBillingEmail(u)}</td>
                       <td className="py-3 px-2 text-sm break-words whitespace-normal max-w-[260px]">{getLoginEmail(u) || '-'}</td>
                       <td className="py-3 px-2">
-                        <span
-                          className="px-2 py-1 rounded-full text-xs font-medium"
-                          style={plan === 'Pro' ? badgeStyle('plan-pro') : plan === 'Enterprise' ? badgeStyle('plan-enterprise') : badgeStyle('plan-basic')}
-                        >
+                        <span className="px-2 py-1 rounded-full text-xs font-medium" style={plan === 'Pro' ? badgeStyle('plan-pro') : plan === 'Enterprise' ? badgeStyle('plan-enterprise') : badgeStyle('plan-basic')}>
                           {plan}
                         </span>
                       </td>
                       <td className="py-3 px-2">
                         {(() => {
-                          const label = userIsAdmin ? 'Admin' : status === 'active' ? 'Ativo' : status === 'trial' ? 'Trial' : 'Inativo';
-                          const style = userIsAdmin
-                            ? badgeStyle('status-admin')
-                            : status === 'active'
-                            ? badgeStyle('status-active')
-                            : status === 'trial'
-                            ? badgeStyle('status-trial')
-                            : badgeStyle('status-inactive');
-                          return (
-                            <span className="px-2 py-1 rounded-full text-xs font-medium" style={style}>
+                    const label = userIsAdmin ? 'Admin' : status === 'active' ? 'Ativo' : status === 'trial' ? 'Trial' : 'Inativo';
+                    const style = userIsAdmin ? badgeStyle('status-admin') : status === 'active' ? badgeStyle('status-active') : status === 'trial' ? badgeStyle('status-trial') : badgeStyle('status-inactive');
+                    return <span className="px-2 py-1 rounded-full text-xs font-medium" style={style}>
                               {label}
-                            </span>
-                          );
-                        })()}
+                            </span>;
+                  })()}
                       </td>
                       <td className="py-3 px-2">
-                        {userIsAdmin ? (
-                          <div className="text-xs text-center text-muted-foreground">
+                        {userIsAdmin ? <div className="text-xs text-center text-muted-foreground">
                             Vitalício
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => updateTrialDays(u, -1)}
-                              className="w-6 h-6 text-xs border rounded hover:bg-muted"
-                              disabled={!u.subscriber?.additional_trial_days || u.subscriber.additional_trial_days <= 0}
-                            >
+                          </div> : <div className="flex items-center gap-1">
+                            <button onClick={() => updateTrialDays(u, -1)} className="w-6 h-6 text-xs border rounded hover:bg-muted" disabled={!u.subscriber?.additional_trial_days || u.subscriber.additional_trial_days <= 0}>
                               -
                             </button>
-                            <input
-                              type="number"
-                              placeholder="+"
-                              className="w-12 px-1 py-1 text-xs border rounded text-center"
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  const days = parseInt((e.currentTarget as HTMLInputElement).value);
-                                  if (days && days !== 0) {
-                                    updateTrialDays(u, days);
-                                    (e.currentTarget as HTMLInputElement).value = '';
-                                  }
-                                }
-                              }}
-                              onBlur={(e) => {
-                                const days = parseInt((e.currentTarget as HTMLInputElement).value);
-                                if (days && days !== 0) {
-                                  updateTrialDays(u, days);
-                                  (e.currentTarget as HTMLInputElement).value = '';
-                                }
-                              }}
-                            />
-                            <button
-                              onClick={() => updateTrialDays(u, 1)}
-                              className="w-6 h-6 text-xs border rounded hover:bg-muted"
-                            >
+                            <input type="number" placeholder="+" className="w-12 px-1 py-1 text-xs border rounded text-center" onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        const days = parseInt((e.currentTarget as HTMLInputElement).value);
+                        if (days && days !== 0) {
+                          updateTrialDays(u, days);
+                          (e.currentTarget as HTMLInputElement).value = '';
+                        }
+                      }
+                    }} onBlur={e => {
+                      const days = parseInt((e.currentTarget as HTMLInputElement).value);
+                      if (days && days !== 0) {
+                        updateTrialDays(u, days);
+                        (e.currentTarget as HTMLInputElement).value = '';
+                      }
+                    }} />
+                            <button onClick={() => updateTrialDays(u, 1)} className="w-6 h-6 text-xs border rounded hover:bg-muted">
                               +
                             </button>
-                          </div>
-                        )}
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {getTrialDaysDisplay(u)}
-                        </div>
+                          </div>}
+                        
                       </td>
                       <td className="py-3 px-2">
-                        {userIsAdmin ? (
-                          <div className="text-xs text-center text-muted-foreground">
+                        {userIsAdmin ? <div className="text-xs text-center text-muted-foreground">
                             Vitalício
-                          </div>
-                        ) : (
-                          <input
-                            type="number"
-                            placeholder="+"
-                            className="w-16 px-2 py-1 text-xs border rounded text-center"
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                const days = parseInt((e.currentTarget as HTMLInputElement).value);
-                                if (days > 0) {
-                                  addDaysTo(u, 'subscription_end', days);
-                                  (e.currentTarget as HTMLInputElement).value = '';
-                                }
-                              }
-                            }}
-                            onBlur={(e) => {
-                              const days = parseInt((e.currentTarget as HTMLInputElement).value);
-                              if (days > 0) {
-                                addDaysTo(u, 'subscription_end', days);
-                                (e.currentTarget as HTMLInputElement).value = '';
-                              }
-                            }}
-                          />
-                        )}
+                          </div> : <input type="number" placeholder="+" className="w-16 px-2 py-1 text-xs border rounded text-center" onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      const days = parseInt((e.currentTarget as HTMLInputElement).value);
+                      if (days > 0) {
+                        addDaysTo(u, 'subscription_end', days);
+                        (e.currentTarget as HTMLInputElement).value = '';
+                      }
+                    }
+                  }} onBlur={e => {
+                    const days = parseInt((e.currentTarget as HTMLInputElement).value);
+                    if (days > 0) {
+                      addDaysTo(u, 'subscription_end', days);
+                      (e.currentTarget as HTMLInputElement).value = '';
+                    }
+                  }} />}
         <div className="text-xs text-muted-foreground mt-1">
           {getSubscriptionDaysDisplay(u)}
         </div>
@@ -732,40 +702,26 @@ export default function UsersSection() {
                       <td className="py-3 px-2">
                         <div className="flex gap-1">
                           {/* Mostrar botão de ativar assinatura apenas se o usuário não for admin */}
-                          {!(u.id && isAdmin(u.id)) && (
-                            <Button
-                              onClick={() => addDaysTo(u, 'subscription_end', 365)}
-                              variant="outline"
-                              size="sm"
-                              className="text-xs px-2 py-1 h-auto"
-                            >
+                          {!(u.id && isAdmin(u.id)) && <Button onClick={() => addDaysTo(u, 'subscription_end', 365)} variant="outline" size="sm" className="text-xs px-2 py-1 h-auto">
                               Ativar
-                            </Button>
-                          )}
+                            </Button>}
                           {/* Mostrar botão Admin apenas se tiver id (usuário do Supabase) e ainda não for admin */}
-                          {u.id && !isAdmin(u.id) && (
-                            <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => promote(u.id!)}>
+                          {u.id && !isAdmin(u.id) && <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => promote(u.id!)}>
                               Admin
-                            </Button>
-                          )}
+                            </Button>}
                           {/* Mostrar botão Remover papel admin apenas se usuário for admin e não for super admin */}
-                          {u.id && isAdmin(u.id) && !isSuperAdmin(u.id) && (
-                            <Button size="sm" variant="destructive" className="h-6 px-2 text-xs" onClick={() => demote(u.id!)}>
+                          {u.id && isAdmin(u.id) && !isSuperAdmin(u.id) && <Button size="sm" variant="destructive" className="h-6 px-2 text-xs" onClick={() => demote(u.id!)}>
                               Remover
-                            </Button>
-                          )}
+                            </Button>}
                           {/* Botão para deletar usuário. Ocultar para super admin */}
-                          {!isSuperAdmin(u.id || '') && (
-                            <Button size="sm" variant="destructive" className="h-6 px-2 text-xs" onClick={() => deleteUser(u)}>
+                          {!isSuperAdmin(u.id || '') && <Button size="sm" variant="destructive" className="h-6 px-2 text-xs" onClick={() => deleteUser(u)}>
                               Excluir
-                            </Button>
-                          )}
+                            </Button>}
                         </div>
                       </td>
                       <td className="py-3 px-2 text-xs text-muted-foreground">{dateStr}</td>
-                    </tr>
-                  );
-                })}
+                    </tr>;
+            })}
             </tbody>
           </table>
         </div>
@@ -779,14 +735,14 @@ export default function UsersSection() {
           <div className="space-y-4">
             <div>
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="usuario@exemplo.com" />
+              <Input id="email" type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="usuario@exemplo.com" />
             </div>
             <div>
               <Label htmlFor="name">Nome (opcional)</Label>
-              <Input id="name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nome do usuário" />
+              <Input id="name" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nome do usuário" />
             </div>
             <div className="flex items-center space-x-2">
-              <input id="admin" type="checkbox" checked={newIsAdmin} onChange={(e) => setNewIsAdmin(e.target.checked)} />
+              <input id="admin" type="checkbox" checked={newIsAdmin} onChange={e => setNewIsAdmin(e.target.checked)} />
               <Label htmlFor="admin">Criar como administrador</Label>
             </div>
           </div>
@@ -800,6 +756,5 @@ export default function UsersSection() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  );
+    </div>;
 }
